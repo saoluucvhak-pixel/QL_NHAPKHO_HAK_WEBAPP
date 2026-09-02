@@ -1659,23 +1659,26 @@
       if (pendingFiles.length === 0) { toast('Vui lòng chọn ít nhất 1 file cân (.xls/.xlsx).', false); return; }
       showOverlay('Đang tải file lên & đối soát…');
       try {
-        let lastResult = null;
-        for (const file of pendingFiles){
-          const base64 = await fileToBase64(file);
-          lastResult = await runServer('step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name });
-        }
+        // FIX #25: TRƯỚC ĐÂY gọi step1_PreviewDraft riêng cho TỪNG file rồi chỉ
+        // giữ lại kết quả của LẦN GỌI CUỐI CÙNG - nếu chọn nhiều file cùng lúc,
+        // dữ liệu của các file trước đó bị mất khỏi bảng xem trước. Nay gửi TẤT
+        // CẢ file trong 1 lần gọi duy nhất để server gộp đúng toàn bộ dữ liệu.
+        const filesPayload = await Promise.all(
+          pendingFiles.map(async file => ({ base64: await fileToBase64(file), mimeType: file.type || 'application/vnd.ms-excel', name: file.name }))
+        );
+        const result = await runServer('step1_PreviewDraft', filesPayload);
         // Bảo vệ: nếu vì lý do nào đó server không trả về kết quả hợp lệ (VD phiên bản
         // web app đang chạy chưa phải bản mới nhất, hoặc quá thời gian xử lý), báo rõ
         // ràng thay vì để lỗi JS khó hiểu "Cannot read properties of null".
-        if (!lastResult || typeof lastResult.status === 'undefined') {
+        if (!result || typeof result.status === 'undefined') {
           toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
           return;
         }
-        if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
-        state.previewData = lastResult.data;
+        if (result.status !== 'success') { toast(result.message, false); return; }
+        state.previewData = result.data;
         renderPreview();
         pendingFiles = []; fileInput.value = ''; renderFileList();
-        toast('Đã xem trước ' + lastResult.data.length + ' dòng.', true);
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
@@ -3641,20 +3644,21 @@
       const khoNhapMacDinh = document.getElementById('xh_khoNhapMacDinh').value;
       showOverlay('Đang tải file lên & đối soát…');
       try {
-        let lastResult = null;
-        for (const file of xhPendingFiles){
-          const base64 = await fileToBase64(file);
-          lastResult = await runServer('XH_step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name }, khoXuatMacDinh, khoNhapMacDinh);
-        }
-        if (!lastResult || typeof lastResult.status === 'undefined') {
+        // FIX #25: gửi TẤT CẢ file trong 1 lần gọi duy nhất (xem chú thích tương
+        // tự ở btnPreview) thay vì chỉ giữ lại kết quả của file cuối cùng.
+        const filesPayload = await Promise.all(
+          xhPendingFiles.map(async file => ({ base64: await fileToBase64(file), mimeType: file.type || 'application/vnd.ms-excel', name: file.name }))
+        );
+        const result = await runServer('XH_step1_PreviewDraft', filesPayload, khoXuatMacDinh, khoNhapMacDinh);
+        if (!result || typeof result.status === 'undefined') {
           toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
           return;
         }
-        if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
-        state.xhPreviewData = lastResult.data;
+        if (result.status !== 'success') { toast(result.message, false); return; }
+        state.xhPreviewData = result.data;
         xhRenderPreview();
         xhPendingFiles = []; xhFileInput.value = ''; xhRenderFileList();
-        toast('Đã xem trước ' + lastResult.data.length + ' dòng.', true);
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
