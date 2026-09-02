@@ -446,51 +446,6 @@ function downloadMisaExcel() {
   } catch (e) { return { status: "error", message: "Lỗi tạo file tải: " + e.toString() }; }
 }
 
-function exportToExcel(fromDate, toDate) {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
-    const fullData = sheet.getDataRange().getValues();
-    if(fullData.length <= 1) return { status: "error", message: "Sheet dữ liệu tổng hợp trống!" };
-
-    const header = fullData[0];
-    const skipIndexes = [13, 14, 16, 18, 20, 21, 26, 27];
-    const keepIndexes = header.map((_, i) => i).filter(i => !skipIndexes.includes(i));
-
-    const start = fromDate ? new Date(fromDate + "T00:00:00+07:00") : null;
-    const end = toDate ? new Date(toDate + "T23:59:59+07:00") : null;
-
-    const filtered = fullData.slice(1).filter(row => {
-      let d = parseDate(row[1]); if (!start || !end) return true;
-      return d && d >= start && d <= end;
-    }).map(row => {
-      return keepIndexes.map(i => { if (i === 7) return '="' + String(row[i] || "").trim() + '"'; return row[i]; });
-    });
-
-    if (filtered.length === 0) return { status: "error", message: "Không tìm thấy dữ liệu nào trong khoảng thời gian đã chọn!" };
-
-    const newHeader = keepIndexes.map(i => header[i]);
-    const tempSS = SpreadsheetApp.create("Bao_Cao_Tong_Hop_" + (fromDate || "All"));
-    const tempSheet = tempSS.getSheets()[0];
-    tempSheet.getRange(1, 1, 1, newHeader.length).setValues([newHeader]);
-    tempSheet.getRange(2, 1, filtered.length, newHeader.length).setValues(filtered);
-
-    const numRows = filtered.length; const getColPos = (oldIdx) => keepIndexes.indexOf(oldIdx) + 1;
-    [8, 9, 19, 23, 25].forEach(oldIdx => { let col = getColPos(oldIdx); if (col > 0) tempSheet.getRange(2, col, numRows, 1).setNumberFormat("#,##0"); });
-    const _rf3 = REGION_FORMAT();
-    [2, 4].forEach(oldIdx => { let col = getColPos(oldIdx); if (col > 0) tempSheet.getRange(2, col, numRows, 1).setNumberFormat(_rf3.TIME_FMT); });
-    let colB = getColPos(1); if (colB > 0) tempSheet.getRange(2, colB, numRows, 1).setNumberFormat(_rf3.DATE_FMT);
-    let colH = getColPos(7); if (colH > 0) tempSheet.getRange(2, colH, numRows, 1).setNumberFormat("@");
-
-    tempSheet.getRange(1, 1, 1, newHeader.length).setFontWeight("bold").setBackground("#B7B7B7").setHorizontalAlignment("center");
-    const tempFile = DriveApp.getFileById(tempSS.getId());
-    DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(tempFile);
-    DriveApp.getRootFolder().removeFile(tempFile);
-
-    return { status: "success", url: "https://docs.google.com/spreadsheets/d/" + tempSS.getId() + "/export?format=xlsx" };
-  } catch (e) { return { status: "error", message: e.toString() }; }
-}
-
 /*********************************************************
  * PHẦN KỸ THUẬT NGẦM CHỐNG TREO & SỬA LỖI ĐỊNH DẠNG NGÀY
  *********************************************************/
@@ -2564,6 +2519,15 @@ function xuLySuaXoaGiaoDich(dataEdit) {
     }
     return "❌ Không tìm thấy.";
   } else {
+    // FIX: nếu client gửi hanhDong="SUA" (đang sửa 1 phiếu có sẵn) nhưng không còn
+    // tìm thấy đúng maPhieu đó trên sheet (VD: người khác vừa xóa phiếu này ở giữa
+    // lúc mở form sửa và lúc bấm Lưu), TRƯỚC ĐÂY sẽ rơi thẳng xuống nhánh tạo phiếu
+    // MỚI bên dưới (vì chỉ nhánh "rowIdx > -1 && hanhDong === SUA" mới đi vào update,
+    // còn lại đều bị coi là "thêm mới") — âm thầm tạo ra 1 phiếu trùng thay vì báo
+    // lỗi rõ ràng cho người dùng biết phiếu gốc đã không còn.
+    if (dataEdit.hanhDong === "SUA" && rowIdx === -1) {
+      return "❌ Không tìm thấy phiếu " + dataEdit.maPhieu + " để cập nhật (có thể đã bị xóa). Vui lòng tải lại danh sách và thử lại.";
+    }
     var ngay = new Date(dataEdit.ngay);
     var thongSo = layThongSoVaTieuHaoCache(ngay, arrKyCache);
     var mt = parseFloat(dataEdit.khoiLuongMT) || 0;
