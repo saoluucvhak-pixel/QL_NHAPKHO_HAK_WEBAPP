@@ -3011,8 +3011,8 @@
           }).join('');
 
           let phanTrangHTML = renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-            `taiDanhSachDoKho('${tuNgay}','${denNgay}',${trangHienTai - 1})`,
-            `taiDanhSachDoKho('${tuNgay}','${denNgay}',${trangHienTai + 1})`);
+            `taiDanhSachDoKho('${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai - 1})`,
+            `taiDanhSachDoKho('${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai + 1})`);
           
           renderScreen(`
             <div class="form-container">
@@ -3116,11 +3116,11 @@
 
           let phanTrangHTML = laXuatBan
             ? renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai - 1},'${htTuNgay}','${htDenNgay}')`,
-                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai + 1},'${htTuNgay}','${htDenNgay}')`)
+                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai - 1},'${jsAttr(htTuNgay)}','${jsAttr(htDenNgay)}')`,
+                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai + 1},'${jsAttr(htTuNgay)}','${jsAttr(htDenNgay)}')`)
             : renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-                `moFormGiaoDich('${loai}','${tab}','${tuNgay}','${denNgay}',${trangHienTai - 1})`,
-                `moFormGiaoDich('${loai}','${tab}','${tuNgay}','${denNgay}',${trangHienTai + 1})`);
+                `moFormGiaoDich('${loai}','${tab}','${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai - 1})`,
+                `moFormGiaoDich('${loai}','${tab}','${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai + 1})`);
 
           if (laXuatBan) {
             renderFormXuatBan(loai, tab, danhSach, khoOptions, todayStr, placeholderDoKho, phanTrangHTML, htTuNgay, htDenNgay);

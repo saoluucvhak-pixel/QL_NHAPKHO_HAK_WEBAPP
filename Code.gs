@@ -2312,9 +2312,16 @@ function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, op
 
 function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
   try {
-    var idFileCan = "1vqMVxccBA7zlAMHrGsVBydGFwZJ6QuDZW10zJ74V29g";
-    var ssCan = SpreadsheetApp.openById(idFileCan);
-    var sheetCan = ssCan.getSheetByName("PhieuCan_DN") || ssCan.getSheets()[0];
+    // FIX: TRƯỚC ĐÂY hard-code thẳng ID Spreadsheet Phiếu Cân ở đây (trùng với
+    // CONFIG.SPREADSHEET_ID nhưng KHÔNG tham chiếu qua CONFIG) - khiến tính năng
+    // "Liên kết dữ liệu" (Hệ thống → Cấu hình hệ thống, ghi đè CONFIG.SPREADSHEET_ID
+    // qua PropertiesService) không có tác dụng ở đúng chỗ này: nếu đổi sang
+    // Spreadsheet Phiếu Cân khác (VD sang năm tài chính mới), riêng "Nhập TP dăm"
+    // (quét dữ liệu phiếu cân để tính khối lượng gỗ keo) vẫn âm thầm đọc SAI từ
+    // Spreadsheet CŨ trong khi mọi chức năng khác đã chuyển sang Spreadsheet mới.
+    // Nay dùng chung CONFIG.SPREADSHEET_ID / CONFIG.DATA_SHEET như toàn bộ hệ thống.
+    var ssCan = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    var sheetCan = ssCan.getSheetByName(CONFIG.DATA_SHEET) || ssCan.getSheets()[0];
 
     if (!sheetCan) return { status: "error", message: "Không tìm thấy sheet PhieuCan_DN trong file trạm cân!" };
 
