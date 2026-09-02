@@ -24,10 +24,15 @@ function doGet() {
 
 function step1_PreviewDraft(fileData) {
   try {
-    const folder = DriveApp.getFolderById(CONFIG.FOLDER_INPUT);
-    if (fileData && fileData.base64) {
-      folder.createFile(Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name));
-    }
+    if (!fileData || !fileData.base64) return { status: "error", message: "Không có file để xử lý." };
+
+    // FIX #23: Lưu file gốc THẲNG vào thư mục Done ngay khi tải lên (đơn giản
+    // hóa - bỏ hẳn thư mục Input trung gian, không quét lại cả thư mục, không
+    // cần "Dọn dẹp" thủ công, không cần di chuyển file ở bước Xác nhận nữa).
+    // File gốc được lưu trữ làm bằng chứng NGAY LẬP TỨC, không phụ thuộc việc
+    // sau đó người dùng có bấm Xác nhận hay không - đơn giản và an toàn hơn.
+    const blob = Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name);
+    DriveApp.getFolderById(CONFIG.FOLDER_DONE).createFile(blob);
 
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const dataSheet = ss.getSheetByName(CONFIG.DATA_SHEET);
@@ -45,27 +50,24 @@ function step1_PreviewDraft(fileData) {
       });
     }
 
-    const files = folder.getFiles();
     let previewRows = [];
     // FIX: theo dõi các key đã xuất hiện TRONG CHÍNH lượt xem trước này, để cảnh báo
     // sớm nếu có phiếu trùng số giữa các file/dòng cùng batch, tránh lỗi khi Xác nhận.
     const seenInThisBatch = new Set();
 
-    while (files.hasNext()) {
-      const file = files.next();
-      if (!file.getName().match(/\.xls[x]?$/i)) continue;
+    // Convert TẠM đúng file vừa tải lên để đọc dữ liệu - đọc xong xóa NGAY bản
+    // convert tạm (không đụng gì đến file gốc đã lưu trong Done ở trên).
+    const tempFile = convertXlsxToTempSheet_(blob, "TMP_" + fileData.name);
+    try {
+      const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
 
-      const tempFile = Drive.Files.insert({ title: "TMP_" + file.getName() }, file.getBlob(), { convert: true });
-      try {
-        const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
+      let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
+      if (hIdx === -1) return { status: "error", message: "Không tìm thấy dòng tiêu đề (cột chứa 'Số phiếu') trong file." };
 
-        let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
-        if (hIdx === -1) { continue; }
+      const rowsToProcess = values.slice(hIdx + 1);
 
-        const rowsToProcess = values.slice(hIdx + 1);
-
-        for (let r of rowsToProcess) {
-          const spRaw = String(r[0] || "").trim();
+      for (let r of rowsToProcess) {
+        const spRaw = String(r[0] || "").trim();
           if (!spRaw || spRaw.toLowerCase().includes("ngày") || spRaw.toLowerCase().includes("tổng") || spRaw.length > 20) continue;
 
           const valA_Dich = String(r[1] || "").trim();
@@ -130,46 +132,135 @@ function step1_PreviewDraft(fileData) {
             gioCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "HH:mm:ss") : "",
             ngayCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
             gioCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "HH:mm:ss") : "",
-            soXe: valF_Dich, klCan1: previewCan1, klCan2: previewCan2, klHangGoc: previewHang, rawRowData: r
+            soXe: valF_Dich, klCan1: previewCan1, klCan2: previewCan2, klHangGoc: previewHang,
+            // FIX #21: TRƯỚC ĐÂY gửi nguyên "rawRowData: r" (CẢ DÒNG THÔ từ file
+            // Excel) qua lại giữa client<->server - nếu BẤT KỲ ô nào trong dòng
+            // (có thể có hàng chục cột) chứa nội dung không tuần tự hóa được
+            // (VD lỗi công thức #REF!/#N/A, giá trị lạ do file nguồn sinh ra),
+            // TOÀN BỘ phản hồi có thể hỏng thành null - đúng triệu chứng "Không
+            // nhận được phản hồi hợp lệ" dù server đã chạy xong rất nhanh. Nay
+            // chỉ trích xuất ĐÚNG 3 giá trị chuỗi thực sự cần dùng lại ở bước
+            // Xác nhận (Khách hàng, Đại lý, Nguồn gốc), loại bỏ hoàn toàn phần
+            // dữ liệu thô không kiểm soát được.
+            khGoc: String(r[9] || "").trim(), dlGoc: String(r[13] || "").trim(), ngGoc: String(r[12] || "").trim(),
+            // Ngày/Giờ cân dạng ISO string AN TOÀN (không phải Date object thật,
+            // không phải mảng thô) để step1_ConfirmImport tái tạo lại đúng Date
+            // khi ghi vào PhieuCan_DN - thay thế hoàn toàn cho "rawRowData" cũ.
+            rawDateC: dateC ? dateC.toISOString() : "", rawDateD: dateD ? dateD.toISOString() : ""
           });
         }
-      } finally {
-        // FIX: dùng try/finally để đảm bảo file tạm luôn bị xóa dù có lỗi xảy ra
-        // trong lúc đọc (tránh rò rỉ file rác trong Drive khi 1 file lỗi làm hỏng vòng lặp)
-        Drive.Files.remove(tempFile.id);
-      }
+    } finally {
+      // FIX: dùng try/finally để đảm bảo file tạm luôn bị xóa dù có lỗi xảy ra
+      // trong lúc đọc (tránh rò rỉ file rác trong Drive khi 1 file lỗi làm hỏng vòng lặp)
+      Drive.Files.remove(tempFile.id);
     }
 
-    // Khởi tạo file Sheet Draft vật lý đối soát thực tế
-    let draftUrl = "";
+    // FIX #19 (đã thay bằng FIX #20): TRƯỚC ĐÂY tại đây tạo cả 1 Google Sheet
+    // MỚI (SpreadsheetApp.create) mỗi lần bấm "Xem trước", rồi di chuyển giữa
+    // các thư mục Drive - ~10 lệnh gọi Drive/Sheets API tuần tự, cộng dồn tới
+    // hàng chục giây với file nhiều dòng, có thể khiến phản hồi không kịp về
+    // client dù server đã chạy xong. Từng bị xóa hẳn (FIX #19), nay theo yêu
+    // cầu chuyển sang cơ chế GIỐNG HỆT NL_PC_XH_Draft bên Xuất hàng: dùng 1
+    // Sheet CỐ ĐỊNH có sẵn (CONFIG.PREVIEW_DRAFT_SHEET, cùng Spreadsheet với
+    // PhieuCan_DN) - mỗi lần Xem trước XÓA nội dung cũ rồi ghi đè dữ liệu mới,
+    // KHÔNG tạo file mới, KHÔNG di chuyển file - chỉ còn 3-4 lệnh setValues/
+    // setNumberFormat, nhanh hơn nhiều so với bản cũ.
     if (previewRows.length > 0) {
-      const draftSS = SpreadsheetApp.create("DRAFT_XemTruoc_PhieuCan_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"));
-      const draftSheet = draftSS.getSheets()[0];
-      draftSheet.setName("XemTruoc_Data");
+      let draftSheet = ss.getSheetByName(CONFIG.PREVIEW_DRAFT_SHEET);
+      if (!draftSheet) draftSheet = ss.insertSheet(CONFIG.PREVIEW_DRAFT_SHEET);
       const draftHeaders = ["Trạng Thái", "Số Chứng Từ", "Số Phiếu", "Số Xe", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "KL Cân 1", "KL Cân 2", "KL Hàng (Kg)", "Ghi Chú Lỗi"];
+      if (draftSheet.getLastRow() > 1) draftSheet.getRange(2, 1, draftSheet.getLastRow() - 1, draftHeaders.length).clearContent();
       draftSheet.getRange(1, 1, 1, draftHeaders.length).setValues([draftHeaders]).setFontWeight("bold").setBackground("#cfe2ff");
       const draftValues = previewRows.map(row => [
         row.typeImport, row.uniqueKey, row.soPhieu, row.soXe, row.ngayCan1, row.gioCan1, row.ngayCan2, row.gioCan2, row.klCan1, row.klCan2, row.klHangGoc, row.isError ? "❌ " + row.errorMsg : "✔️ Hợp lệ"
       ]);
-      // FIX #6 (tiếp): ép định dạng Text (@) cho cột Số Chứng Từ..Giờ Cân 2 (B..H)
-      // TRƯỚC KHI ghi giá trị — bắt buộc làm trước setValues, nếu không Google
-      // Sheets có thể tự động "đoán" và chuyển chuỗi ngày dd/MM/yyyy thành kiểu
-      // Date thật theo Locale mặc định của chính file Draft này (thường lấy theo
-      // Locale tài khoản Google, có thể là US), khiến ngày lại bị đảo lần nữa dù
-      // chuỗi gốc (từ FIX #6 ở trên) đã đúng.
-      draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@"); // B..H (Số Chứng Từ..Giờ Cân 2)
+      // Ép định dạng Text (@) cột B..H TRƯỚC KHI ghi giá trị - tránh Google
+      // Sheets tự "đoán" và chuyển chuỗi ngày dd/MM/yyyy thành Date thật theo
+      // Locale mặc định của Sheet, khiến ngày bị đảo lần nữa (giống FIX #6).
+      draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@");
       draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
       draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0");
-      const draftFileObj = DriveApp.getFileById(draftSS.getId());
-      DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(draftFileObj);
-      DriveApp.getRootFolder().removeFile(draftFileObj);
-      draftUrl = draftSS.getUrl();
     }
-    return { status: "success", data: previewRows, draftUrl: draftUrl };
-  } catch (e) { return { status: "error", message: e.toString() }; }
+
+    return { status: "success", data: previewRows };
+  } catch (e) {
+    // FIX #24: Nếu là lỗi tạm thời từ Google (Internal Error khi convert file)
+    // đã thử lại 3 lần vẫn thất bại - báo rõ đây là lỗi PHÍA GOOGLE, không phải
+    // lỗi dữ liệu/logic, để người dùng biết nên thử lại sau ít phút thay vì
+    // tưởng file bị sai.
+    const thongBaoLoi = e.toString();
+    if (/internal error|backend error/i.test(thongBaoLoi)) {
+      return { status: "error", message: "Google đang gặp sự cố tạm thời khi chuyển đổi file (đã tự thử lại 3 lần). Đây KHÔNG phải lỗi trong file hay hệ thống - vui lòng thử lại sau ít phút. Chi tiết: " + thongBaoLoi };
+    }
+    return { status: "error", message: thongBaoLoi };
+  }
 }
 
-function step1_ConfirmImport(confirmedDataList) {
+// Ghi (hoặc GHI ĐÈ nếu trùng Mã chứng từ) các phiếu cân MỚI vào Sheet Draft
+// theo dõi "Chưa thanh toán" - CHỈ nhận rowsMoiNK (đã được lọc sẵn ở
+// step1_ConfirmImport, chỉ gồm những dòng THẬT SỰ MỚI trong lần import này,
+// không bao gồm các dòng cập nhật/trùng với PhieuCan_DN). Không làm hỏng luồng
+// import chính nếu Sheet Draft lỗi/không mở được (chỉ ghi log, không throw).
+function ghiVaoDraftChuaTT_(rowsMoiNK) {
+  if (!rowsMoiNK || rowsMoiNK.length === 0) return;
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.DRAFT_CHUATT_SPREADSHEET_ID);
+    let sheet = ss.getSheetByName(CONFIG.DRAFT_CHUATT_SHEET);
+    const HEADERS = ["Số phiếu", "Ngày cân 1", "Giờ cân 1", "Ngày cân 2", "Giờ cân 2", "Biển số 1", "Biển số 2",
+      "Cân lần 1", "Cân lần 2", "KL Hàng (KG)", "Nguồn gốc", "Khách hàng", "Mã hàng", "ĐL", "NG", "Hình ảnh",
+      "Mã ĐG", "Giảm giá", "Timestamp", "ĐG_AD", "Picture", "ID_PC (Mã chứng từ)", "Số CT"];
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.DRAFT_CHUATT_SHEET);
+      sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold").setBackground("#1B4332").setFontColor("#FFFFFF");
+      sheet.setFrozenRows(1);
+    }
+
+    // Gom sẵn Mã chứng từ (cột V, index 21 - 0-based -> cột 22, 1-based) đã có
+    // trong Draft -> số dòng thật, để biết dòng nào cần GHI ĐÈ thay vì thêm mới.
+    const lastRow = sheet.getLastRow();
+    const mapDongCu = new Map();
+    if (lastRow > 1) {
+      const existingKeys = sheet.getRange(2, 22, lastRow - 1, 1).getValues();
+      existingKeys.forEach((r, idx) => {
+        const key = String(r[0] || "").trim();
+        if (key) mapDongCu.set(key, idx + 2);
+      });
+    }
+
+    const _rf = REGION_FORMAT();
+    const rowsThemMoi = [];
+
+    rowsMoiNK.forEach(row => {
+      const key = String(row[21] || "").trim();
+      if (!key) return;
+      if (mapDongCu.has(key)) {
+        // TRÙNG Mã chứng từ đã có sẵn trong Draft -> GHI ĐÈ đúng dòng đó (không tạo dòng trùng)
+        const dongThat = mapDongCu.get(key);
+        sheet.getRange(dongThat, 1, 1, row.length).setValues([row]);
+        sheet.getRange(dongThat, 2, 1, 1).setNumberFormat(_rf.DATE_FMT);
+        sheet.getRange(dongThat, 3, 1, 1).setNumberFormat(_rf.TIME_FMT);
+        sheet.getRange(dongThat, 4, 1, 1).setNumberFormat(_rf.DATE_FMT);
+        sheet.getRange(dongThat, 5, 1, 1).setNumberFormat(_rf.TIME_FMT);
+      } else {
+        rowsThemMoi.push(row);
+      }
+    });
+
+    if (rowsThemMoi.length > 0) {
+      const startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, rowsThemMoi.length, rowsThemMoi[0].length).setValues(rowsThemMoi);
+      sheet.getRange(startRow, 2, rowsThemMoi.length, 1).setNumberFormat(_rf.DATE_FMT);
+      sheet.getRange(startRow, 3, rowsThemMoi.length, 1).setNumberFormat(_rf.TIME_FMT);
+      sheet.getRange(startRow, 4, rowsThemMoi.length, 1).setNumberFormat(_rf.DATE_FMT);
+      sheet.getRange(startRow, 5, rowsThemMoi.length, 1).setNumberFormat(_rf.TIME_FMT);
+    }
+    logAudit_('DRAFT_CHUATT', 'OK', 'Ghi ' + rowsMoiNK.length + ' phiếu vào Draft Chưa Thanh Toán (' + rowsThemMoi.length + ' mới, ' + (rowsMoiNK.length - rowsThemMoi.length) + ' ghi đè).');
+  } catch (e) {
+    logAudit_('DRAFT_CHUATT', 'ERROR', e.toString());
+  }
+}
+
+function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
   // FIX #2: khóa toàn bộ quá trình xác nhận ghi dữ liệu. Nếu 2 người dùng bấm
   // "Xác nhận" gần như đồng thời, nếu không khóa thì cả hai sẽ đọc cùng
   // getLastRow() và ghi đè lên CÙNG một dải hàng, làm mất dữ liệu của một bên.
@@ -199,8 +290,8 @@ function step1_ConfirmImport(confirmedDataList) {
 
     for (let item of confirmedDataList) {
       if (item.isError) continue;
-      const r = item.rawRowData; const valA_Dich = item.soPhieu; const valF_Dich = item.soXe; const uniqueKeyMaCT = item.uniqueKey;
-      let valL_Dich = r[9]; let valN_Dich = String(r[13] || "").toUpperCase(); let valO_Dich = String(r[12] || "").toUpperCase();
+      const valA_Dich = item.soPhieu; const valF_Dich = item.soXe; const uniqueKeyMaCT = item.uniqueKey;
+      let valL_Dich = item.khGoc; let valN_Dich = String(item.dlGoc || "").toUpperCase(); let valO_Dich = String(item.ngGoc || "").toUpperCase();
       let valK_Dich = valN_Dich + "_" + valO_Dich; let valQ_Dich = valN_Dich + "_" + valO_Dich + "_Y";
 
       if (duplicateMap.has(uniqueKeyMaCT)) {
@@ -238,7 +329,14 @@ function step1_ConfirmImport(confirmedDataList) {
       }
 
       let newRow = new Array(NUM_COLUMNS).fill("");
-      let dateC = toDateObj(r[2]); let dateD = toDateObj(r[3]);
+      // FIX #22: TRƯỚC ĐÂY dùng "toDateObj(r[2])"/"toDateObj(r[3])" - biến "r"
+      // KHÔNG TỒN TẠI trong hàm này (đó là biến của step1_PreviewDraft, đã bị
+      // xóa cùng "rawRowData" ở FIX #21) - gây lỗi "ReferenceError: r is not
+      // defined" ngay khi có phiếu MỚI cần ghi. Nay tái tạo đúng Date object từ
+      // "item.rawDateC"/"item.rawDateD" (chuỗi ISO an toàn, được step1_PreviewDraft
+      // gửi kèm mỗi dòng xem trước) - khớp đúng cấu trúc mới.
+      let dateC = item.rawDateC ? new Date(item.rawDateC) : null;
+      let dateD = item.rawDateD ? new Date(item.rawDateD) : null;
       newRow[0] = valA_Dich;
 
       // FIX #3: Ghi đúng Ngày THUẦN vào cột "Ngày cân X" và Giờ THUẦN vào cột
@@ -273,16 +371,17 @@ function step1_ConfirmImport(confirmedDataList) {
       dataSheet.getRange(startRow, 3, batchNew.length, 1).setNumberFormat(_rf.TIME_FMT); // Giờ Cân 1
       dataSheet.getRange(startRow, 4, batchNew.length, 1).setNumberFormat(_rf.DATE_FMT); // Ngày Cân 2
       dataSheet.getRange(startRow, 5, batchNew.length, 1).setNumberFormat(_rf.TIME_FMT); // Giờ Cân 2
+
+      // Tùy chọn: đồng thời lưu (ghi đè nếu trùng) các phiếu MỚI này vào Sheet
+      // Draft "Chưa thanh toán" - CHỈ nhận batchNew (đã chắc chắn là phiếu mới,
+      // không lẫn phiếu cập nhật/trùng), đúng yêu cầu "chỉ phiếu mới mới được ghi vào".
+      if (luuDraftChuaTT) ghiVaoDraftChuaTT_(batchNew);
     }
 
-    const folder = DriveApp.getFolderById(CONFIG.FOLDER_INPUT); const files = folder.getFiles();
-    while (files.hasNext()) {
-      const file = files.next(); if (!file.getName().match(/\.xls[x]?$/i)) continue;
-      const meta = Drive.Files.get(file.getId(), { fields: "parents" });
-      if (meta.parents && meta.parents.length > 0) {
-        Drive.Files.update({}, file.getId(), null, { addParents: CONFIG.FOLDER_DONE, removeParents: meta.parents[0].id });
-      }
-    }
+    // FIX #23: TRƯỚC ĐÂY tại đây quét thư mục Input, di chuyển từng file gốc
+    // sang Done - không còn cần nữa vì step1_PreviewDraft giờ lưu file gốc
+    // THẲNG vào Done ngay từ bước Xem trước (đơn giản hóa, không cần thư mục
+    // Input trung gian nữa).
 
     let priceMsg = "";
     if (countNew > 0 || countUpdate > 0) {
@@ -293,7 +392,8 @@ function step1_ConfirmImport(confirmedDataList) {
       const priceResult = runCalculatePrice_core();
       priceMsg = " | " + priceResult.message;
     }
-    const finalMsg = `Mới: ${countNew}, Cập nhật: ${countUpdate}, Bỏ qua: ${countSkip}${priceMsg}`;
+    const draftMsg = luuDraftChuaTT ? ` | Đã lưu ${batchNew.length} phiếu vào Draft Chưa Thanh Toán` : "";
+    const finalMsg = `Mới: ${countNew}, Cập nhật: ${countUpdate}, Bỏ qua: ${countSkip}${priceMsg}${draftMsg}`;
     logAudit_('IMPORT_PHIEUCAN', 'OK', finalMsg);
     return { status: "success", message: finalMsg };
   } catch (e) {
@@ -1209,9 +1309,34 @@ function parseDate(v) {
   return null;
 }
 
-// FIX #4 (NGHIÊM TRỌNG): google.script.run TỰ ĐỘNG chuyển Date object thành
-// chuỗi ISO 8601 ("yyyy-MM-ddTHH:mm:ss.sssZ") mỗi khi truyền qua lại giữa
-// client <-> server. Cụ thể: step1_PreviewDraft trả về rawRowData (chứa Date
+// FIX #24: Chuyển đổi 1 Blob .xlsx sang Google Sheet TẠM để đọc dữ liệu - có
+// THỬ LẠI (retry) tự động vì Drive.Files.insert(..., {convert:true}) là API
+// v2 CŨ, được cộng đồng Apps Script Community và Google Issue Tracker xác
+// nhận từ lâu là hay gặp lỗi "Internal Error" TẠM THỜI phía server Google khi
+// convert file - không phải lỗi logic code. Thử lại vài lần với độ trễ tăng
+// dần (1s, 2s) thường sẽ thành công ở lần 2 hoặc 3. Nếu lỗi KHÔNG PHẢI dạng
+// tạm thời (VD sai định dạng file, hết quyền truy cập) thì dừng ngay, không
+// retry vô ích - dùng chung cho cả step1_PreviewDraft và XH_step1_PreviewDraft.
+function convertXlsxToTempSheet_(blob, title) {
+  const SO_LAN_THU_TOI_DA = 3;
+  let loiCuoi = null;
+  for (let lan = 1; lan <= SO_LAN_THU_TOI_DA; lan++) {
+    try {
+      return Drive.Files.insert({ title: title }, blob, { convert: true });
+    } catch (e) {
+      loiCuoi = e;
+      const thongBaoLoi = String((e && e.message) || e);
+      const laLoiTamThoi = /internal error|backend error|rate limit|try again|timeout|temporarily/i.test(thongBaoLoi);
+      if (!laLoiTamThoi || lan === SO_LAN_THU_TOI_DA) throw e;
+      Utilities.sleep(1000 * lan); // 1 giây, rồi 2 giây trước khi thử lại
+    }
+  }
+  throw loiCuoi;
+}
+
+// FIX #4 CỰC KỲ QUAN TRỌNG (round-trip qua client-server Apps Script): Khi
+// step1_PreviewDraft trả Date object thật về client, Apps Script serialize
+// thành chuỗi ISO ("2026-07-25T00:00:00.000Z") để gửi qua JSON - KHÔNG PHẢI
 // object thật) cho trình duyệt; khi người dùng bấm "Xác nhận", trình duyệt gửi
 // NGUYÊN rawRowData đó về step1_ConfirmImport — nhưng lúc này Date đã bị
 // Apps Script tự chuyển thành chuỗi ISO. Bản toDateObj cũ chỉ biết phân tích
@@ -1269,25 +1394,6 @@ function logAudit_(action, status, message) {
   } catch (e) { /* Không để lỗi ghi log làm hỏng thao tác chính */ }
 }
 function createSimpleMap_(s,k,v) { const d=s.getDataRange().getValues(); let m={}; for(let i=1;i<d.length;i++){ let key=String(d[i][k]).trim(); if(key) m[key]=d[i][v]; } return m; }
-
-function clearInputFolderFiles() {
-  try {
-    const folder = DriveApp.getFolderById(CONFIG.FOLDER_INPUT);
-    const files = folder.getFiles();
-    let count = 0;
-
-    while (files.hasNext()) {
-      const file = files.next();
-      if (file.getName().match(/\.xls[x]?$/i)) {
-        file.setTrashed(true);
-        count++;
-      }
-    }
-    return { status: "success", message: `Đã dọn dẹp sạch sẽ, hủy bỏ và xóa thành công ${count} file tạm rác!` };
-  } catch (e) {
-    return { status: "error", message: "Lỗi dọn dẹp thư mục tạm: " + e.toString() };
-  }
-}
 
 /* ---------- File mẫu tải về cho 2 loại Import (không đụng dữ liệu thật) ---------- */
 
@@ -3446,10 +3552,15 @@ function XH_timCotTheoTen_(headerRow) {
 
 function XH_step1_PreviewDraft(fileData, khoXuatMacDinh, khoNhapMacDinh) {
   try {
-    const folder = DriveApp.getFolderById(CONFIG.FOLDER_INPUT);
-    if (fileData && fileData.base64) {
-      folder.createFile(Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name));
-    }
+    if (!fileData || !fileData.base64) return { status: "error", message: "Không có file để xử lý." };
+
+    // FIX #23: Lưu file gốc THẲNG vào thư mục Done ngay khi tải lên (đơn giản
+    // hóa - bỏ hẳn thư mục Input trung gian, không quét lại cả thư mục, không
+    // cần "Dọn dẹp" thủ công, không cần di chuyển file ở bước Xác nhận nữa).
+    // File gốc được lưu trữ làm bằng chứng NGAY LẬP TỨC, không phụ thuộc việc
+    // sau đó người dùng có bấm Xác nhận hay không - đơn giản và an toàn hơn.
+    const blob = Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name);
+    DriveApp.getFolderById(CONFIG.FOLDER_DONE).createFile(blob);
 
     const ss = XH_ss_();
     const dataSheet = ss.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH);
@@ -3463,94 +3574,91 @@ function XH_step1_PreviewDraft(fileData, khoXuatMacDinh, khoNhapMacDinh) {
       });
     }
 
-    const files = folder.getFiles();
     let previewRows = [];
     const seenInThisBatch = new Set();
 
-    while (files.hasNext()) {
-      const file = files.next();
-      if (!file.getName().match(/\.xls[x]?$/i)) continue;
+    // Convert TẠM đúng file vừa tải lên để đọc dữ liệu - đọc xong xóa NGAY bản
+    // convert tạm (không đụng gì đến file gốc đã lưu trong Done ở trên).
+    const tempFile = convertXlsxToTempSheet_(blob, "TMP_XH_" + fileData.name);
+    try {
+      const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
+      let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
+      if (hIdx === -1) return { status: "error", message: "Không tìm thấy dòng tiêu đề (cột chứa 'Số phiếu') trong file." };
 
-      const tempFile = Drive.Files.insert({ title: "TMP_XH_" + file.getName() }, file.getBlob(), { convert: true });
-      try {
-        const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
-        let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
-        if (hIdx === -1) continue;
-
-        const cotMap = XH_timCotTheoTen_(values[hIdx]);
-        if (cotMap.soPhieu === undefined || cotMap.ngayCan1 === undefined) continue; // thiếu cột lõi, bỏ qua file này
-
-        const rowsToProcess = values.slice(hIdx + 1);
-        for (let r of rowsToProcess) {
-          const spRaw = String(r[cotMap.soPhieu] || "").trim();
-          if (!spRaw || spRaw.toLowerCase().includes("ngày") || spRaw.toLowerCase().includes("tổng") || spRaw.length > 20) continue;
-
-          const klHangRaw = cotMap.klHang !== undefined ? r[cotMap.klHang] : null;
-          // FIX #16: dùng parseSoTheoLocale_() (Config.gs) thay vì regex "mù"
-          let klHang = parseSoTheoLocale_(klHangRaw);
-          if (!klHangRaw || isNaN(klHang) || klHang === 0) continue;
-
-          let dateC = toDateObj(r[cotMap.ngayCan1]);
-          let dateD = cotMap.ngayCan2 !== undefined ? toDateObj(r[cotMap.ngayCan2]) : null;
-
-          let now = new Date();
-          let nam = dateC ? dateC.getFullYear() : now.getFullYear();
-          let currentMaChungTu = spRaw + "/" + nam + "/XK";
-
-          let isError = false; let errorMsg = "";
-          if (!dateC || isNaN(dateC.getTime())) { isError = true; errorMsg += "Lỗi Ngày Cân 1. "; }
-          if (cotMap.ngayCan2 !== undefined && (!dateD || isNaN(dateD.getTime()))) { isError = true; errorMsg += "Lỗi Ngày Cân 2. "; }
-
-          if (seenInThisBatch.has(currentMaChungTu)) {
-            isError = true;
-            errorMsg += "Trùng Số Chứng Từ ngay trong dữ liệu đang nạp (" + currentMaChungTu + "). ";
-          } else {
-            seenInThisBatch.add(currentMaChungTu);
-          }
-
-          let typeImport = duplicateMap.has(currentMaChungTu) ? "Bỏ qua (Đã tồn tại)" : "Mới";
-
-          let ngayXuat = null;
-          if (cotMap.ngayXuat !== undefined) ngayXuat = toDateObj(r[cotMap.ngayXuat]);
-
-          // Kho xuất/Kho nhập: ưu tiên lấy TỪ FILE nếu người chuẩn bị dữ liệu đã
-          // điền theo đúng cột (Kho xuất/Kho nhập); nếu file không có 2 cột này,
-          // dùng giá trị mặc định áp dụng cho CẢ LÔ do người dùng chọn trước khi tải lên.
-          const khoXuatRow = cotMap.khoXuat !== undefined ? String(r[cotMap.khoXuat] || "").trim() : "";
-          const khoNhapRow = cotMap.khoNhap !== undefined ? String(r[cotMap.khoNhap] || "").trim() : "";
-
-          previewRows.push({
-            isError: isError, errorMsg: errorMsg.trim(), typeImport: typeImport, uniqueKey: currentMaChungTu,
-            soPhieu: spRaw,
-            ngayCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
-            gioCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "HH:mm:ss") : "",
-            ngayCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy") : (cotMap.ngayCan2 !== undefined ? "Lỗi định dạng ngày" : ""),
-            gioCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "HH:mm:ss") : "",
-            bienSo: cotMap.bienSo !== undefined ? String(r[cotMap.bienSo] || "").trim() : "",
-            canLan1: cotMap.canLan1 !== undefined ? (parseFloat(r[cotMap.canLan1]) || 0) : 0,
-            canLan2: cotMap.canLan2 !== undefined ? (parseFloat(r[cotMap.canLan2]) || 0) : 0,
-            klHang: klHang,
-            donViVanChuyen: cotMap.donViVanChuyen !== undefined ? String(r[cotMap.donViVanChuyen] || "").trim() : "",
-            tenTaiXe: cotMap.tenTaiXe !== undefined ? String(r[cotMap.tenTaiXe] || "").trim() : "",
-            nguoiCan: cotMap.nguoiCan !== undefined ? String(r[cotMap.nguoiCan] || "").trim() : "",
-            // Các cột đặc thù NL_PC_XH - có gì lấy nấy, không có thì để trống (điền bổ sung sau khi đối chiếu đơn hàng)
-            khoiLuongTan: cotMap.khoiLuongTan !== undefined ? (parseFloat(r[cotMap.khoiLuongTan]) || (klHang / 1000)) : (klHang / 1000),
-            soBKLS: cotMap.soBKLS !== undefined ? String(r[cotMap.soBKLS] || "").trim() : "",
-            khoiLuongM3: cotMap.khoiLuongM3 !== undefined ? (parseFloat(r[cotMap.khoiLuongM3]) || "") : "",
-            soTKHQ: cotMap.soTKHQ !== undefined ? String(r[cotMap.soTKHQ] || "").trim() : "",
-            khoXuat: khoXuatRow || String(khoXuatMacDinh || "").trim(),
-            khoNhap: khoNhapRow || String(khoNhapMacDinh || "").trim(),
-            rawDateC: dateC ? dateC.toISOString() : "", rawDateD: dateD ? dateD.toISOString() : "",
-            rawNgayXuat: ngayXuat ? ngayXuat.toISOString() : ""
-          });
-        }
-      } finally {
-        Drive.Files.remove(tempFile.id);
+      const cotMap = XH_timCotTheoTen_(values[hIdx]);
+      if (cotMap.soPhieu === undefined || cotMap.ngayCan1 === undefined) {
+        return { status: "error", message: "File thiếu cột bắt buộc (Số phiếu / Ngày giờ cân 1) - kiểm tra lại đúng tên tiêu đề cột." };
       }
+
+      const rowsToProcess = values.slice(hIdx + 1);
+      for (let r of rowsToProcess) {
+        const spRaw = String(r[cotMap.soPhieu] || "").trim();
+        if (!spRaw || spRaw.toLowerCase().includes("ngày") || spRaw.toLowerCase().includes("tổng") || spRaw.length > 20) continue;
+
+        const klHangRaw = cotMap.klHang !== undefined ? r[cotMap.klHang] : null;
+        // FIX #16: dùng parseSoTheoLocale_() (Config.gs) thay vì regex "mù"
+        let klHang = parseSoTheoLocale_(klHangRaw);
+        if (!klHangRaw || isNaN(klHang) || klHang === 0) continue;
+
+        let dateC = toDateObj(r[cotMap.ngayCan1]);
+        let dateD = cotMap.ngayCan2 !== undefined ? toDateObj(r[cotMap.ngayCan2]) : null;
+
+        let now = new Date();
+        let nam = dateC ? dateC.getFullYear() : now.getFullYear();
+        let currentMaChungTu = spRaw + "/" + nam + "/XK";
+
+        let isError = false; let errorMsg = "";
+        if (!dateC || isNaN(dateC.getTime())) { isError = true; errorMsg += "Lỗi Ngày Cân 1. "; }
+        if (cotMap.ngayCan2 !== undefined && (!dateD || isNaN(dateD.getTime()))) { isError = true; errorMsg += "Lỗi Ngày Cân 2. "; }
+
+        if (seenInThisBatch.has(currentMaChungTu)) {
+          isError = true;
+          errorMsg += "Trùng Số Chứng Từ ngay trong dữ liệu đang nạp (" + currentMaChungTu + "). ";
+        } else {
+          seenInThisBatch.add(currentMaChungTu);
+        }
+
+        let typeImport = duplicateMap.has(currentMaChungTu) ? "Bỏ qua (Đã tồn tại)" : "Mới";
+
+        let ngayXuat = null;
+        if (cotMap.ngayXuat !== undefined) ngayXuat = toDateObj(r[cotMap.ngayXuat]);
+
+        // Kho xuất/Kho nhập: ưu tiên lấy TỪ FILE nếu người chuẩn bị dữ liệu đã
+        // điền theo đúng cột (Kho xuất/Kho nhập); nếu file không có 2 cột này,
+        // dùng giá trị mặc định áp dụng cho CẢ LÔ do người dùng chọn trước khi tải lên.
+        const khoXuatRow = cotMap.khoXuat !== undefined ? String(r[cotMap.khoXuat] || "").trim() : "";
+        const khoNhapRow = cotMap.khoNhap !== undefined ? String(r[cotMap.khoNhap] || "").trim() : "";
+
+        previewRows.push({
+          isError: isError, errorMsg: errorMsg.trim(), typeImport: typeImport, uniqueKey: currentMaChungTu,
+          soPhieu: spRaw,
+          ngayCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
+          gioCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "HH:mm:ss") : "",
+          ngayCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy") : (cotMap.ngayCan2 !== undefined ? "Lỗi định dạng ngày" : ""),
+          gioCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "HH:mm:ss") : "",
+          bienSo: cotMap.bienSo !== undefined ? String(r[cotMap.bienSo] || "").trim() : "",
+          canLan1: cotMap.canLan1 !== undefined ? (parseFloat(r[cotMap.canLan1]) || 0) : 0,
+          canLan2: cotMap.canLan2 !== undefined ? (parseFloat(r[cotMap.canLan2]) || 0) : 0,
+          klHang: klHang,
+          donViVanChuyen: cotMap.donViVanChuyen !== undefined ? String(r[cotMap.donViVanChuyen] || "").trim() : "",
+          tenTaiXe: cotMap.tenTaiXe !== undefined ? String(r[cotMap.tenTaiXe] || "").trim() : "",
+          nguoiCan: cotMap.nguoiCan !== undefined ? String(r[cotMap.nguoiCan] || "").trim() : "",
+          // Các cột đặc thù NL_PC_XH - có gì lấy nấy, không có thì để trống (điền bổ sung sau khi đối chiếu đơn hàng)
+          khoiLuongTan: cotMap.khoiLuongTan !== undefined ? (parseFloat(r[cotMap.khoiLuongTan]) || (klHang / 1000)) : (klHang / 1000),
+          soBKLS: cotMap.soBKLS !== undefined ? String(r[cotMap.soBKLS] || "").trim() : "",
+          khoiLuongM3: cotMap.khoiLuongM3 !== undefined ? (parseFloat(r[cotMap.khoiLuongM3]) || "") : "",
+          soTKHQ: cotMap.soTKHQ !== undefined ? String(r[cotMap.soTKHQ] || "").trim() : "",
+          khoXuat: khoXuatRow || String(khoXuatMacDinh || "").trim(),
+          khoNhap: khoNhapRow || String(khoNhapMacDinh || "").trim(),
+          rawDateC: dateC ? dateC.toISOString() : "", rawDateD: dateD ? dateD.toISOString() : "",
+          rawNgayXuat: ngayXuat ? ngayXuat.toISOString() : ""
+        });
+      }
+    } finally {
+      Drive.Files.remove(tempFile.id);
     }
 
-    // Sheet Draft để đối soát (ghi cùng lúc, tách biệt hoàn toàn với PhieuCan_DN)
-    let draftUrl = "";
+    // Sheet Draft để đối soát (ghi cùng lúc, tách biệt hoàn toàn với PhieuCan_DN) - xóa cũ ghi mới, không tạo file
     if (previewRows.length > 0) {
       const draftSheet = ss.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH_DRAFT);
       if (draftSheet) {
@@ -3565,12 +3673,20 @@ function XH_step1_PreviewDraft(fileData, khoXuatMacDinh, khoNhapMacDinh) {
         ]);
         draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
         draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0");
-        draftUrl = ss.getUrl() + "#gid=" + draftSheet.getSheetId();
       }
     }
 
-    return { status: "success", data: previewRows, draftUrl: draftUrl };
-  } catch (e) { return { status: "error", message: e.toString() }; }
+    return { status: "success", data: previewRows };
+  } catch (e) {
+    // FIX #24: Nếu là lỗi tạm thời từ Google (Internal Error khi convert file)
+    // đã thử lại 3 lần vẫn thất bại - báo rõ đây là lỗi PHÍA GOOGLE, không phải
+    // lỗi dữ liệu/logic.
+    const thongBaoLoi = e.toString();
+    if (/internal error|backend error/i.test(thongBaoLoi)) {
+      return { status: "error", message: "Google đang gặp sự cố tạm thời khi chuyển đổi file (đã tự thử lại 3 lần). Đây KHÔNG phải lỗi trong file hay hệ thống - vui lòng thử lại sau ít phút. Chi tiết: " + thongBaoLoi };
+    }
+    return { status: "error", message: thongBaoLoi };
+  }
 }
 
 function XH_step1_ConfirmImport(confirmedDataList) {
@@ -3634,14 +3750,8 @@ function XH_step1_ConfirmImport(confirmedDataList) {
       dataSheet.getRange(startRowXH, 1, batchNew.length, 17).setValues(batchNew);
     }
 
-    const folder = DriveApp.getFolderById(CONFIG.FOLDER_INPUT); const files = folder.getFiles();
-    while (files.hasNext()) {
-      const file = files.next(); if (!file.getName().match(/\.xls[x]?$/i)) continue;
-      const meta = Drive.Files.get(file.getId(), { fields: "parents" });
-      if (meta.parents && meta.parents.length > 0) {
-        Drive.Files.update({}, file.getId(), null, { addParents: CONFIG.FOLDER_DONE, removeParents: meta.parents[0].id });
-      }
-    }
+    // FIX #23: không còn cần quét thư mục Input di chuyển file nữa - file gốc
+    // đã được XH_step1_PreviewDraft lưu thẳng vào Done ngay từ bước Xem trước.
 
     const finalMsg = `Mới: ${countNew}, Bỏ qua (đã tồn tại/trùng): ${countSkip}`;
     logAudit_("IMPORT_XUATHANG", "OK", finalMsg);
