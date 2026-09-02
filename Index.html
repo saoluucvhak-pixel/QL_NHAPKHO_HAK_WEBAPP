@@ -444,7 +444,6 @@
             <div class="filelist" id="fileList"></div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnPreview">Tải lên &amp; Xem trước</button>
-              <button class="btn btn-danger" id="btnClearFolder">Dọn dẹp file tạm trong thư mục Input</button>
               <button class="btn btn-ghost" id="btnTaiMauPhieuCan">📄 Tải file mẫu</button>
             </div>
           </div>
@@ -467,6 +466,13 @@
                 </thead>
                 <tbody id="previewBody"></tbody>
               </table>
+            </div>
+            <div class="field" style="max-width:520px;margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;">
+                <input type="checkbox" id="chkLuuDraftChuaTT" style="width:auto;">
+                Đồng thời lưu (ghi đè nếu trùng) các phiếu MỚI vào Draft Chưa Thanh Toán
+              </label>
+              <p style="font-size:11.5px;color:var(--ink-soft);margin:4px 0 0;">Chỉ những phiếu <b>MỚI</b> (không phải phiếu cập nhật/trùng) mới được ghi vào Sheet <code>PhieuCan_DN_CHUA_TT_DRAFT</code> — nếu trùng Mã chứng từ đã có sẵn trong Draft thì ghi đè, không tạo trùng dòng. Địa chỉ Sheet này đổi được ở Hệ thống → Cấu hình hệ thống → Liên kết dữ liệu.</p>
             </div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnConfirmImport">✔️ Xác nhận nhập liệu (theo lựa chọn)</button>
@@ -518,7 +524,6 @@
             <div class="filelist" id="xhFileList"></div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnXhPreview">Tải lên &amp; Xem trước</button>
-              <button class="btn btn-danger" id="btnXhClearFolder">Dọn dẹp file tạm trong thư mục Input</button>
               <button class="btn btn-ghost" id="btnTaiMauXuatHang">📄 Tải file mẫu</button>
             </div>
           </div>
@@ -1168,7 +1173,7 @@
                   <li>Kiểm tra bảng xem trước: dòng lỗi (❌) sẽ không chọn được; bỏ tick những dòng không muốn nhập.</li>
                   <li>Bấm <b>"✔️ Xác nhận nhập liệu"</b> để ghi chính thức vào PhieuCan_DN. Hệ thống tự tính giá ngay sau khi ghi xong.</li>
                 </ol>
-                <div class="guide-note">Nếu Import nhiều lần, nhớ bấm <b>"Dọn dẹp file tạm"</b> trước khi tải file mới, vì hệ thống quét toàn bộ file còn nằm trong thư mục tạm mỗi lần xem trước.</div>
+                <div class="guide-note">Mỗi lần Xem trước chỉ xử lý đúng file vừa chọn — file gốc tự động lưu trữ vào thư mục Done ngay lập tức, không cần dọn dẹp thủ công.</div>
 
                 <h5>Xuất kho theo phiếu cân (dăm gỗ)</h5>
                 <ol>
@@ -1659,6 +1664,13 @@
           const base64 = await fileToBase64(file);
           lastResult = await runServer('step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name });
         }
+        // Bảo vệ: nếu vì lý do nào đó server không trả về kết quả hợp lệ (VD phiên bản
+        // web app đang chạy chưa phải bản mới nhất, hoặc quá thời gian xử lý), báo rõ
+        // ràng thay vì để lỗi JS khó hiểu "Cannot read properties of null".
+        if (!lastResult || typeof lastResult.status === 'undefined') {
+          toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
+          return;
+        }
         if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
         state.previewData = lastResult.data;
         renderPreview();
@@ -1669,13 +1681,6 @@
       } finally { hideOverlay(); }
     });
 
-    document.getElementById('btnClearFolder').addEventListener('click', async ()=>{
-      showOverlay('Đang dọn dẹp thư mục Input…');
-      try {
-        const res = await runServer('clearInputFolderFiles');
-        toast(res.message, res.status === 'success');
-      } catch(err){ toast('Lỗi: ' + err, false); } finally { hideOverlay(); }
-    });
     document.getElementById('btnTaiMauPhieuCan').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file mẫu…');
       try {
@@ -1739,11 +1744,13 @@
       if (selectedRows.length === 0) { toast('Vui lòng chọn ít nhất 1 dòng hợp lệ để nhập.', false); return; }
       showOverlay('Đang ghi dữ liệu vào hệ thống…');
       try {
-        const res = await runServer('step1_ConfirmImport', selectedRows);
+        const luuDraftChuaTT = document.getElementById('chkLuuDraftChuaTT').checked;
+        const res = await runServer('step1_ConfirmImport', selectedRows, luuDraftChuaTT);
         toast(res.message, res.status === 'success');
         if (res.status === 'success'){
           state.previewData = [];
           document.getElementById('previewCard').style.display = 'none';
+          document.getElementById('chkLuuDraftChuaTT').checked = false;
           loadFilterOptions();
         }
       } catch(err){ toast('Lỗi xác nhận: ' + err, false); } finally { hideOverlay(); }
@@ -3639,6 +3646,10 @@
           const base64 = await fileToBase64(file);
           lastResult = await runServer('XH_step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name }, khoXuatMacDinh, khoNhapMacDinh);
         }
+        if (!lastResult || typeof lastResult.status === 'undefined') {
+          toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
+          return;
+        }
         if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
         state.xhPreviewData = lastResult.data;
         xhRenderPreview();
@@ -3649,13 +3660,6 @@
       } finally { hideOverlay(); }
     });
 
-    document.getElementById('btnXhClearFolder').addEventListener('click', async ()=>{
-      showOverlay('Đang dọn dẹp thư mục Input…');
-      try {
-        const res = await runServer('clearInputFolderFiles');
-        toast(res.message, res.status === 'success');
-      } catch(err){ toast('Lỗi: ' + err, false); } finally { hideOverlay(); }
-    });
     document.getElementById('btnTaiMauXuatHang').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file mẫu…');
       try {

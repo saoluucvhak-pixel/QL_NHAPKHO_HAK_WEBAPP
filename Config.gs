@@ -15,14 +15,17 @@
 
 /* ---------- CẤU HÌNH HỆ THỐNG CÂN HÀNG & THANH TOÁN (PhieuCan_DN) ---------- */
 const CONFIG = {
-  // Thư mục Drive chứa file Excel phiếu cân mới tải lên chờ xử lý
-  FOLDER_INPUT: "1sybSo9vSdSq_puu1LQR2m1zT59ZopgrL",
   // Thư mục Drive lưu file đã xử lý xong (file gốc đã import + các file export)
   FOLDER_DONE: "1bAp97Lwrpq6N8z4-2oXSaieszSL2roca",
 
   // Google Sheet chính chứa dữ liệu phiếu cân
   SPREADSHEET_ID: "1vqMVxccBA7zlAMHrGsVBydGFwZJ6QuDZW10zJ74V29g",
   DATA_SHEET: "PhieuCan_DN",
+  // Sheet Draft xem trước (cùng Spreadsheet với PhieuCan_DN) - mỗi lần bấm
+  // "Tải lên & Xem trước" sẽ XÓA nội dung cũ rồi ghi lại dữ liệu mới, giống
+  // đúng cơ chế NL_PC_XH_Draft bên Xuất hàng. KHÔNG tạo file Spreadsheet mới
+  // mỗi lần (khác bản cũ trước đây) - giữ tốc độ nhanh, không tốn Drive API.
+  PREVIEW_DRAFT_SHEET: "PhieuCan_DN_Draft",
 
   // Đường dẫn/spreadsheet Báo giá dùng để tra giá khi tính tiền phiếu cân
   // (chính là spreadsheet của BAOGIA_CONFIG bên dưới - xem thêm ghi chú ở đó)
@@ -40,6 +43,15 @@ const CONFIG = {
 
   // Timeout chờ khóa LockService dùng chung (ms) - chống ghi đè dữ liệu khi nhiều người dùng cùng lúc
   LOCK_TIMEOUT_MS: 30000,
+
+  // Sheet DRAFT theo dõi các phiếu cân CHƯA THANH TOÁN - tùy chọn bật/tắt khi
+  // Import (checkbox "Đồng thời lưu vào Draft Chưa Thanh Toán"), giúp kế toán
+  // nhanh chóng thấy phiếu nào cần lập ĐNTT mà không phải lọc lại cả
+  // PhieuCan_DN. Mặc định nằm CÙNG Spreadsheet PhieuCan_DN, nhưng địa chỉ có
+  // thể đổi qua Hệ thống → Cấu hình hệ thống → Liên kết dữ liệu để dùng cho
+  // đơn vị/công ty khác (không hard-code, không phụ thuộc Sheet hiện hành).
+  DRAFT_CHUATT_SPREADSHEET_ID: "1vqMVxccBA7zlAMHrGsVBydGFwZJ6QuDZW10zJ74V29g",
+  DRAFT_CHUATT_SHEET: "PhieuCan_DN_CHUA_TT_DRAFT",
 
   // Tên sheet log audit (Timestamp, Action, Status, Message) - đã có sẵn trong hệ thống
   AUDIT_SHEET: "Audit"
@@ -317,11 +329,11 @@ function HT_luuMisaDefaults(data) {
 // đã khai báo trong code (không bị mất, luôn có thể khôi phục).
 const LIENKET_DANH_SACH = [
   { key: "CONFIG_SPREADSHEET_ID", nhom: "CONFIG", truong: "SPREADSHEET_ID", ten: "Spreadsheet Phiếu Cân (PhieuCan_DN)", loai: "sheet" },
-  { key: "CONFIG_FOLDER_INPUT", nhom: "CONFIG", truong: "FOLDER_INPUT", ten: "Thư mục Input (file cân chờ xử lý)", loai: "folder" },
   { key: "CONFIG_FOLDER_DONE", nhom: "CONFIG", truong: "FOLDER_DONE", ten: "Thư mục Done (file đã xử lý + báo cáo tự xuất ra)", loai: "folder" },
   { key: "CONFIG_SRC_FILE_ID", nhom: "CONFIG", truong: "SRC_FILE_ID", ten: "Spreadsheet tham chiếu (DM_NG, DM_KH, HD_NCC)", loai: "sheet" },
   { key: "CONFIG_MISA_DST_ID", nhom: "CONFIG", truong: "MISA_DST_ID", ten: "Spreadsheet đích Update_MiSa_PC", loai: "sheet" },
   { key: "CONFIG_DNTT_FILE_ID", nhom: "CONFIG", truong: "DNTT_FILE_ID", ten: "Spreadsheet Đề Nghị Thanh Toán (ĐNTT)", loai: "sheet" },
+  { key: "CONFIG_DRAFT_CHUATT_SPREADSHEET_ID", nhom: "CONFIG", truong: "DRAFT_CHUATT_SPREADSHEET_ID", ten: "Spreadsheet Draft Chưa Thanh Toán (PhieuCan_DN_CHUA_TT_DRAFT)", loai: "sheet" },
   { key: "BAOGIA_SPREADSHEET_ID", nhom: "BAOGIA_CONFIG", truong: "SPREADSHEET_ID", ten: "Spreadsheet Báo giá", loai: "sheet" },
   { key: "BAOGIA_BACKUP_FOLDER_ID", nhom: "BAOGIA_CONFIG", truong: "BACKUP_FOLDER_ID", ten: "Thư mục lưu file báo giá xuất ra", loai: "folder" },
   { key: "KHODAM_SPREADSHEET_ID", nhom: "KHODAM_CONFIG", truong: "SPREADSHEET_ID", ten: "Spreadsheet Kho Dăm", loai: "sheet" },
