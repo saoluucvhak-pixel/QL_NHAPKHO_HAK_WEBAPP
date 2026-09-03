@@ -12,6 +12,30 @@
 
 function doGet() {
   apDungOverrideLienKet_(); // đảm bảo luôn dùng đúng ID Spreadsheet/Thư mục mới nhất đã cấu hình (Config.gs)
+
+  // FIX (NGHIÊM TRỌNG - phân quyền, Config.gs): TRƯỚC ĐÂY doGet() phục vụ
+  // trang cho BẤT KỲ ai đăng nhập bằng bất kỳ tài khoản Google nào (do
+  // appsscript.json đặt access:"ANYONE" - chỉ yêu cầu ĐÃ đăng nhập Google,
+  // KHÔNG giới hạn tài khoản nào cụ thể) - nghĩa là mọi hàm server (kể cả xóa
+  // dữ liệu, đổi cấu hình hệ thống) đều bị lộ cho bất kỳ ai có link. Nay chặn
+  // NGAY TẠI ĐÂY: nếu email đang đăng nhập không có trong danh sách được cấp
+  // quyền (Hệ thống → Quản lý người dùng), trả về trang "Không có quyền truy
+  // cập" thay vì tải toàn bộ ứng dụng - vì trang bị chặn không có cầu nối
+  // google.script.run, người không có quyền KHÔNG THỂ gọi được bất kỳ hàm
+  // server nào nữa (không chỉ là ẩn giao diện).
+  const nd = layThongTinNguoiDungHienTai_();
+  if (!nd.coQuyen) {
+    const emailHienThi = nd.email ? nd.email.replace(/[<>&]/g, '') : "(không xác định - có thể chưa đăng nhập Google)";
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:80px auto;padding:32px;' +
+      'border:1px solid #f5c2c7;border-radius:12px;background:#f8d7da;color:#58151c;text-align:center;">' +
+      '<h2 style="margin-top:0;">🚫 Không có quyền truy cập</h2>' +
+      '<p>Tài khoản <b>' + emailHienThi + '</b> chưa được cấp quyền sử dụng hệ thống này.</p>' +
+      '<p>Vui lòng liên hệ Quản trị viên để được thêm vào danh sách truy cập, sau đó tải lại trang.</p>' +
+      '</div>'
+    ).setTitle('Không có quyền truy cập');
+  }
+
   return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('HỆ THỐNG QUẢN LÝ CÂN HAKGROUP')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -309,6 +333,10 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
     const dataSheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = dataSheet.getLastRow();
     const NUM_COLUMNS = 23; const now = new Date();
+    // FIX (bảo vệ chống lệch cột - xem kiemTraLechHeaderSheet_ ở PHẦN 1): chỉ
+    // CẢNH BÁO (không chặn) nếu tiêu đề Sheet PhieuCan_DN đã đổi khác so với
+    // lần kiểm tra gần nhất, vì hệ thống ghi/đọc theo VỊ TRÍ cột cố định.
+    const _canhBaoHeader = kiemTraLechHeaderSheet_(dataSheet, "PhieuCan_DN", NUM_COLUMNS);
 
     const duplicateMap = new Map();
     if (lastRow > 1) {
@@ -320,12 +348,30 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
     }
 
     let countNew = 0, countUpdate = 0, countSkip = 0; const batchNew = [];
+    // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
+    // đã tồn tại lẫn nhánh ghi dòng mới bên dưới), tránh gọi PropertiesService lặp lại.
+    const _rfLoop = REGION_FORMAT();
 
     for (let item of confirmedDataList) {
       if (item.isError) continue;
-      const valA_Dich = item.soPhieu; const valF_Dich = item.soXe; const uniqueKeyMaCT = item.uniqueKey;
-      let valL_Dich = item.khGoc; let valN_Dich = String(item.dlGoc || "").toUpperCase(); let valO_Dich = String(item.ngGoc || "").toUpperCase();
+      // FIX (Sanitize): áp dụng sanitize() (chống Formula/CSV Injection - xem
+      // định nghĩa ở PHẦN 6) cho MỌI chuỗi văn bản tự do đến từ file Excel tải
+      // lên (Số phiếu, Số xe, Khách hàng, Đại lý, Nguồn gốc) - TRƯỚC ĐÂY chỉ áp
+      // dụng cho module Kho Dăm, khiến 1 ô bắt đầu bằng "=" trong file gốc có
+      // thể trở thành công thức sống ngay trong sổ sách PhieuCan_DN.
+      const valA_Dich = sanitize(item.soPhieu); const valF_Dich = sanitize(item.soXe); const uniqueKeyMaCT = item.uniqueKey;
+      let valL_Dich = sanitize(item.khGoc); let valN_Dich = sanitize(String(item.dlGoc || "").toUpperCase()); let valO_Dich = sanitize(String(item.ngGoc || "").toUpperCase());
       let valK_Dich = valN_Dich + "_" + valO_Dich; let valQ_Dich = valN_Dich + "_" + valO_Dich + "_Y";
+
+      // FIX #22: TRƯỚC ĐÂY dùng "toDateObj(r[2])"/"toDateObj(r[3])" - biến "r"
+      // KHÔNG TỒN TẠI trong hàm này (đó là biến của step1_PreviewDraft, đã bị
+      // xóa cùng "rawRowData" ở FIX #21) - gây lỗi "ReferenceError: r is not
+      // defined" ngay khi có phiếu MỚI cần ghi. Nay tái tạo đúng Date object từ
+      // "item.rawDateC"/"item.rawDateD" (chuỗi ISO an toàn, được step1_PreviewDraft
+      // gửi kèm mỗi dòng xem trước) - khớp đúng cấu trúc mới. Tính TRƯỚC nhánh
+      // cập nhật/mới để dùng chung được cho cả 2 nhánh bên dưới.
+      let dateC = item.rawDateC ? new Date(item.rawDateC) : null;
+      let dateD = item.rawDateD ? new Date(item.rawDateD) : null;
 
       if (duplicateMap.has(uniqueKeyMaCT)) {
         const info = duplicateMap.get(uniqueKeyMaCT);
@@ -341,8 +387,22 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
         // cập nhật thẳng vào mảng batchNew đang ở RAM, KHÔNG được gọi getRange lên
         // sheet bằng info.rowNum (lúc đó info.rowNum sẽ là undefined -> lỗi
         // "Tham số (null,number)...").
+        // FIX (cập nhật thiếu khối lượng/ngày giờ khi re-import): TRƯỚC ĐÂY nhánh
+        // "Cập nhật dòng cũ" chỉ ghi lại mã Khách hàng/Đại lý/Nguồn gốc, KHÔNG bao
+        // giờ cập nhật lại Cân lần 1/2, KL Hàng hay Ngày/Giờ cân - nếu file gốc lần
+        // đầu nhập sai khối lượng, tải lại file đã sửa (khi phiếu CHƯA bị khóa "OK")
+        // vẫn âm thầm giữ nguyên số liệu SAI cũ. Nay cập nhật đầy đủ luôn cả các cột
+        // này, đúng đúng ý nghĩa "re-import file đã sửa để thay thế dữ liệu cũ".
         if (info.rowNum === undefined && info.batchIndex !== undefined) {
           const row = batchNew[info.batchIndex];
+          row[1] = dateC ? toDateOnly_(dateC) : row[1];
+          row[2] = dateC ? toTimeOnly_(dateC) : row[2];
+          row[3] = dateD ? toDateOnly_(dateD) : row[3];
+          row[4] = dateD ? toTimeOnly_(dateD) : row[4];
+          row[5] = valF_Dich;
+          row[7] = item.klCan1 !== undefined ? item.klCan1 : row[7];
+          row[8] = item.klCan2 !== undefined ? item.klCan2 : row[8];
+          row[9] = item.klHangGoc !== undefined ? item.klHangGoc : row[9];
           row[10] = valK_Dich;
           row[11] = valL_Dich;
           row[13] = valN_Dich;
@@ -353,6 +413,17 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
           continue;
         }
 
+        dataSheet.getRange(info.rowNum, 2, 1, 4).setValues([[
+          dateC ? toDateOnly_(dateC) : "", dateC ? toTimeOnly_(dateC) : "",
+          dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : ""
+        ]]);
+        dataSheet.getRange(info.rowNum, 2, 1, 1).setNumberFormat(_rfLoop.DATE_FMT);
+        dataSheet.getRange(info.rowNum, 3, 1, 1).setNumberFormat(_rfLoop.TIME_FMT);
+        dataSheet.getRange(info.rowNum, 4, 1, 1).setNumberFormat(_rfLoop.DATE_FMT);
+        dataSheet.getRange(info.rowNum, 5, 1, 1).setNumberFormat(_rfLoop.TIME_FMT);
+        dataSheet.getRange(info.rowNum, 6).setValue(valF_Dich);
+        dataSheet.getRange(info.rowNum, 8, 1, 3).setValues([[item.klCan1, item.klCan2, item.klHangGoc]]);
+        dataSheet.getRange(info.rowNum, 8, 1, 3).setNumberFormat("#,##0");
         dataSheet.getRange(info.rowNum, 11).setValue(valK_Dich);
         dataSheet.getRange(info.rowNum, 12).setValue(valL_Dich);
         dataSheet.getRange(info.rowNum, 14, 1, 2).setValues([[valN_Dich, valO_Dich]]);
@@ -362,14 +433,6 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       }
 
       let newRow = new Array(NUM_COLUMNS).fill("");
-      // FIX #22: TRƯỚC ĐÂY dùng "toDateObj(r[2])"/"toDateObj(r[3])" - biến "r"
-      // KHÔNG TỒN TẠI trong hàm này (đó là biến của step1_PreviewDraft, đã bị
-      // xóa cùng "rawRowData" ở FIX #21) - gây lỗi "ReferenceError: r is not
-      // defined" ngay khi có phiếu MỚI cần ghi. Nay tái tạo đúng Date object từ
-      // "item.rawDateC"/"item.rawDateD" (chuỗi ISO an toàn, được step1_PreviewDraft
-      // gửi kèm mỗi dòng xem trước) - khớp đúng cấu trúc mới.
-      let dateC = item.rawDateC ? new Date(item.rawDateC) : null;
-      let dateD = item.rawDateD ? new Date(item.rawDateD) : null;
       newRow[0] = valA_Dich;
 
       // FIX #3: Ghi đúng Ngày THUẦN vào cột "Ngày cân X" và Giờ THUẦN vào cột
@@ -428,7 +491,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
     const draftMsg = luuDraftChuaTT ? ` | Đã lưu ${batchNew.length} phiếu vào Draft Chưa Thanh Toán` : "";
     const finalMsg = `Mới: ${countNew}, Cập nhật: ${countUpdate}, Bỏ qua: ${countSkip}${priceMsg}${draftMsg}`;
     logAudit_('IMPORT_PHIEUCAN', 'OK', finalMsg);
-    return { status: "success", message: finalMsg };
+    return { status: "success", message: finalMsg + (_canhBaoHeader ? " | " + _canhBaoHeader : "") };
   } catch (e) {
     logAudit_('IMPORT_PHIEUCAN', 'ERROR', e.toString());
     return { status: "error", message: e.toString() };
@@ -497,16 +560,20 @@ function addManualPhieuCan(fields) {
     const valK_Dich = maKH + "_" + maNG;
     const valQ_Dich = maKH + "_" + maNG + "_Y";
 
-    newRow[0] = String(fields.soPhieu).trim();
+    // FIX (Sanitize): áp dụng sanitize() (chống Formula/CSV Injection - định
+    // nghĩa ở PHẦN 6) cho các trường văn bản tự do gõ tay - TRƯỚC ĐÂY chỉ áp
+    // dụng ở module Kho Dăm, khiến ai đó gõ nhầm/cố ý 1 ô bắt đầu bằng "="
+    // (VD số điện thoại dạng "=SDT...") có thể trở thành công thức sống.
+    newRow[0] = sanitize(String(fields.soPhieu).trim());
     // FIX #3: Ghi đúng Ngày THUẦN vào cột "Ngày cân X" và Giờ THUẦN vào cột
     // "Giờ cân X", khớp đúng quy ước dữ liệu thật (xem toDateOnly_/toTimeOnly_).
     newRow[1] = toDateOnly_(dateC); newRow[2] = toTimeOnly_(dateC);
     newRow[3] = toDateOnly_(dateD); newRow[4] = toTimeOnly_(dateD);
-    newRow[5] = String(fields.soXe).trim();
-    newRow[6] = String(fields.soXe2 || "").trim(); // Cột G - Biển số 2 (tùy chọn, cho xe kéo/rơ-moóc)
+    newRow[5] = sanitize(String(fields.soXe).trim());
+    newRow[6] = sanitize(String(fields.soXe2 || "").trim()); // Cột G - Biển số 2 (tùy chọn, cho xe kéo/rơ-moóc)
     newRow[7] = klCan1; newRow[8] = klCan2; newRow[9] = klHang;
     newRow[10] = valK_Dich;
-    newRow[11] = String(fields.khachHang || "").trim(); // Cột L - Khách hàng
+    newRow[11] = sanitize(String(fields.khachHang || "").trim()); // Cột L - Khách hàng
     newRow[12] = "GK"; newRow[13] = maKH; newRow[14] = maNG;
     newRow[15] = "Y"; newRow[16] = valQ_Dich; newRow[17] = 0; newRow[18] = now;
     newRow[21] = uniqueKeyMaCT; newRow[22] = uniqueKeyMaCT;
@@ -652,13 +719,38 @@ function runCalculatePrice() {
   }
 }
 
+// FIX (lệch ranh giới hiệu lực): quy ước DUY NHẤT về "1 mốc thời gian ts có
+// nằm trong khoảng hiệu lực [tuTS, denTS) hay không" - ĐẦU khoảng bao gồm
+// (>=), CUỐI khoảng KHÔNG bao gồm (<, giống nửa-khoảng toán học), khớp đúng
+// cách BG_coreLogicProcessor_ tạo các khoảng hiệu lực NỐI TIẾP nhau (điểm kết
+// thúc báo giá cũ = điểm bắt đầu báo giá mới, trừ đi 1 giây). TRƯỚC ĐÂY
+// runCalculatePrice_core dùng "< end" (cuối khoảng KHÔNG bao gồm) trong khi
+// BG_checkRowEditable_/BG_annotateApplied_ lại dùng "<= end" (cuối khoảng CÓ
+// bao gồm) - 2 quy ước khác nhau cho CÙNG 1 khái niệm khiến 1 phiếu cân đúng
+// ngay mốc ranh giới (tới từng mili-giây) có thể được TÍNH GIÁ theo báo giá A
+// nhưng lại bị hệ thống báo "ĐÃ ÁP DỤNG" nhầm sang báo giá B liền kề. Nay gom
+// về 1 hàm DUY NHẤT, mọi nơi so khớp khoảng hiệu lực đều gọi hàm này để không
+// thể lệch nhau lần nữa.
+function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
+  return ts >= tuTS && ts < denTS;
+}
+
 // FIX #2: bản LÕI, KHÔNG khóa — dùng khi được gọi từ bên trong một hàm khác
 // (như step1_ConfirmImport) mà đã tự khóa từ trước. Gọi runCalculatePrice()
 // (bản có khóa) từ trong 1 hàm đang giữ khóa sẽ gây deadlock (tự chờ chính mình).
 function runCalculatePrice_core() {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET); const data = sheet.getDataRange().getValues();
-    const ssBG = SpreadsheetApp.openByUrl(CONFIG.URL_BAO_GIA); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
+    // FIX (đồng bộ Liên kết dữ liệu): TRƯỚC ĐÂY dùng thẳng CONFIG.URL_BAO_GIA
+    // (URL cố định, KHÔNG nằm trong LIENKET_DANH_SACH nên không đổi được qua
+    // Hệ thống → Cấu hình → Liên kết dữ liệu). Nếu admin từng dùng tính năng đó
+    // để đổi "Spreadsheet Báo giá" (BAOGIA_SPREADSHEET_ID) sang 1 sheet khác
+    // (VD sang năm tài chính mới), mọi nơi khác trong hệ thống (quản lý báo
+    // giá...) đã chuyển đúng, nhưng RIÊNG engine tính giá này vẫn âm thầm đọc
+    // sheet CŨ - sai giá cho mọi phiếu cân mới mà không ai biết. Nay dùng
+    // BG_ss_() (mở theo BAOGIA_CONFIG.SPREADSHEET_ID, ĐÃ nằm trong danh sách
+    // Liên kết dữ liệu) để luôn đồng bộ với đúng 1 nguồn cấu hình duy nhất.
+    const ssBG = BG_ss_(); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
     const dataBG = rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
     const resT = []; const resX = []; const resY = []; const resZ = [];
     for (let i = 1; i < data.length; i++) {
@@ -666,7 +758,7 @@ function runCalculatePrice_core() {
       let valQ = String(r[16] || "").trim().toUpperCase(); let rVal = parseFloat(r[17]) || 0; let klJ = parseFloat(r[9]) || 0; let klSoSanh = klJ / 1000;
       let dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
       let ts = dt.getTime(); let giaFound = 0;
-      if (valQ !== "" && klSoSanh > 0) { let listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (let bg of listCungMa) { if (ts >= bg.start && ts < bg.end && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
+      if (valQ !== "" && klSoSanh > 0) { let listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (let bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
       resT.push([giaFound]); let hieuSo = Math.round(giaFound + rVal); resX.push([hieuSo]); let thanhTienRaw = Math.round(klSoSanh * hieuSo); let thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000; resZ.push([thanhTienLamTron]);
       resY.push((giaFound > 0 && thanhTienLamTron > 0) ? ["Test giá"] : ["Lỗi ĐK/Báo giá"]);
     }
@@ -1383,6 +1475,68 @@ function logAudit_(action, status, message) {
 }
 function createSimpleMap_(s,k,v) { const d=s.getDataRange().getValues(); let m={}; for(let i=1;i<d.length;i++){ let key=String(d[i][k]).trim(); if(key) m[key]=d[i][v]; } return m; }
 
+// FIX (bảo vệ chống lệch cột): Toàn bộ hệ thống ghi/đọc theo VỊ TRÍ CỘT CỐ ĐỊNH
+// (VD row[21], getRange(...,22,...)...) trên các Sheet mà nhân viên vẫn có thể
+// mở và sửa trực tiếp (chèn/xóa/đổi thứ tự cột) - TRƯỚC ĐÂY không có bất kỳ
+// cảnh báo nào, nên 1 cột bị chèn/xóa nhầm sẽ làm dữ liệu SAI LỆCH ÂM THẦM.
+// Vì code không biết chắc "tiêu đề ĐÚNG" phải là chữ gì trên từng Sheet thật
+// (không có quyền đọc trước dữ liệu thật để đối chiếu), hàm này dùng cách AN
+// TOÀN hơn: TỰ CHỤP LẠI tiêu đề dòng 1 làm "chuẩn tin cậy" (lưu PropertiesService)
+// ngay LẦN ĐẦU chạy sau khi triển khai bản vá này, rồi từ đó về sau CHỈ CẢNH BÁO
+// (không chặn thao tác) nếu phát hiện tiêu đề đã đổi khác so với chuẩn đã lưu.
+// Nếu thay đổi cột là CHỦ Ý (admin thêm/sửa cột hợp lệ), gọi
+// HT_datLaiChuanHeaderSheet_ (bên dưới) để "chốt lại" chuẩn mới, tắt cảnh báo.
+function kiemTraLechHeaderSheet_(sheet, tenGoiSheet, soCotCanTheoDoi) {
+  try {
+    if (!sheet || sheet.getLastRow() < 1) return "";
+    const soCotDoc = Math.min(soCotCanTheoDoi, Math.max(sheet.getLastColumn(), 1));
+    const headerThat = sheet.getRange(1, 1, 1, soCotDoc).getValues()[0].map(v => String(v || "").trim());
+    const key = "HEADER_BASELINE_" + tenGoiSheet;
+    const props = PropertiesService.getScriptProperties();
+    const daLuu = props.getProperty(key);
+    if (!daLuu) {
+      props.setProperty(key, JSON.stringify(headerThat)); // Lần đầu: chụp làm chuẩn, chưa có gì để so sánh
+      return "";
+    }
+    let baseline = [];
+    try { baseline = JSON.parse(daLuu); } catch (e) { baseline = []; }
+    const saiLech = [];
+    for (let i = 0; i < Math.max(baseline.length, headerThat.length); i++) {
+      const cu = baseline[i] || ""; const moi = headerThat[i] || "";
+      if (cu !== moi) saiLech.push('Cột ' + (i + 1) + ': "' + cu + '" → "' + moi + '"');
+    }
+    if (saiLech.length > 0) {
+      const canhBao = "⚠️ CẢNH BÁO cấu trúc Sheet \"" + tenGoiSheet + "\" đã đổi khác so với lần kiểm tra gần nhất (có thể do chèn/xóa/đổi thứ tự cột thủ công) - hệ thống đọc/ghi theo VỊ TRÍ cột cố định nên có nguy cơ SAI LỆCH DỮ LIỆU: " + saiLech.join("; ") + ". Nếu đây là thay đổi hợp lệ, vào Hệ thống → Cấu hình hệ thống để xác nhận lại chuẩn.";
+      logAudit_("CANH_BAO_LECH_HEADER", "WARNING", canhBao);
+      return canhBao;
+    }
+    return "";
+  } catch (e) { return ""; } // Không để lỗi kiểm tra làm hỏng luồng chính
+}
+
+// Admin xác nhận cấu trúc cột HIỆN TẠI là đúng/hợp lệ (VD sau khi chủ động
+// thêm cột mới) - chụp lại làm chuẩn mới, tắt cảnh báo từ lần sau.
+function HT_datLaiChuanHeaderSheet_(tenGoiSheet, sheet) {
+  try {
+    if (!sheet || sheet.getLastRow() < 1) return;
+    const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map(v => String(v || "").trim());
+    PropertiesService.getScriptProperties().setProperty("HEADER_BASELINE_" + tenGoiSheet, JSON.stringify(header));
+  } catch (e) { /* bỏ qua */ }
+}
+
+function HT_xacNhanCauTrucSheetHienTai() {
+  try {
+    yeuCauQuyenAdmin_();
+    const ssPC = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    HT_datLaiChuanHeaderSheet_("PhieuCan_DN", ssPC.getSheetByName(CONFIG.DATA_SHEET));
+    const ssXH = XH_ss_();
+    HT_datLaiChuanHeaderSheet_("NL_PC_XH", ssXH.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH));
+    HT_datLaiChuanHeaderSheet_("NL_DH_XB", ssXH.getSheetByName(XUATHANG_CONFIG.SHEET_DHXB));
+    logAudit_("CAUHINH_XACNHAN_HEADER", "OK", "Admin đã xác nhận lại chuẩn cấu trúc cột hiện tại.");
+    return { status: "success", message: "✅ Đã xác nhận cấu trúc cột hiện tại làm chuẩn mới. Cảnh báo lệch cột sẽ tắt cho đến lần thay đổi tiếp theo." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 /* ---------- File mẫu tải về cho 2 loại Import (không đụng dữ liệu thật) ---------- */
 
 // Mẫu Phiếu cân NHẬP (PhieuCan_DN) - đúng theo tiêu đề đã XÁC NHẬN từ file thật
@@ -1691,7 +1845,7 @@ function BG_checkRowEditable_(idBgct, maList) {
       const tuTS = row[1].getTime();
       const denTS = row[2].getTime();
       const list = byMa[ma] || [];
-      const daApDung = list.some(ts => ts >= tuTS && ts <= denTS);
+      const daApDung = list.some(ts => _tsTrongKhoangHieuLuc_(ts, tuTS, denTS));
       if (daApDung) {
         return { editable: false, reason: "Mã \"" + ma + "\" ĐÃ CÓ PHIẾU CÂN ÁP DỤNG trong khoảng hiệu lực này — không thể sửa/xóa để không làm sai lệch số liệu đã tính tiền." };
       }
@@ -1711,7 +1865,7 @@ function BG_annotateApplied_(finalRows, displayData) {
     const tuTS = finalRow[1].getTime();
     const denTS = finalRow[2].getTime();
     const list = byMa[d.ma] || [];
-    const daApDung = list.some(ts => ts >= tuTS && ts <= denTS);
+    const daApDung = list.some(ts => _tsTrongKhoangHieuLuc_(ts, tuTS, denTS));
     const hetHieuLuc = d.trangThai === "Hết hiệu lực";
     let reason = "";
     if (hetHieuLuc) reason = "Đã hết hiệu lực, không thể sửa/xóa.";
@@ -3443,6 +3597,19 @@ function layBaoCaoTheoKyVetBai(params) {
   };
 }
 
+// GHI CHÚ (đã đánh giá, CHỦ Ý giữ nguyên): processFormData và các hàm nó gọi
+// (xuLyDanhMucKho, xuLyKyVetBai, xuLySuaXoaDoKho, xuLySuaXoaGiaoDich,
+// KD_taoPhieuDieuChinhTuDong...) trả về CHUỖI có tiền tố emoji ("✅ ...",
+// "❌ ...") thay vì object {status, message} như quy ước mọi module khác
+// trong hệ thống. ĐÃ CÂN NHẮC đổi lại cho đồng bộ, nhưng KHÔNG thực hiện vì
+// rủi ro cao hơn lợi ích: toàn bộ ~20 điểm gọi ở phía Index.html (module Kho
+// Dăm) đang dùng google.script.run.withSuccessHandler(res => alert(res)...)
+// - đọc res NHƯ 1 CHUỖI trực tiếp - nên đổi định dạng trả về ở đây bắt buộc
+// phải sửa ĐỒNG THỜI toàn bộ các điểm gọi đó, và không thể kiểm thử trực tiếp
+// trên Google Sheet thật đang chạy để xác nhận không bỏ sót. Vì hàm hiện tại
+// KHÔNG có lỗi hành vi (chỉ là quy ước khác), giữ nguyên để tránh rủi ro làm
+// hỏng module Kho Dăm đang chạy thật - chỉ mới nơi nào MỚI thêm/sửa (VD
+// PHẦN 6 dùng sanitize()) mới cần tuân theo quy ước {status,message}.
 function processFormData(action, data) {
   kiemTraVaTaoTieuDeSheets();
   var lock = LockService.getScriptLock();
@@ -3728,6 +3895,8 @@ function XH_step1_ConfirmImport(confirmedDataList) {
     const ss = XH_ss_();
     const dataSheet = ss.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH);
     const lastRow = dataSheet.getLastRow();
+    // FIX (bảo vệ chống lệch cột): xem giải thích ở step1_ConfirmImport (PHẦN 1)
+    const _canhBaoHeaderXH = kiemTraLechHeaderSheet_(dataSheet, "NL_PC_XH", 17);
 
     const existingKeys = new Set();
     if (lastRow > 0) {
@@ -3754,12 +3923,16 @@ function XH_step1_ConfirmImport(confirmedDataList) {
       // Khớp đúng 17 cột của NL_PC_XH (A..Q): cột O = Số TKHQ (không đổi), cột P
       // = Kho xuất (thay cho "TÀU XUẤT" cũ - đã xác nhận chưa từng có dữ liệu
       // nên an toàn để tái sử dụng), cột Q = Kho nhập (cột MỚI thêm).
+      // FIX (Sanitize): áp dụng sanitize() cho toàn bộ trường văn bản đến từ
+      // file Excel tải lên (chống Formula/CSV Injection) - sanitize() không ảnh
+      // hưởng các giá trị số (trả nguyên giá trị nếu không phải chuỗi), nên an
+      // toàn kết hợp với setNumberFormat("@") của Số TKHQ/Số BKLS bên dưới.
       batchNew.push([
-        item.uniqueKey, ngayCan1Str, ngayCan2Str, item.bienSo || "",
+        item.uniqueKey, ngayCan1Str, ngayCan2Str, sanitize(item.bienSo || ""),
         parseFloat(item.canLan1) || 0, parseFloat(item.canLan2) || 0, parseFloat(item.klHang) || 0,
-        item.donViVanChuyen || "", item.tenTaiXe || "", klTan,
-        ngayXuat || "", item.soBKLS || "", item.khoiLuongM3 || "", item.nguoiCan || "",
-        item.soTKHQ || "", item.khoXuat || "", item.khoNhap || ""
+        sanitize(item.donViVanChuyen || ""), sanitize(item.tenTaiXe || ""), klTan,
+        ngayXuat || "", sanitize(item.soBKLS || ""), sanitize(item.khoiLuongM3 || ""), sanitize(item.nguoiCan || ""),
+        sanitize(item.soTKHQ || ""), sanitize(item.khoXuat || ""), sanitize(item.khoNhap || "")
       ]);
       countNew++;
     }
@@ -3782,7 +3955,7 @@ function XH_step1_ConfirmImport(confirmedDataList) {
 
     const finalMsg = `Mới: ${countNew}, Bỏ qua (đã tồn tại/trùng): ${countSkip}`;
     logAudit_("IMPORT_XUATHANG", "OK", finalMsg);
-    return { status: "success", message: finalMsg };
+    return { status: "success", message: finalMsg + (_canhBaoHeaderXH ? " | " + _canhBaoHeaderXH : "") };
   } catch (e) {
     logAudit_("IMPORT_XUATHANG", "ERROR", e.toString());
     return { status: "error", message: e.toString() };
@@ -3855,6 +4028,8 @@ function XH_saveDonHang(payload) {
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const lastRow = sheet.getLastRow();
     const stt = lastRow; // header ở dòng 1, dữ liệu bắt đầu dòng 2 -> STT = lastRow (số dòng dữ liệu hiện có + 1, vì lastRow đang TÍNH CẢ header)
+    // FIX (bảo vệ chống lệch cột): xem giải thích ở step1_ConfirmImport (PHẦN 1)
+    const _canhBaoHeaderDH = kiemTraLechHeaderSheet_(sheet, "NL_DH_XB", 16);
 
     const loaiXe = String(payload.loaiXe || "Y").toUpperCase() === "N" ? "N" : "Y";
 
@@ -3865,17 +4040,20 @@ function XH_saveDonHang(payload) {
     const targetRowDH = sheet.getLastRow() + 1;
     sheet.getRange(targetRowDH, 3, 1, 1).setNumberFormat("@");
 
+    // FIX (Sanitize): áp dụng sanitize() cho toàn bộ trường văn bản tự do (chống
+    // Formula/CSV Injection - TRƯỚC ĐÂY module Xuất hàng không dùng sanitize()
+    // dù ghi thẳng text người dùng nhập vào sổ sách, khác với module Kho Dăm).
     sheet.appendRow([
-      stt, new Date(payload.ngayDonHang), String(payload.soTKHQ || "").trim(), String(payload.tau || "").trim(),
-      String(payload.khachHang || "").trim(), String(payload.diaChiKH || "").trim(), String(payload.tenHangHoa || "").trim(),
+      stt, new Date(payload.ngayDonHang), sanitize(String(payload.soTKHQ || "").trim()), sanitize(String(payload.tau || "").trim()),
+      sanitize(String(payload.khachHang || "").trim()), sanitize(String(payload.diaChiKH || "").trim()), sanitize(String(payload.tenHangHoa || "").trim()),
       parseFloat(payload.donGiaUSD) || 0, klMT, klBDMT, doKhoTinh,
       parseFloat(payload.doKhoNhaMay) || 0, payload.tuNgay || "", payload.denNgay || "", loaiXe,
-      String(payload.khoXuat || "").trim()
+      sanitize(String(payload.khoXuat || "").trim())
     ]);
     sheet.getRange(sheet.getLastRow(), 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
 
     logAudit_("XUATHANG_DONHANG", "OK", "Thêm đơn hàng xuất bán: " + payload.khachHang + " - " + payload.tau);
-    return { status: "success", message: "✅ Đã lưu đơn hàng xuất bán." };
+    return { status: "success", message: "✅ Đã lưu đơn hàng xuất bán." + (_canhBaoHeaderDH ? " | " + _canhBaoHeaderDH : "") };
   } catch (e) {
     logAudit_("XUATHANG_DONHANG", "ERROR", e.toString());
     return { status: "error", message: e.toString() };
@@ -3954,12 +4132,13 @@ function XH_updateDonHang(rowIndex, payload) {
 
     // FIX #17: Khóa Text cột Số TKHQ (cột C) TRƯỚC KHI ghi
     sheet.getRange(r, 3, 1, 1).setNumberFormat("@");
+    // FIX (Sanitize): xem giải thích ở XH_saveDonHang phía trên.
     sheet.getRange(r, 1, 1, 16).setValues([[
-      sttCu, new Date(payload.ngayDonHang), String(payload.soTKHQ || "").trim(), String(payload.tau || "").trim(),
-      String(payload.khachHang || "").trim(), String(payload.diaChiKH || "").trim(), String(payload.tenHangHoa || "").trim(),
+      sttCu, new Date(payload.ngayDonHang), sanitize(String(payload.soTKHQ || "").trim()), sanitize(String(payload.tau || "").trim()),
+      sanitize(String(payload.khachHang || "").trim()), sanitize(String(payload.diaChiKH || "").trim()), sanitize(String(payload.tenHangHoa || "").trim()),
       parseFloat(payload.donGiaUSD) || 0, klMT, klBDMT, doKho,
       parseFloat(payload.doKhoNhaMay) || 0, payload.tuNgay || "", payload.denNgay || "", loaiXe,
-      String(payload.khoXuat || "").trim()
+      sanitize(String(payload.khoXuat || "").trim())
     ]]);
     sheet.getRange(r, 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
 

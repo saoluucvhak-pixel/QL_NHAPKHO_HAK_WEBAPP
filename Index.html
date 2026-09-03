@@ -411,6 +411,7 @@
           <div class="sub-item active" data-tab="ht-tab-quytrinh" data-group="hethong">Quy trình tổng quan</div>
           <div class="sub-item" data-tab="ht-tab-huongdan" data-group="hethong">Hướng dẫn sử dụng</div>
           <div class="sub-item" data-tab="ht-tab-cauhinh" data-group="hethong">Cấu hình hệ thống</div>
+          <div class="sub-item" data-tab="ht-tab-quyen" data-group="hethong">Quản lý người dùng</div>
         </li>
       </ul>
 
@@ -1089,6 +1090,7 @@
           <div class="tabbtn active" data-pane="ht-tab-quytrinh">🗺️ Quy trình tổng quan</div>
           <div class="tabbtn" data-pane="ht-tab-huongdan">📖 Hướng dẫn sử dụng</div>
           <div class="tabbtn" data-pane="ht-tab-cauhinh">⚙️ Cấu hình hệ thống</div>
+          <div class="tabbtn" data-pane="ht-tab-quyen">👤 Quản lý người dùng</div>
         </div>
 
         <!-- TAB: QUY TRÌNH TỔNG QUAN -->
@@ -1106,7 +1108,7 @@
               <div class="process-arrow">→</div>
               <div class="process-step"><div class="step-num">3</div><h4>Tự động tính giá</h4><p>Hệ thống tự tra Mã đơn giá (Đại lý_Nguồn gốc_Hình ảnh) trong <b>Quản lý báo giá</b> đang hiệu lực tại đúng thời điểm cân để tính Thành tiền.</p></div>
               <div class="process-arrow">→</div>
-              <div class="process-step"><div class="step-num">4</div><h4>Báo cáo &amp; thanh toán</h4><p>Xem <b>Báo cáo tổng hợp kho → Báo cáo gỗ keo nhập qua cân</b>, xuất Excel/PDF, xuất dữ liệu Misa để hạch toán và lập Đề nghị thanh toán (ĐNTT).</p></div>
+              <div class="process-step"><div class="step-num">4</div><h4>Báo cáo &amp; thanh toán</h4><p>Xem <b>Báo cáo tổng hợp kho → Báo cáo gỗ keo nhập qua cân</b>, xuất Excel/PDF, xuất dữ liệu Misa để hạch toán. Cột "Đã/Chưa lập ĐNTT" trong báo cáo chỉ <b>hiển thị trạng thái</b> đọc từ Spreadsheet ĐNTT ngoài — việc lập Đề nghị thanh toán (ĐNTT) vẫn thực hiện ở quy trình/hệ thống hiện có, chưa có trong webapp này.</p></div>
             </div>
           </div>
 
@@ -1370,6 +1372,17 @@
           </div>
 
           <div class="card">
+            <h2>5. Cảnh báo lệch cấu trúc cột</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Hệ thống tự ghi nhớ tiêu đề cột (dòng 1) của các Sheet quan trọng nhất (PhieuCan_DN, NL_PC_XH, NL_DH_XB) và sẽ <b>hiện cảnh báo</b> (kèm theo kết quả Import/Lưu) nếu phát hiện tiêu đề đã đổi khác — dấu hiệu ai đó lỡ chèn/xóa/đổi thứ tự cột thủ công, có thể khiến dữ liệu ghi/đọc SAI LỆCH vì hệ thống vẫn đang đọc/ghi theo đúng VỊ TRÍ cột cũ.
+              Nếu vừa <b>chủ động</b> thêm/sửa cột hợp lệ, bấm nút dưới đây để xác nhận cấu trúc hiện tại là đúng, tắt cảnh báo cho đến lần thay đổi tiếp theo.
+            </p>
+            <div class="btnrow">
+              <button class="btn btn-ghost" id="btnXacNhanCauTrucSheet">✅ Xác nhận cấu trúc cột hiện tại là đúng</button>
+            </div>
+          </div>
+
+          <div class="card">
             <h2>Cấu hình nào áp dụng cho dữ liệu nào?</h2>
             <div class="table-wrap">
               <table>
@@ -1387,6 +1400,31 @@
               </table>
             </div>
             <p style="font-size:11.5px;color:var(--ink-soft);margin-top:10px;">Khối lượng tươi/khô trong Kho Dăm luôn hiển thị cố định <b>2 số lẻ</b> (không cấu hình được, vì không thuộc khái niệm Locale). Các bảng/báo cáo <b>không có trong danh sách trên</b> (báo giá, các báo cáo hiển thị trong webapp...) luôn cố định <b>dd/MM/yyyy</b>, không phụ thuộc các cấu hình này.</p>
+          </div>
+        </div>
+
+        <!-- TAB: QUẢN LÝ NGƯỜI DÙNG (phân quyền - chỉ Admin xem/sửa được, server chặn cứng dù có cố tình gọi trực tiếp) -->
+        <div class="tabpane" id="ht-tab-quyen">
+          <div class="card">
+            <h2>Danh sách người dùng được cấp quyền truy cập</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Trước đây webapp cho phép <b>BẤT KỲ ai đăng nhập bằng tài khoản Google</b> (kể cả không phải nhân viên) sử dụng mọi chức năng, kể cả xóa dữ liệu. Nay chỉ những email trong danh sách dưới đây mới mở được hệ thống. Nhân viên dùng Gmail cá nhân nên phải nhập <b>đúng email Gmail</b> đang dùng để đăng nhập.
+              Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Email</th><th>Vai trò</th><th></th></tr></thead>
+                <tbody id="ht_quyenBody"></tbody>
+              </table>
+            </div>
+            <div class="btnrow" style="margin-top:10px;">
+              <button class="btn btn-ghost btn-sm" id="btnThemNguoiDung">➕ Thêm người dùng</button>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnLuuDanhSachQuyen">💾 Lưu danh sách</button>
+              <button class="btn btn-ghost" id="btnTaiLaiDanhSachQuyen">🔄 Tải lại</button>
+            </div>
+            <div class="guide-warn">Phải giữ lại ít nhất 1 tài khoản Quản trị. Xóa nhầm email đang tự dùng để đăng nhập sẽ khiến chính bạn bị khóa khỏi hệ thống ngay khi Lưu — hãy chắc chắn trước khi bấm Lưu.</div>
           </div>
         </div>
       </section>
@@ -1554,6 +1592,7 @@
         if (paneId === 'tab-xh-donhang' && !state.loadedDonHangXB) { state.loadedDonHangXB = true; xhInitDonHang(); }
         if (paneId === 'xk-tab-misa' && !state.loadedXuatMisa) { state.loadedXuatMisa = true; locXuatMisa(); }
         if (paneId === 'ht-tab-cauhinh' && !state.loadedCauHinh) { state.loadedCauHinh = true; htLoadCauHinh(); }
+        if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadDanhSachQuyen(); }
       });
     });
     document.querySelectorAll('.sub-item[data-tab]').forEach(sub=>{
@@ -1569,7 +1608,8 @@
       bgMaBaoGiaList: [], bgMaKLList: [], bgQuoteList: [],
       bgHieuLucData: [], bgViewType: 'FINAL', bgUncheckedIds: new Set(), loadedKhoDam: false,
       loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null,
-      loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false
+      loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
+      currentUser: null
     };
 
     // ---------------------------------------------------------------
@@ -1577,12 +1617,43 @@
     // ---------------------------------------------------------------
     window.addEventListener('DOMContentLoaded', ()=>{
       const t = todayStr();
-      ['th_fromDate','th_toDate','ms_fromDate','ms_toDate','ms_genFrom','ms_genTo','bg_ngayBaoGia','bg_exportDate','dg_fromDate','dg_toDate'].forEach(id=>{
-        document.getElementById(id).value = t;
+      // FIX: bổ sung xk_fromDate/xk_toDate (Báo cáo xuất kho qua cân) và
+      // xm_fromDate/xm_toDate (Báo cáo xuất kho Misa) - TRƯỚC ĐÂY 2 cặp ô ngày
+      // này KHÔNG được set mặc định như mọi tab báo cáo khác, nên lần đầu mở
+      // tab (tự động gọi xkInitView()/locXuatMisa()) sẽ query với ngày rỗng -
+      // trông giống "đã lọc hôm nay" nhưng thực chất lấy TOÀN BỘ dữ liệu.
+      ['th_fromDate','th_toDate','ms_fromDate','ms_toDate','ms_genFrom','ms_genTo','bg_ngayBaoGia','bg_exportDate','dg_fromDate','dg_toDate','xk_fromDate','xk_toDate','xm_fromDate','xm_toDate'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.value = t;
       });
       document.getElementById('bg_hieuLuc').value = nowDatetimeLocalStr();
       loadFilterOptions();
+      initUserInfo();
     });
+    // FIX (phân quyền): hiển thị đang đăng nhập bằng tài khoản nào / vai trò gì,
+    // và ẩn (không chỉ để trống) các mục CHỈ ADMIN mới dùng được khỏi sidebar
+    // cho nhân viên thường - server vẫn luôn CHẶN CỨNG các hàm này dù có cố
+    // gọi trực tiếp (xem yeuCauQuyenAdmin_ ở Config.gs), đây chỉ là lớp ẩn UI
+    // cho gọn gàng, không phải lớp bảo mật chính.
+    function initUserInfo(){
+      runServer('HT_layThongTinNguoiDungHienTai').then(res=>{
+        if (res.status !== 'success' || !res.data) return;
+        state.currentUser = res.data;
+        const foot = document.querySelector('.sidebar-foot');
+        if (foot) {
+          foot.innerHTML = '© HAKGROUP · Quản lý Thanh toán HAK<br>👤 ' + escapeHtml(res.data.email || '(không xác định)')
+            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : 'Nhân viên');
+        }
+        if (!res.data.laAdmin) {
+          ['ht-tab-cauhinh', 'ht-tab-quyen'].forEach(tabId=>{
+            const subItem = document.querySelector('.sub-item[data-tab="' + tabId + '"]');
+            if (subItem) subItem.style.display = 'none';
+            const tabBtn = document.querySelector('.tabbtn[data-pane="' + tabId + '"]');
+            if (tabBtn) tabBtn.style.display = 'none';
+          });
+        }
+      }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
+    }
     function nowDatetimeLocalStr(){
       const d = new Date();
       const tz = new Date(d.getTime() - d.getTimezoneOffset()*60000);
@@ -2311,9 +2382,25 @@
       }
 
       // CHẾ ĐỘ TẠO MỚI (nhập mới hoặc sao chép)
+      // FIX: TRƯỚC ĐÂY nhánh tạo mới này gửi thẳng payload lên server không hề
+      // kiểm tra gì ở client (khác nhánh SỬA ở trên đã kiểm tra đủ) - nếu chưa
+      // nhập ngày báo giá/hiệu lực, hoặc còn nhóm giá thiếu Mã/Đơn giá, người
+      // dùng chỉ nhận được lỗi chung chung từ server, trải nghiệm kém hơn hẳn
+      // nhánh Sửa. Nay kiểm tra đầy đủ tương tự trước khi gọi server.
+      const ngayBaoGiaVal = document.getElementById('bg_ngayBaoGia').value;
+      const hieuLucVal = document.getElementById('bg_hieuLuc').value;
+      if (!ngayBaoGiaVal) { toast('Vui lòng chọn Ngày báo giá.', false); return; }
+      if (!hieuLucVal) { toast('Vui lòng chọn Ngày giờ hiệu lực.', false); return; }
+      if (!state.bgGroups || state.bgGroups.length === 0) { toast('Vui lòng thêm ít nhất 1 nhóm giá.', false); return; }
+      for (const g of state.bgGroups) {
+        if (!g.maList || g.maList.length === 0 || !g.klCode || !(parseFloat(g.gia) > 0)) {
+          toast('Vui lòng chọn đủ Mã báo giá, Mã khối lượng và nhập Đơn giá > 0 cho TẤT CẢ các nhóm giá.', false);
+          return;
+        }
+      }
       const payload = {
-        ngayBaoGia: document.getElementById('bg_ngayBaoGia').value,
-        hieuLuc: document.getElementById('bg_hieuLuc').value,
+        ngayBaoGia: ngayBaoGiaVal,
+        hieuLuc: hieuLucVal,
         idTam: state.bgIdTam || '',
         groups: state.bgGroups.map(g => ({ maList: g.maList, klCode: g.klCode, gia: g.gia }))
       };
@@ -2941,7 +3028,7 @@
     
     function thucHienXoaKho(maKho) {
       if (!confirm("Xóa kho này?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).processFormData('Danhmuckho', { maKho: maKho, hanhDong: 'XOA' });
+      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa kho: " + err.message)).processFormData('Danhmuckho', { maKho: maKho, hanhDong: 'XOA' });
     }
     
     function luuDanhMucKho(btn) {
@@ -2982,7 +3069,7 @@
     
     function thucHienXoaKy(rowIdx) {
       if (!confirm("Xóa kỳ này?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).processFormData('Thongsokho', { rowIndex: rowIdx, hanhDong: 'XOA' });
+      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).withFailureHandler(err => alert("❌ Lỗi xóa kỳ vét bãi: " + err.message)).processFormData('Thongsokho', { rowIndex: rowIdx, hanhDong: 'XOA' });
     }
     
     function luuKyVetBai(btn) {
@@ -3062,7 +3149,7 @@
     
     function thucHienXoaDoKho(ngay) {
       if (!confirm("Xóa ngày " + ngay + "?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA' });
+      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa độ khô: " + err.message)).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA' });
     }
     
     function luuDoKhoForm(btn) {
@@ -3355,7 +3442,10 @@
             if (document.getElementById('doKho_' + loai)) document.getElementById('doKho_' + loai).focus();
           }
         } else if (res.status === "success") {
-          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Thành phẩm:<br>- Gỗ keo: <b>${res.tongGoKeo.toLocaleString()} kg</b><br>- Dăm tươi: <b>${res.tongKhoiLuongUot.toLocaleString()} MT</b><br>- Độ khô: <b>${(res.doKho*100).toFixed(1)}%</b><br>- Nguồn: <b style="color:#d9822b;">${res.dienGiaiDoKho}</b>`;
+          // FIX (XSS/nhất quán): trước đây res.dienGiaiDoKho được chèn thẳng vào
+          // innerHTML không qua escapeHtml(), khác với hầu hết nơi còn lại của
+          // file luôn escape dữ liệu server/người dùng trước khi chèn HTML.
+          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Thành phẩm:<br>- Gỗ keo: <b>${res.tongGoKeo.toLocaleString()} kg</b><br>- Dăm tươi: <b>${res.tongKhoiLuongUot.toLocaleString()} MT</b><br>- Độ khô: <b>${(res.doKho*100).toFixed(1)}%</b><br>- Nguồn: <b style="color:#d9822b;">${escapeHtml(res.dienGiaiDoKho)}</b>`;
           alert("✅ Tải phiếu cân thành công! Nhấn 'Hoàn Thành & Lưu Phiếu'.");
         } else {
           alert("⚠️ " + res.message);
@@ -3511,7 +3601,7 @@
 
     function thucHienXoaGiaoDich(loai, tab, maPhieu) {
       if (!confirm("Xóa phiếu " + maPhieu + "?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); moLaiTheoTab(loai, tab); }).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA' });
+      google.script.run.withSuccessHandler(res => { alert(res); moLaiTheoTab(loai, tab); }).withFailureHandler(err => alert("❌ Lỗi xóa phiếu: " + err.message)).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA' });
     }
 
     function luuGiaoDichForm(loai, tab, btn) {
@@ -4147,6 +4237,62 @@
         if (soLech > 0) toast('Phát hiện ' + soLech + ' Sheet đang LỆCH Locale so với lựa chọn hiện tại!', false);
         else toast('Tất cả Sheet đều khớp với Locale đang chọn.', true);
       } catch(err){ toast('Lỗi kiểm tra Locale thật: ' + err, false); } finally { hideOverlay(); }
+    });
+
+    document.getElementById('btnXacNhanCauTrucSheet').addEventListener('click', async ()=>{
+      if (!confirm('Xác nhận cấu trúc cột HIỆN TẠI của PhieuCan_DN / NL_PC_XH / NL_DH_XB là đúng và đặt làm chuẩn mới?')) return;
+      showOverlay('Đang xác nhận cấu trúc cột…');
+      try {
+        const res = await runServer('HT_xacNhanCauTrucSheetHienTai');
+        toast(res.message, res.status === 'success');
+      } catch(err){ toast('Lỗi xác nhận cấu trúc cột: ' + err, false); } finally { hideOverlay(); }
+    });
+
+    // =================================================================
+    // HỆ THỐNG - QUẢN LÝ NGƯỜI DÙNG (phân quyền truy cập - chỉ Admin)
+    // =================================================================
+    function htVeDongQuyen(email, vaiTro){
+      return '<tr>'
+        + '<td><input type="email" class="ht-quyen-email" value="'+escapeHtml(email || '')+'" placeholder="ten@gmail.com" style="width:100%;font-size:12px;"></td>'
+        + '<td><select class="ht-quyen-vaitro" style="font-size:12px;">'
+          + '<option value="NHANVIEN"'+(vaiTro !== 'ADMIN' ? ' selected' : '')+'>Nhân viên</option>'
+          + '<option value="ADMIN"'+(vaiTro === 'ADMIN' ? ' selected' : '')+'>Quản trị</option>'
+          + '</select></td>'
+        + '<td><button class="btn btn-ghost btn-sm ht-quyen-xoa" type="button" title="Xóa">🗑️</button></td>'
+        + '</tr>';
+    }
+    async function htLoadDanhSachQuyen(){
+      try {
+        const res = await runServer('HT_layDanhSachQuyen');
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        const body = document.getElementById('ht_quyenBody');
+        body.innerHTML = res.data.map(u => htVeDongQuyen(u.email, u.vaiTro)).join('');
+        body.querySelectorAll('.ht-quyen-xoa').forEach(btn => btn.addEventListener('click', () => btn.closest('tr').remove()));
+      } catch(err){ toast('Lỗi tải danh sách người dùng: ' + err, false); }
+    }
+    document.getElementById('btnTaiLaiDanhSachQuyen').addEventListener('click', htLoadDanhSachQuyen);
+    document.getElementById('btnThemNguoiDung').addEventListener('click', ()=>{
+      const body = document.getElementById('ht_quyenBody');
+      body.insertAdjacentHTML('beforeend', htVeDongQuyen('', 'NHANVIEN'));
+      const rows = body.querySelectorAll('tr');
+      const lastRow = rows[rows.length - 1];
+      lastRow.querySelector('.ht-quyen-xoa').addEventListener('click', () => lastRow.remove());
+      lastRow.querySelector('.ht-quyen-email').focus();
+    });
+    document.getElementById('btnLuuDanhSachQuyen').addEventListener('click', async ()=>{
+      const rows = document.querySelectorAll('#ht_quyenBody tr');
+      const danhSach = Array.from(rows).map(row => ({
+        email: row.querySelector('.ht-quyen-email').value.trim(),
+        vaiTro: row.querySelector('.ht-quyen-vaitro').value
+      })).filter(u => u.email);
+      if (danhSach.length === 0) { toast('Danh sách người dùng không được để trống.', false); return; }
+      if (!confirm('Lưu danh sách ' + danhSach.length + ' người dùng? Email KHÔNG có trong danh sách sau khi lưu sẽ mất quyền truy cập ngay lập tức.')) return;
+      showOverlay('Đang lưu danh sách người dùng…');
+      try {
+        const res = await runServer('HT_luuDanhSachQuyen', danhSach);
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') await htLoadDanhSachQuyen();
+      } catch(err){ toast('Lỗi lưu danh sách người dùng: ' + err, false); } finally { hideOverlay(); }
     });
 
   </script>
