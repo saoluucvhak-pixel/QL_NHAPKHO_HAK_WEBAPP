@@ -1614,6 +1614,12 @@
       sel.value = current;
     }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    // Dùng khi chèn dữ liệu (có thể do người dùng nhập) làm THAM SỐ chuỗi bên trong
+    // 1 lệnh gọi hàm JS nằm trong thuộc tính onclick="..." (VD: onclick="foo('${jsAttr(x)}')").
+    // Escape 2 lớp: (1) escape \ và ' để giữ đúng cú pháp chuỗi JS trong onclick,
+    // (2) escapeHtml toàn bộ kết quả để không bị thoát khỏi thuộc tính HTML onclick="..."
+    // (chặn cả 2 hướng: chèn thêm thuộc tính/thẻ HTML lẫn chèn JS lạ vào trình xử lý sự kiện).
+    function jsAttr(s){ return escapeHtml(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
 
     // ---------------------------------------------------------------
     // TAB IMPORT FILE
@@ -1653,23 +1659,26 @@
       if (pendingFiles.length === 0) { toast('Vui lòng chọn ít nhất 1 file cân (.xls/.xlsx).', false); return; }
       showOverlay('Đang tải file lên & đối soát…');
       try {
-        let lastResult = null;
-        for (const file of pendingFiles){
-          const base64 = await fileToBase64(file);
-          lastResult = await runServer('step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name });
-        }
+        // FIX #25: TRƯỚC ĐÂY gọi step1_PreviewDraft riêng cho TỪNG file rồi chỉ
+        // giữ lại kết quả của LẦN GỌI CUỐI CÙNG - nếu chọn nhiều file cùng lúc,
+        // dữ liệu của các file trước đó bị mất khỏi bảng xem trước. Nay gửi TẤT
+        // CẢ file trong 1 lần gọi duy nhất để server gộp đúng toàn bộ dữ liệu.
+        const filesPayload = await Promise.all(
+          pendingFiles.map(async file => ({ base64: await fileToBase64(file), mimeType: file.type || 'application/vnd.ms-excel', name: file.name }))
+        );
+        const result = await runServer('step1_PreviewDraft', filesPayload);
         // Bảo vệ: nếu vì lý do nào đó server không trả về kết quả hợp lệ (VD phiên bản
         // web app đang chạy chưa phải bản mới nhất, hoặc quá thời gian xử lý), báo rõ
         // ràng thay vì để lỗi JS khó hiểu "Cannot read properties of null".
-        if (!lastResult || typeof lastResult.status === 'undefined') {
+        if (!result || typeof result.status === 'undefined') {
           toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
           return;
         }
-        if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
-        state.previewData = lastResult.data;
+        if (result.status !== 'success') { toast(result.message, false); return; }
+        state.previewData = result.data;
         renderPreview();
         pendingFiles = []; fileInput.value = ''; renderFileList();
-        toast('Đã xem trước ' + lastResult.data.length + ' dòng.', true);
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
@@ -2716,7 +2725,7 @@
           renderBaoCaoTonKho(res);
         })
         .withFailureHandler(function(err) {
-          renderScreen(`<div class="form-container text-danger"><b>❌ Lỗi tải báo cáo: ${err.message}</b></div>`);
+          renderScreen(`<div class="form-container text-danger"><b>❌ Lỗi tải báo cáo: ${escapeHtml(err.message)}</b></div>`);
         })
         .layBaoCaoTonKho(params);
     }
@@ -2732,11 +2741,11 @@
       let denNgay = res.denNgay || getTodayString();
 
       let khoOptions = '<option value="Tất cả">Tất cả</option>' + khoList.map(k => {
-        let safeK = String(k).replace(/'/g, "\\'");
+        let safeK = escapeHtml(k);
         return `<option value="${safeK}">${safeK}</option>`;
       }).join('');
       let nhaMayOptions = '<option value="Tất cả">Tất cả</option>' + nhaMayList.map(n => {
-        let safeN = String(n).replace(/'/g, "\\'");
+        let safeN = escapeHtml(n);
         return `<option value="${safeN}">${safeN}</option>`;
       }).join('');
 
@@ -2747,16 +2756,16 @@
         let mauTon = k.tonCuoiBDMT < 0 ? '#dc3545' : '#006b5a';
 
         let nhapCT = k.nhapTheoHinhThuc.length === 0 ? '<tr><td colspan="3">Không có phát sinh nhập</td></tr>' : k.nhapTheoHinhThuc.map(h =>
-          `<tr><td>${h.ten}</td><td style="text-align:right;">${fmtSo(h.mt)}</td><td style="text-align:right;">${fmtSo(h.bdmt)}</td></tr>`
+          `<tr><td>${escapeHtml(h.ten)}</td><td style="text-align:right;">${fmtSo(h.mt)}</td><td style="text-align:right;">${fmtSo(h.bdmt)}</td></tr>`
         ).join('');
         let xuatCT = k.xuatTheoHinhThuc.length === 0 ? '<tr><td colspan="3">Không có phát sinh xuất</td></tr>' : k.xuatTheoHinhThuc.map(h =>
-          `<tr><td>${h.ten}</td><td style="text-align:right;">${fmtSo(h.mt)}</td><td style="text-align:right;">${fmtSo(h.bdmt)}</td></tr>`
+          `<tr><td>${escapeHtml(h.ten)}</td><td style="text-align:right;">${fmtSo(h.mt)}</td><td style="text-align:right;">${fmtSo(h.bdmt)}</td></tr>`
         ).join('');
 
         return `
           <tr>
-            <td>${k.tenNhaMay}</td>
-            <td><b>${k.tenKho}</b></td>
+            <td>${escapeHtml(k.tenNhaMay)}</td>
+            <td><b>${escapeHtml(k.tenKho)}</b></td>
             <td style="text-align:right;">${fmtSo(k.tonDauMT)}<br><small style="color:#6c757d;">${fmtSo(k.tonDauBDMT)} BDMT (${fmtDoKho(k.tonDauDoKho)})</small></td>
             <td style="text-align:right; color:#0056b3;">${fmtSo(k.nhapKyMT)}<br><small style="color:#6c757d;">${fmtSo(k.nhapKyBDMT)} BDMT</small></td>
             <td style="text-align:right; color:#c0392b;">${fmtSo(k.xuatKyMT)}<br><small style="color:#6c757d;">${fmtSo(k.xuatKyBDMT)} BDMT</small></td>
@@ -2829,7 +2838,7 @@
       google.script.run
         .withSuccessHandler(function(res) { renderBaoCaoTheoKyVetBai(res); })
         .withFailureHandler(function(err) {
-          renderScreen(`<div class="form-container text-danger"><b>❌ Lỗi tải báo cáo: ${err.message}</b></div>`);
+          renderScreen(`<div class="form-container text-danger"><b>❌ Lỗi tải báo cáo: ${escapeHtml(err.message)}</b></div>`);
         })
         .processFormData('BaocaoKyVetBai', params);
     }
@@ -2842,7 +2851,7 @@
       let denNgay = res.denNgay || getTodayString();
 
       let khoOptions = '<option value="Tất cả">Tất cả</option>' + khoList.map(k => {
-        let safeK = String(k).replace(/'/g, "\\'");
+        let safeK = escapeHtml(k);
         return `<option value="${safeK}">${safeK}</option>`;
       }).join('');
 
@@ -2852,7 +2861,7 @@
         let mauCL = k.chenhLechBDMT < 0 ? '#dc3545' : '#006b5a';
         return `
           <tr>
-            <td><b>${k.tenKy}</b></td>
+            <td><b>${escapeHtml(k.tenKy)}</b></td>
             <td style="text-align:right; color:#0056b3;">${fmtSo(k.nhapMT)}<br><small style="color:#6c757d;">${fmtSo(k.nhapBDMT)} BDMT</small></td>
             <td style="text-align:right;">${k.soPhieuNhap}</td>
             <td style="text-align:right; color:#c0392b;">${fmtSo(k.xuatMT)}<br><small style="color:#6c757d;">${fmtSo(k.xuatBDMT)} BDMT</small></td>
@@ -2904,8 +2913,8 @@
         .withSuccessHandler(function(danhSach) {
           danhSach = danhSach || [];
           let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có danh mục kho nào</td></tr>' : danhSach.map(item => {
-            let safeMaKho = String(item.maKho).replace(/'/g, "\\'");
-            return `<tr><td><b>${item.tenNhaMay}</b></td><td>${item.tenKho}</td><td>${item.ngayKhoiTao}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKho('${safeMaKho}')">Xóa</button></td></tr>`;
+            let safeMaKho = jsAttr(item.maKho);
+            return `<tr><td><b>${escapeHtml(item.tenNhaMay)}</b></td><td>${escapeHtml(item.tenKho)}</td><td>${escapeHtml(item.ngayKhoiTao)}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKho('${safeMaKho}')">Xóa</button></td></tr>`;
           }).join('');
           renderScreen(`
             <div class="form-container">
@@ -2947,7 +2956,7 @@
       google.script.run
         .withSuccessHandler(function(danhSach) {
           danhSach = danhSach || [];
-          let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có kỳ nào</td></tr>' : danhSach.map(item => item.isLocked ? `<tr class="locked-row"><td><b>${item.kyVetBai}</b></td><td>${item.thoiGian}</td><td>${item.tieuHao}</td><td>🔒 Khóa</td></tr>` : `<tr><td><b>${item.kyVetBai}</b></td><td>${item.thoiGian}</td><td>${item.tieuHao}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKy('${item.rowIndex}')">Xóa</button></td></tr>`).join('');
+          let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có kỳ nào</td></tr>' : danhSach.map(item => item.isLocked ? `<tr class="locked-row"><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td>🔒 Khóa</td></tr>` : `<tr><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKy('${jsAttr(item.rowIndex)}')">Xóa</button></td></tr>`).join('');
           renderScreen(`
             <div class="form-container">
               <b>⚙️ QUẢN LÝ KỲ VÉT BÃI</b>
@@ -3003,17 +3012,17 @@
           let tongSoPhieu = ketQua.tongSoPhieu || 0;
 
           let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="5">Không có dữ liệu trong khoảng thời gian đã chọn</td></tr>' : danhSach.map(item => {
-            let safeNgay = String(item.ngay).replace(/'/g, "\\'");
-            let safeHinhThuc = String(item.hinhThuc).replace(/'/g, "\\'");
-            let safeDoKho = String(item.doKho).replace(/'/g, "\\'");
-            return item.isLocked ? 
-              `<tr class="locked-row"><td><b>${item.ngay}</b></td><td>${item.hinhThuc}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td>🔒 Khóa</td></tr>` : 
-              `<tr><td><b>${item.ngay}</b></td><td>${item.hinhThuc}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}')">Xóa</button></td></tr>`;
+            let safeNgay = jsAttr(item.ngay);
+            let safeHinhThuc = jsAttr(item.hinhThuc);
+            let safeDoKho = jsAttr(item.doKho);
+            return item.isLocked ?
+              `<tr class="locked-row"><td><b>${escapeHtml(item.ngay)}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td>🔒 Khóa</td></tr>` :
+              `<tr><td><b>${escapeHtml(item.ngay)}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}')">Xóa</button></td></tr>`;
           }).join('');
 
           let phanTrangHTML = renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-            `taiDanhSachDoKho('${tuNgay}','${denNgay}',${trangHienTai - 1})`,
-            `taiDanhSachDoKho('${tuNgay}','${denNgay}',${trangHienTai + 1})`);
+            `taiDanhSachDoKho('${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai - 1})`,
+            `taiDanhSachDoKho('${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai + 1})`);
           
           renderScreen(`
             <div class="form-container">
@@ -3097,7 +3106,7 @@
           }
 
           let khoOptions = '<option value="Không có">Không có</option>' + khoList.map(k => {
-             let safeK = String(k).replace(/'/g, "\\'");
+             let safeK = escapeHtml(k);
              return `<option value="${safeK}">${safeK}</option>`;
           }).join('');
           
@@ -3117,11 +3126,11 @@
 
           let phanTrangHTML = laXuatBan
             ? renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai - 1},'${htTuNgay}','${htDenNgay}')`,
-                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai + 1},'${htTuNgay}','${htDenNgay}')`)
+                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai - 1},'${jsAttr(htTuNgay)}','${jsAttr(htDenNgay)}')`,
+                `moFormGiaoDich('${loai}','${tab}',null,null,${trangHienTai + 1},'${jsAttr(htTuNgay)}','${jsAttr(htDenNgay)}')`)
             : renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
-                `moFormGiaoDich('${loai}','${tab}','${tuNgay}','${denNgay}',${trangHienTai - 1})`,
-                `moFormGiaoDich('${loai}','${tab}','${tuNgay}','${denNgay}',${trangHienTai + 1})`);
+                `moFormGiaoDich('${loai}','${tab}','${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai - 1})`,
+                `moFormGiaoDich('${loai}','${tab}','${jsAttr(tuNgay)}','${jsAttr(denNgay)}',${trangHienTai + 1})`);
 
           if (laXuatBan) {
             renderFormXuatBan(loai, tab, danhSach, khoOptions, todayStr, placeholderDoKho, phanTrangHTML, htTuNgay, htDenNgay);
@@ -3136,19 +3145,19 @@
     /** Dựng các dòng bảng kê phiếu dùng chung cho layout lưới (Nhập kho / Xuất khác / Xuất trung chuyển) — 10 cột. */
     function buildRowsGiaoDich(loai, tab, danhSach) {
       return danhSach.length === 0 ? '<tr><td colspan="10">Không có phiếu nào trong khoảng thời gian đã chọn</td></tr>' : danhSach.map(item => {
-        let safeMaPhieu = String(item.maPhieu).replace(/'/g, "\\'");
-        let safeNgay = String(item.ngay).replace(/'/g, "\\'");
-        let safeHinhThuc = String(item.hinhThuc).replace(/'/g, "\\'");
-        let safeKhoXuat = String(item.khoXuat).replace(/'/g, "\\'");
-        let safeKhoNhap = String(item.khoNhap).replace(/'/g, "\\'");
-        let safeDotVetBai = String(item.dotVetBai || "Mặc định").replace(/'/g, "\\'");
-        let safeMt = String(item.mt);
-        let safeDoKho = String(item.doKho);
+        let safeMaPhieu = jsAttr(item.maPhieu);
+        let safeNgay = jsAttr(item.ngay);
+        let safeHinhThuc = jsAttr(item.hinhThuc);
+        let safeKhoXuat = jsAttr(item.khoXuat);
+        let safeKhoNhap = jsAttr(item.khoNhap);
+        let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
+        let safeMt = jsAttr(item.mt);
+        let safeDoKho = jsAttr(item.doKho);
         let dkStr = (item.doKho * 100).toFixed(1) + '%';
 
-        return item.isLocked ? 
-          `<tr class="locked-row"><td><b>${item.maPhieu}</b></td><td>${item.ngay}</td><td>${safeDotVetBai}</td><td>${item.hinhThuc}</td><td>${item.khoXuat}->${item.khoNhap}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${item.nguonDK}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` : 
-          `<tr><td><b>${item.maPhieu}</b></td><td>${item.ngay}</td><td>${safeDotVetBai}</td><td>${item.hinhThuc}</td><td>${item.khoXuat}->${item.khoNhap}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#0056b3; font-weight:bold;">${item.nguonDK}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+        return item.isLocked ?
+          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` :
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#0056b3; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -3232,19 +3241,19 @@
     /** Dựng các dòng bảng kê phiếu Xuất bán (không có cột "Từ->Đến" vì luôn Xuất từ 1 kho) — 9 cột. */
     function buildRowsXuatBan(danhSach) {
       return danhSach.length === 0 ? '<tr><td colspan="9">Không có phiếu nào trong khoảng thời gian đã chọn</td></tr>' : danhSach.map(item => {
-        let safeMaPhieu = String(item.maPhieu).replace(/'/g, "\\'");
-        let safeNgay = String(item.ngay).replace(/'/g, "\\'");
-        let safeHinhThuc = String(item.hinhThuc).replace(/'/g, "\\'");
-        let safeKhoXuat = String(item.khoXuat).replace(/'/g, "\\'");
-        let safeKhoNhap = String(item.khoNhap).replace(/'/g, "\\'");
-        let safeDotVetBai = String(item.dotVetBai || "Mặc định").replace(/'/g, "\\'");
-        let safeMt = String(item.mt);
-        let safeDoKho = String(item.doKho);
+        let safeMaPhieu = jsAttr(item.maPhieu);
+        let safeNgay = jsAttr(item.ngay);
+        let safeHinhThuc = jsAttr(item.hinhThuc);
+        let safeKhoXuat = jsAttr(item.khoXuat);
+        let safeKhoNhap = jsAttr(item.khoNhap);
+        let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
+        let safeMt = jsAttr(item.mt);
+        let safeDoKho = jsAttr(item.doKho);
         let dkStr = (item.doKho * 100).toFixed(1) + '%';
 
         return item.isLocked ?
-          `<tr class="locked-row"><td><b>${item.maPhieu}</b></td><td>${item.ngay}</td><td>${safeDotVetBai}</td><td>${item.khoXuat}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${item.nguonDK}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` :
-          `<tr><td><b>${item.maPhieu}</b></td><td>${item.ngay}</td><td>${safeDotVetBai}</td><td>${item.khoXuat}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#0056b3; font-weight:bold;">${item.nguonDK}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` :
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#0056b3; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -3635,20 +3644,21 @@
       const khoNhapMacDinh = document.getElementById('xh_khoNhapMacDinh').value;
       showOverlay('Đang tải file lên & đối soát…');
       try {
-        let lastResult = null;
-        for (const file of xhPendingFiles){
-          const base64 = await fileToBase64(file);
-          lastResult = await runServer('XH_step1_PreviewDraft', { base64, mimeType: file.type || 'application/vnd.ms-excel', name: file.name }, khoXuatMacDinh, khoNhapMacDinh);
-        }
-        if (!lastResult || typeof lastResult.status === 'undefined') {
+        // FIX #25: gửi TẤT CẢ file trong 1 lần gọi duy nhất (xem chú thích tương
+        // tự ở btnPreview) thay vì chỉ giữ lại kết quả của file cuối cùng.
+        const filesPayload = await Promise.all(
+          xhPendingFiles.map(async file => ({ base64: await fileToBase64(file), mimeType: file.type || 'application/vnd.ms-excel', name: file.name }))
+        );
+        const result = await runServer('XH_step1_PreviewDraft', filesPayload, khoXuatMacDinh, khoNhapMacDinh);
+        if (!result || typeof result.status === 'undefined') {
           toast('Không nhận được phản hồi hợp lệ từ máy chủ. Vui lòng thử lại; nếu vẫn lỗi, có thể web app đang chạy bản cũ - hãy deploy lại bản mới nhất.', false);
           return;
         }
-        if (lastResult.status !== 'success') { toast(lastResult.message, false); return; }
-        state.xhPreviewData = lastResult.data;
+        if (result.status !== 'success') { toast(result.message, false); return; }
+        state.xhPreviewData = result.data;
         xhRenderPreview();
         xhPendingFiles = []; xhFileInput.value = ''; xhRenderFileList();
-        toast('Đã xem trước ' + lastResult.data.length + ' dòng.', true);
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
