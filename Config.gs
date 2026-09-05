@@ -212,6 +212,11 @@ function MISA_FORMAT() {
 // cho giao diện Cấu hình hệ thống hiển thị đúng trạng thái đang áp dụng.
 function HT_layCauHinhVungMien() {
   try {
+    // FIX (phân quyền - phát hiện qua test tự động): hàm này bị BỎ SÓT khi gate
+    // quyền Admin cho cả mục "Cấu hình hệ thống" - dù giá trị trả về (VN/US) ít
+    // nhạy cảm, vẫn nên nhất quán với các hàm HT_lay*/HT_luu* còn lại trong cùng
+    // mục cấu hình (đã chặn Admin-only), tránh 1 điểm hở dù nhỏ.
+    yeuCauQuyenAdmin_();
     const rf = REGION_FORMAT();
     const mf = MISA_FORMAT();
     return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN };

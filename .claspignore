@@ -1,0 +1,7 @@
+**/node_modules/**
+**/coverage/**
+test/**
+package.json
+package-lock.json
+.claspignore
+.gitignore

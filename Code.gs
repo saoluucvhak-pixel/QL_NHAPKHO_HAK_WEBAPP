@@ -413,19 +413,26 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
           continue;
         }
 
-        dataSheet.getRange(info.rowNum, 2, 1, 4).setValues([[
+        // TỐI ƯU: gộp các lệnh getRange/setValue(s)/setNumberFormat(s) liền cột
+        // thành ít lệnh nhất có thể (giảm số lượt gọi Sheets API cho mỗi dòng
+        // cập nhật - từ 13 lệnh xuống còn 7 lệnh) - GIỮ NGUYÊN 100% giá trị và
+        // định dạng ghi vào từng cột, chỉ đổi CÁCH gộp lệnh gọi.
+        // Cột B..F (Ngày/Giờ cân 1, Ngày/Giờ cân 2, Số xe) - 1 lệnh ghi giá trị duy nhất.
+        dataSheet.getRange(info.rowNum, 2, 1, 5).setValues([[
           dateC ? toDateOnly_(dateC) : "", dateC ? toTimeOnly_(dateC) : "",
-          dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : ""
+          dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : "",
+          valF_Dich
         ]]);
-        dataSheet.getRange(info.rowNum, 2, 1, 1).setNumberFormat(_rfLoop.DATE_FMT);
-        dataSheet.getRange(info.rowNum, 3, 1, 1).setNumberFormat(_rfLoop.TIME_FMT);
-        dataSheet.getRange(info.rowNum, 4, 1, 1).setNumberFormat(_rfLoop.DATE_FMT);
-        dataSheet.getRange(info.rowNum, 5, 1, 1).setNumberFormat(_rfLoop.TIME_FMT);
-        dataSheet.getRange(info.rowNum, 6).setValue(valF_Dich);
+        // Cột B..E cần ĐỊNH DẠNG khác nhau xen kẽ (Ngày/Giờ/Ngày/Giờ) - setNumberFormats
+        // (số nhiều) nhận mảng 2 chiều, gán được nhiều định dạng khác nhau trong 1 lệnh
+        // duy nhất (khác setNumberFormat số ít chỉ nhận 1 định dạng áp cho cả vùng).
+        dataSheet.getRange(info.rowNum, 2, 1, 4).setNumberFormats([[
+          _rfLoop.DATE_FMT, _rfLoop.TIME_FMT, _rfLoop.DATE_FMT, _rfLoop.TIME_FMT
+        ]]);
         dataSheet.getRange(info.rowNum, 8, 1, 3).setValues([[item.klCan1, item.klCan2, item.klHangGoc]]);
         dataSheet.getRange(info.rowNum, 8, 1, 3).setNumberFormat("#,##0");
-        dataSheet.getRange(info.rowNum, 11).setValue(valK_Dich);
-        dataSheet.getRange(info.rowNum, 12).setValue(valL_Dich);
+        // Cột K..L (Khách hàng ghép mã + Khách hàng) liền nhau - gộp 1 lệnh.
+        dataSheet.getRange(info.rowNum, 11, 1, 2).setValues([[valK_Dich, valL_Dich]]);
         dataSheet.getRange(info.rowNum, 14, 1, 2).setValues([[valN_Dich, valO_Dich]]);
         dataSheet.getRange(info.rowNum, 17).setValue(valQ_Dich);
         dataSheet.getRange(info.rowNum, 19).setValue(now);
@@ -1946,10 +1953,15 @@ function BG_updateBaogiaRow(payload) {
     if (!checkOld.editable) return { status: "error", message: "Không thể sửa: " + checkOld.reason };
 
     const sheetRow = rowIndex + 2;
-    sheet.getRange(sheetRow, 2).setValue(hieuLucDate);       // Cột B - Thời điểm hiệu lực
-    sheet.getRange(sheetRow, 3).setValue(maList.join(" , ")); // Cột C - Mã đơn giá
-    sheet.getRange(sheetRow, 4).setValue(klCode);             // Cột D - Khối lượng_Tấn
-    sheet.getRange(sheetRow, 5).setValue(gia);                // Cột E - Đơn giá
+    // TỐI ƯU: gộp 4 lệnh setValue riêng lẻ (cột B/C/D/E liền nhau, cùng 1 dòng)
+    // thành 1 lệnh setValues() duy nhất - giảm 4 lượt gọi Sheets API xuống 1,
+    // không đổi giá trị/kết quả ghi.
+    sheet.getRange(sheetRow, 2, 1, 4).setValues([[
+      hieuLucDate,             // Cột B - Thời điểm hiệu lực
+      maList.join(" , "),      // Cột C - Mã đơn giá
+      klCode,                  // Cột D - Khối lượng_Tấn
+      gia                      // Cột E - Đơn giá
+    ]]);
 
     return { status: "success", message: "Đã cập nhật báo giá " + idBgct + "." };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -3307,10 +3319,10 @@ function xuLySuaXoaDoKho(dataEdit) {
     if (dk > 1) dk = dk / 100; if (da > 1) da = da / 100;
     
     if (rowIdx > -1) {
-      sheet.getRange(rowIdx, 2).setValue(hinhThucSanitized); 
-      sheet.getRange(rowIdx, 3).setValue(dk); 
-      sheet.getRange(rowIdx, 4).setValue(da);
-      sheet.getRange(rowIdx, 5).setValue("Hợp lệ");
+      // TỐI ƯU: gộp 4 lệnh getRange(...).setValue(...) riêng lẻ (4 lượt gọi API
+      // Sheets) thành 1 lệnh setValues() duy nhất trên cả dải 4 cột liền nhau -
+      // giảm số lượt gọi Sheets API, phản hồi nhanh hơn, không đổi hành vi/kết quả.
+      sheet.getRange(rowIdx, 2, 1, 4).setValues([[hinhThucSanitized, dk, da, "Hợp lệ"]]);
       return "✏️ Đã cập nhật.";
     } else {
       sheet.appendRow([new Date(target), hinhThucSanitized, dk, da, "Hợp lệ"]);
