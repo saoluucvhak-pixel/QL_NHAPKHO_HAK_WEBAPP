@@ -69,6 +69,12 @@ function createGasEnv(opts) {
     };
     const context = vm.createContext(sandbox);
     vm.runInContext(BUNDLE_SRC, context, { filename: 'gas-bundle.js' });
+    // FIX (đa-realm Date): xem ghi chú chi tiết ở đầu gasMocks.js - đăng ký
+    // Date constructor của CHÍNH context vừa tạo làm "Date đang hoạt động",
+    // để mọi lần đọc dữ liệu từ sheet giả (getValues/getValue) tái tạo lại
+    // đúng Date theo realm này, giúp "instanceof Date" trong Code.gs hoạt
+    // động đúng như khi chạy thật trên Apps Script (chỉ có 1 realm duy nhất).
+    mocks.setActiveDateCtor_(vm.runInContext('Date', context));
     return context;
   }
 

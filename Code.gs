@@ -77,6 +77,11 @@ function step1_PreviewDraft(fileDataList) {
         if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim() });
       });
     }
+    // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): 1 phiếu đã "chốt sổ" chuyển
+    // sang sheet lưu trữ sẽ KHÔNG còn nằm trong existingData ở trên - nếu
+    // không bổ sung ở đây, tải lại đúng file gốc của phiếu đó sẽ bị hiểu nhầm
+    // là "Mới" ngay ở bước xem trước.
+    LT_bosungMaChungTuDaLuuTru_(duplicateMap);
 
     let previewRows = [];
     // FIX: theo dõi các key đã xuất hiện TRONG CHÍNH lượt xem trước này (GỘP CẢ
@@ -346,6 +351,8 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
         if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim() });
       });
     }
+    // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): xem giải thích ở step1_PreviewDraft.
+    LT_bosungMaChungTuDaLuuTru_(duplicateMap);
 
     let countNew = 0, countUpdate = 0, countSkip = 0; const batchNew = [];
     // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
@@ -559,6 +566,12 @@ function addManualPhieuCan(fields) {
         }
       }
     }
+    // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): năm "nam" ở trên có thể đã được
+    // Admin "chốt sổ" (chuyển sang sheet lưu trữ) - kiểm tra thêm đúng sheet năm
+    // đó để không nhập trùng 1 Mã Chứng Từ đã có trong dữ liệu lưu trữ.
+    if (LT_trungMaChungTuTrongNamLuuTru_(nam, uniqueKeyMaCT)) {
+      return { status: "error", message: "Số chứng từ " + uniqueKeyMaCT + " đã tồn tại trong dữ liệu LƯU TRỮ (năm " + nam + " đã chốt sổ). Vui lòng kiểm tra lại Số phiếu / năm." };
+    }
 
     const NUM_COLUMNS = 23; const now = new Date();
     let newRow = new Array(NUM_COLUMNS).fill("");
@@ -616,6 +629,245 @@ function combineDateTime_(dateStr, timeStr) {
 }
 
 /*********************************************************
+ * PHẦN 1C: LƯU TRỮ THEO NĂM (ARCHIVING)
+ * Giải quyết vấn đề PhieuCan_DN càng nhiều năm càng phình to khiến MỌI thao
+ * tác (nhập phiếu, xem báo cáo, tính giá...) chậm dần theo thời gian - vì gần
+ * như mọi hàm trong hệ thống đều quét NGUYÊN CẢ sheet mỗi lần chạy.
+ *
+ * Ý TƯỞNG: PhieuCan_DN chỉ giữ dữ liệu "ĐANG HOẠT ĐỘNG" - phiếu của năm hiện
+ * tại + mọi phiếu CHƯA khóa "OK" (dù thuộc năm nào, vì vẫn có thể cần sửa/tính
+ * lại giá). Phiếu đã "OK" của các năm CŨ được Admin CHỦ ĐỘNG "Chốt sổ" (chuyển
+ * hẳn, không tự động) sang 1 sheet lưu trữ riêng - CÙNG spreadsheet với
+ * PhieuCan_DN (không cần cấp phát thêm 1 Google Sheet mới), tên
+ * "PhieuCan_DN_<năm>" (VD "PhieuCan_DN_2024"). Nhờ vậy sheet đang hoạt động
+ * không phình to vô hạn theo thời gian - engine tính giá
+ * (runCalculatePrice_core) và việc kiểm tra trùng khi import chỉ còn phải
+ * quét đúng phần dữ liệu đang hoạt động, không phụ thuộc tổng số năm lịch sử.
+ *
+ * Báo cáo (getBaoCaoTongHop/getBaoCaoDonGia) vẫn xem được dữ liệu ĐÃ lưu trữ
+ * bình thường - khi bộ lọc ngày chạm tới 1 năm đã chốt sổ, hệ thống TỰ ĐỘNG mở
+ * thêm đúng sheet lưu trữ năm đó để gộp vào (xem LT_docPhieuCanGopLuuTru_) -
+ * chỉ chậm hơn 1 chút cho báo cáo hiếm khi cần nhìn lại nhiều năm cũ, còn báo
+ * cáo "tháng này/quý này/năm nay" (đa số nhu cầu hàng ngày) vẫn NHANH vì không
+ * đụng tới các sheet lưu trữ.
+ *********************************************************/
+
+// A..AA - đủ mọi cột PhieuCan_DN đang dùng (kể cả AA=ID_DNTT) - archive KHÔNG
+// được làm mất cột nào so với sheet gốc.
+const LT_SO_COT_DAY_DU = 27;
+
+function LT_tenSheetLuuTru_(nam) {
+  return CONFIG.DATA_SHEET + "_" + nam;
+}
+
+// Liệt kê TẤT CẢ các năm đã từng "chốt sổ" (tồn tại sheet PhieuCan_DN_<năm>) -
+// quét theo TÊN sheet, không cần nhớ trước danh sách năm nào.
+function LT_layDanhSachNamDaLuuTru_(ss) {
+  const prefix = CONFIG.DATA_SHEET + "_";
+  const nams = [];
+  ss.getSheets().forEach(function (sh) {
+    const ten = sh.getName();
+    if (ten.indexOf(prefix) === 0) {
+      const phanNam = ten.substring(prefix.length);
+      if (/^\d{4}$/.test(phanNam)) nams.push(parseInt(phanNam, 10));
+    }
+  });
+  return nams;
+}
+
+// Danh sách năm CẦN kiểm tra sheet lưu trữ cho 1 khoảng lọc ngày (fromDate/
+// toDate dạng "yyyy-MM-dd" hoặc rỗng). Nếu KHÔNG lọc ngày (cả 2 đều rỗng), trả
+// về TOÀN BỘ các năm đã từng lưu trữ - an toàn, không bỏ sót năm nào khi người
+// dùng không giới hạn ngày (đồng nghĩa muốn xem/kiểm tra hết lịch sử).
+function LT_capNamCanDoc_(ss, fromDate, toDate) {
+  if (!fromDate && !toDate) return LT_layDanhSachNamDaLuuTru_(ss);
+  const namTu = fromDate ? new Date(fromDate).getFullYear() : 2000;
+  const namDen = toDate ? new Date(toDate).getFullYear() : new Date().getFullYear();
+  const nams = [];
+  for (let n = namTu; n <= namDen; n++) nams.push(n);
+  return nams;
+}
+
+// Đọc dữ liệu PhieuCan_DN GỘP CẢ sheet đang hoạt động LẪN các sheet lưu trữ
+// theo năm CÓ LIÊN QUAN tới khoảng ngày lọc (xem LT_capNamCanDoc_ ở trên).
+// Trả về mảng các dòng đủ soCot cột (KHÔNG kèm dòng tiêu đề) - dùng thay cho
+// sheet.getRange(2,1,lastRow-1,soCot).getValues() ở các hàm báo cáo cần nhìn
+// xuyên cả dữ liệu đã lưu trữ.
+function LT_docPhieuCanGopLuuTru_(fromDate, toDate, soCot) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheetChinh = ss.getSheetByName(CONFIG.DATA_SHEET);
+  const lastRowChinh = sheetChinh.getLastRow();
+  let rows = lastRowChinh > 1 ? sheetChinh.getRange(2, 1, lastRowChinh - 1, soCot).getValues() : [];
+
+  LT_capNamCanDoc_(ss, fromDate, toDate).forEach(function (nam) {
+    const sheetNam = ss.getSheetByName(LT_tenSheetLuuTru_(nam));
+    if (sheetNam && sheetNam.getLastRow() > 1) {
+      rows = rows.concat(sheetNam.getRange(2, 1, sheetNam.getLastRow() - 1, soCot).getValues());
+    }
+  });
+  return rows;
+}
+
+// Kiểm tra 1 Mã Chứng Từ có trùng với dữ liệu ĐÃ LƯU TRỮ của ĐÚNG 1 năm cụ thể
+// hay không - dùng khi đã biết trước năm cần kiểm tra (VD nhập tay 1 phiếu),
+// nhanh hơn quét tất cả các năm đã lưu trữ vì chỉ mở đúng 1 sheet năm đó.
+function LT_trungMaChungTuTrongNamLuuTru_(nam, maChungTu) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheetNam = ss.getSheetByName(LT_tenSheetLuuTru_(nam));
+  if (!sheetNam || sheetNam.getLastRow() <= 1) return false;
+  const keys = sheetNam.getRange(2, 22, sheetNam.getLastRow() - 1, 1).getValues(); // Cột V
+  return keys.some(function (row) { return String(row[0] || "").trim() === maChungTu; });
+}
+
+// QUAN TRỌNG (an toàn khi có Lưu trữ theo năm): bổ sung TOÀN BỘ Mã Chứng Từ
+// đang có trong MỌI sheet lưu trữ vào 1 duplicateMap đã dựng sẵn từ sheet đang
+// hoạt động (dùng trong step1_PreviewDraft/step1_ConfirmImport - xử lý cả LÔ
+// nhiều phiếu, có thể thuộc nhiều năm khác nhau, nên quét hết các năm đã lưu
+// trữ 1 lần thay vì đoán trước năm nào). KHÔNG GHI ĐÈ nếu key đã có sẵn trong
+// map (ưu tiên dữ liệu ở sheet đang hoạt động, dù về lý thuyết 1 Mã Chứng Từ
+// không thể vừa ở sheet chính vừa ở sheet lưu trữ). status LUÔN là "OK" (chỉ
+// phiếu đã "OK" mới được chốt sổ - xem HT_chotSoNam) để luồng import tự động
+// "Bỏ qua (Đã khóa OK)" đúng như với 1 dòng OK còn nằm ở sheet chính, không
+// bao giờ cố ghi đè 1 dòng đã lưu trữ (rowNum để undefined - không dùng tới,
+// vì nhánh "OK" luôn bị bỏ qua trước khi cần đến rowNum).
+function LT_bosungMaChungTuDaLuuTru_(duplicateMap) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  LT_layDanhSachNamDaLuuTru_(ss).forEach(function (nam) {
+    const sheetNam = ss.getSheetByName(LT_tenSheetLuuTru_(nam));
+    const lastRowNam = sheetNam ? sheetNam.getLastRow() : 0;
+    if (lastRowNam > 1) {
+      sheetNam.getRange(2, 22, lastRowNam - 1, 1).getValues().forEach(function (row) {
+        const key = String(row[0] || "").trim();
+        if (key && !duplicateMap.has(key)) duplicateMap.set(key, { rowNum: undefined, status: "OK" });
+      });
+    }
+  });
+}
+
+// Thống kê nhanh theo từng năm (dựa vào Ngày cân 1 - cột B) đang có trong
+// PhieuCan_DN: bao nhiêu dòng đã "OK" (CÓ THỂ chốt sổ) và bao nhiêu dòng CHƯA
+// "OK" (KHÔNG thể chốt, dù thuộc năm cũ - vẫn cần giữ lại để còn sửa được).
+// Giúp Admin biết năm nào đáng chốt sổ trước khi bấm nút.
+function HT_layThongKeNamPhieuCan() {
+  try {
+    yeuCauQuyenAdmin_();
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const lastRow = sheet.getLastRow();
+    const thongKe = {};
+    if (lastRow > 1) {
+      const data = sheet.getRange(2, 2, lastRow - 1, 24).getValues(); // B..Y
+      data.forEach(function (row) {
+        const ngay = row[0];
+        if (!(ngay instanceof Date) || isNaN(ngay.getTime())) return;
+        const nam = ngay.getFullYear();
+        if (!thongKe[nam]) thongKe[nam] = { nam: nam, ok: 0, chuaOk: 0 };
+        if (String(row[23] || "").trim() === "OK") thongKe[nam].ok++; else thongKe[nam].chuaOk++;
+      });
+    }
+    const namHienTai = new Date().getFullYear();
+    const dsNamDaLuuTru = LT_layDanhSachNamDaLuuTru_(ss);
+    const ketQua = Object.keys(thongKe).map(function (k) { return thongKe[k]; })
+      .sort(function (a, b) { return a.nam - b.nam; })
+      .map(function (item) {
+        return Object.assign({}, item, {
+          laNamHienTai: item.nam === namHienTai,
+          daTungLuuTru: dsNamDaLuuTru.indexOf(item.nam) !== -1,
+          coTheChotSo: item.nam !== namHienTai && item.ok > 0
+        });
+      });
+    return { status: "success", data: ketQua, tongSoDongDangHoatDong: lastRow > 1 ? lastRow - 1 : 0 };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Chuyển TOÀN BỘ phiếu ĐÃ "OK" của đúng 1 năm (dựa vào Ngày cân 1) từ
+// PhieuCan_DN sang sheet lưu trữ PhieuCan_DN_<nam> (tạo mới nếu chưa có, hoặc
+// NỐI THÊM nếu đã tồn tại - an toàn khi chạy lại nhiều lần cho cùng 1 năm, VD
+// sau khi có thêm phiếu của năm đó vừa được chốt "OK"). Phiếu CHƯA "OK" của
+// đúng năm đó KHÔNG bị đụng tới - dù bấm nhầm năm hiện tại cũng không mất/khóa
+// nhầm dữ liệu đang hoạt động, vì chỉ dòng đã "OK" mới đủ điều kiện di chuyển.
+function HT_chotSoNam(nam) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  } catch (e) {
+    return { status: "error", message: "Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây." };
+  }
+  try {
+    yeuCauQuyenAdmin_();
+    nam = parseInt(nam, 10);
+    if (isNaN(nam) || nam < 2000 || nam > 2100) return { status: "error", message: "Năm không hợp lệ." };
+
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { status: "success", message: "Không có dữ liệu để chốt sổ." };
+
+    const data = sheet.getRange(2, 1, lastRow - 1, LT_SO_COT_DAY_DU).getValues();
+    // Gom các dòng ĐỦ ĐIỀU KIỆN chuyển đi (đúng năm + đã "OK"), giữ đúng rowNum thật trên sheet.
+    const dongCanChuyen = [];
+    for (let i = 0; i < data.length; i++) {
+      const ngay = data[i][1]; // Cột B
+      const trangThai = String(data[i][24] || "").trim(); // Cột Y
+      if (ngay instanceof Date && !isNaN(ngay.getTime()) && ngay.getFullYear() === nam && trangThai === "OK") {
+        dongCanChuyen.push({ rowNum: i + 2, values: data[i] });
+      }
+    }
+    if (dongCanChuyen.length === 0) {
+      return { status: "success", message: "Không có phiếu nào của năm " + nam + " đủ điều kiện chốt sổ (chỉ chuyển được phiếu đã khóa \"OK\")." };
+    }
+
+    // Tạo/mở sheet lưu trữ đúng năm - nếu MỚI TẠO thì chép nguyên dòng tiêu đề
+    // hiện tại của PhieuCan_DN sang cho nhất quán cấu trúc.
+    const tenSheetLuuTru = LT_tenSheetLuuTru_(nam);
+    let sheetLuuTru = ss.getSheetByName(tenSheetLuuTru);
+    if (!sheetLuuTru) {
+      sheetLuuTru = ss.insertSheet(tenSheetLuuTru);
+      const header = sheet.getRange(1, 1, 1, LT_SO_COT_DAY_DU).getValues();
+      sheetLuuTru.getRange(1, 1, 1, LT_SO_COT_DAY_DU).setValues(header).setFontWeight("bold");
+      sheetLuuTru.setFrozenRows(1);
+    }
+
+    // Ghi thêm vào CUỐI sheet lưu trữ (append, không ghi đè dữ liệu đã lưu trữ từ lần chốt sổ trước).
+    const startRowLuuTru = sheetLuuTru.getLastRow() + 1;
+    sheetLuuTru.getRange(startRowLuuTru, 1, dongCanChuyen.length, LT_SO_COT_DAY_DU)
+      .setValues(dongCanChuyen.map(function (d) { return d.values; }));
+    // Giữ đúng định dạng Ngày/Giờ như sheet gốc (tránh Sheets tự đoán lại định dạng).
+    const _rfLT = REGION_FORMAT();
+    sheetLuuTru.getRange(startRowLuuTru, 2, dongCanChuyen.length, 1).setNumberFormat(_rfLT.DATE_FMT);
+    sheetLuuTru.getRange(startRowLuuTru, 3, dongCanChuyen.length, 1).setNumberFormat(_rfLT.TIME_FMT);
+    sheetLuuTru.getRange(startRowLuuTru, 4, dongCanChuyen.length, 1).setNumberFormat(_rfLT.DATE_FMT);
+    sheetLuuTru.getRange(startRowLuuTru, 5, dongCanChuyen.length, 1).setNumberFormat(_rfLT.TIME_FMT);
+
+    // XÓA đúng các dòng đã chuyển khỏi sheet đang hoạt động - XÓA TỪ DƯỚI LÊN
+    // (rowNum giảm dần, đã tính trước nên không phụ thuộc thứ tự xóa) để việc
+    // xóa dòng phía trên không làm lệch rowNum của các dòng còn chờ xóa phía
+    // dưới. Gom thành khối liên tiếp để giảm số lượt gọi deleteRows().
+    const rowNumsGiam = dongCanChuyen.map(function (d) { return d.rowNum; }).sort(function (a, b) { return b - a; });
+    let i = 0;
+    while (i < rowNumsGiam.length) {
+      let j = i;
+      while (j + 1 < rowNumsGiam.length && rowNumsGiam[j + 1] === rowNumsGiam[j] - 1) j++;
+      const soDong = j - i + 1;
+      const rowDauKhoi = rowNumsGiam[j]; // rowNum NHỎ NHẤT của khối (vì đang giảm dần, phần tử cuối khối)
+      sheet.deleteRows(rowDauKhoi, soDong);
+      i = j + 1;
+    }
+
+    logAudit_("CHOT_SO_NAM", "OK", "Đã chuyển " + dongCanChuyen.length + " phiếu năm " + nam + " sang sheet lưu trữ " + tenSheetLuuTru + ".");
+    return {
+      status: "success",
+      message: "✅ Đã chuyển " + dongCanChuyen.length + " phiếu của năm " + nam + " sang sheet lưu trữ \"" + tenSheetLuuTru + "\". Sheet chính hiện còn " + (sheet.getLastRow() - 1) + " dòng dữ liệu."
+    };
+  } catch (e) {
+    logAudit_("CHOT_SO_NAM", "ERROR", e.toString());
+    return { status: "error", message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/*********************************************************
  * PHẦN 2: BIỆT LẬP CÁC CHỨC NĂNG XUẤT BÁO CÁO (CHẠY ĐỘC LẬP)
  *********************************************************/
 
@@ -668,7 +920,6 @@ function copyDataWithFinalLookup(fromDate, toDate) {
   }
 
   try {
-    const ssSourcePC = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.DATA_SHEET);
     const ssTarget   = SpreadsheetApp.openById(CONFIG.MISA_DST_ID).getSheetByName(CONFIG.MISA_DST_SHEET);
     const ssRef      = SpreadsheetApp.openById(CONFIG.SRC_FILE_ID);
     const ssDNTT     = SpreadsheetApp.openById(CONFIG.DNTT_FILE_ID);
@@ -681,9 +932,13 @@ function copyDataWithFinalLookup(fromDate, toDate) {
     let mapHDNCC = {}; for (let i = 1; i < dataHDNCC.length; i++) { let k = String(dataHDNCC[i][2]).trim(); if (k) mapHDNCC[k] = { colG: dataHDNCC[i][6], colE: dataHDNCC[i][4] }; }
     const dataDNTT = ssDNTT.getSheetByName(CONFIG.DNTT_SHEET).getDataRange().getValues();
     let mapDNTT = {}; for (let i = 1; i < dataDNTT.length; i++) { let k = String(dataDNTT[i][11] || "").trim(); if (k) mapDNTT[k] = { colT: dataDNTT[i][19], colV: dataDNTT[i][21] }; }
-    const sourceData = ssSourcePC.getDataRange().getValues(); let targetData = [];
+    // TỐI ƯU LƯU TRỮ: TRƯỚC ĐÂY đọc NGUYÊN sheet PhieuCan_DN (getDataRange())
+    // dù chỉ cần đúng khoảng [start, end] - nay dùng LT_docPhieuCanGopLuuTru_
+    // để chỉ mở thêm sheet lưu trữ năm nào thật sự nằm trong khoảng lọc, đồng
+    // thời không còn phải bỏ qua dòng tiêu đề (hàm này không trả kèm tiêu đề).
+    const sourceData = LT_docPhieuCanGopLuuTru_(fromDate, toDate, LT_SO_COT_DAY_DU); let targetData = [];
     const _misaDf = MISA_DEFAULTS(); // đọc 1 lần trước vòng lặp, tránh gọi PropertiesService lặp lại mỗi dòng
-    for (let i = 1; i < sourceData.length; i++) {
+    for (let i = 0; i < sourceData.length; i++) {
       let row = sourceData[i]; let ngayPhieu = parseDate(row[1]); if (ngayPhieu && (ngayPhieu < start || ngayPhieu > end)) continue;
       let newRow = new Array(33).fill(""); let soHopDongGoc = String(row[22] || "").trim(); let khoiLuong = (parseFloat(row[9]) || 0) / 1000; let donGia = parseFloat(row[23]) || 0; let thanhTienTuCotZ = parseFloat(row[25]) || 0;
       newRow[0] = row[1]; newRow[1] = row[1]; newRow[2] = soHopDongGoc; newRow[3] = row[5]; newRow[4] = khoiLuong; newRow[5] = donGia; newRow[6] = thanhTienTuCotZ;
@@ -914,12 +1169,15 @@ function buildDNTTStatusMap_() {
 function getBaoCaoTongHop(filters) {
   try {
     filters = filters || {};
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
-    const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return { status: "success", data: [], summary: { soLuong: 0, tongKL: 0, tongTien: 0 } };
+    // TỐI ƯU LƯU TRỮ: TRƯỚC ĐÂY luôn đọc NGUYÊN sheet PhieuCan_DN (chỉ chứa dữ
+    // liệu "đang hoạt động" từ khi có tính năng Lưu trữ theo năm - PHẦN 1C).
+    // Nay dùng LT_docPhieuCanGopLuuTru_ để TỰ ĐỘNG gộp thêm đúng (các) sheet lưu
+    // trữ năm mà bộ lọc ngày yêu cầu - báo cáo "tháng này/quý này" (đa số nhu
+    // cầu hàng ngày) không đụng sheet lưu trữ nào nên vẫn nhanh như cũ; chỉ báo
+    // cáo cố tình xem lại năm đã chốt sổ mới cần mở thêm sheet đó.
+    const data = LT_docPhieuCanGopLuuTru_(filters.fromDate, filters.toDate, 27); // A..AA
+    if (data.length === 0) return { status: "success", data: [], summary: { soLuong: 0, tongKL: 0, tongTien: 0 } };
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues(); // A..AA
     const start = filters.fromDate ? new Date(filters.fromDate + "T00:00:00+07:00") : null;
     const end = filters.toDate ? new Date(filters.toDate + "T23:59:59+07:00") : null;
     const xeFilter = String(filters.xe || "").trim();
@@ -1040,12 +1298,12 @@ function findMaKLForTan_(bands, klTan) {
 function getBaoCaoDonGia(filters) {
   try {
     filters = filters || {};
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
-    const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return { status: "success", data: [], summary: { soLuong: 0, tongTien: 0 } };
+    // TỐI ƯU LƯU TRỮ: xem giải thích ở getBaoCaoTongHop (PHẦN 4) - gộp thêm
+    // đúng (các) sheet lưu trữ năm mà bộ lọc ngày yêu cầu, thay vì luôn đọc
+    // nguyên sheet PhieuCan_DN.
+    const data = LT_docPhieuCanGopLuuTru_(filters.fromDate, filters.toDate, 27); // A..AA
+    if (data.length === 0) return { status: "success", data: [], summary: { soLuong: 0, tongTien: 0 } };
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues(); // A..AA
     const start = filters.fromDate ? new Date(filters.fromDate + "T00:00:00+07:00") : null;
     const end = filters.toDate ? new Date(filters.toDate + "T23:59:59+07:00") : null;
     const xeFilter = String(filters.xe || "").trim();
@@ -1866,22 +2124,25 @@ function BG_getQuoteDetail(soBaoGia) {
 // Đọc PhieuCan_DN 1 lần, gom theo Mã ĐG -> danh sách timestamp Ngày cân 1, dùng
 // chung cho cả kiểm tra 1 dòng (BG_checkRowEditable_) lẫn tính hàng loạt cho cả
 // bảng (BG_annotateApplied_) - tránh phải đọc lại PhieuCan_DN nhiều lần.
+// QUAN TRỌNG (an toàn khi có Lưu trữ theo năm - PHẦN 1C): hàm này quyết định 1
+// mã báo giá đã TỪNG được dùng để tính tiền cho phiếu cân nào hay chưa, để
+// khóa Sửa/Xóa - phải quét TOÀN BỘ lịch sử (kể cả các năm ĐÃ chốt sổ/lưu trữ),
+// KHÔNG được giới hạn theo khoảng ngày như các hàm báo cáo khác. Nếu bỏ sót dữ
+// liệu đã lưu trữ ở đây, 1 mã giá cũ đã dùng thật (nhưng nằm ở năm đã archive)
+// có thể bị tưởng nhầm "chưa dùng" và cho phép sửa/xóa, làm sai lệch số liệu
+// lịch sử đã tính tiền - do đó gọi LT_docPhieuCanGopLuuTru_(null, null, ...)
+// (không truyền khoảng ngày) để luôn gộp TẤT CẢ các năm đã lưu trữ.
 function BG_getPhieuCanByMaDG_() {
   const byMa = {};
-  const ssHak = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  const sheetPC = ssHak.getSheetByName(CONFIG.DATA_SHEET);
-  const lastRowPC = sheetPC.getLastRow();
-  if (lastRowPC > 1) {
-    // Cột B(2)..Q(17): idx0=Ngày cân 1, idx15=Mã ĐG
-    const dataPC = sheetPC.getRange(2, 2, lastRowPC - 1, 16).getValues();
-    dataPC.forEach(pc => {
-      const ngayCan1 = pc[0];
-      const ma = String(pc[15] || "").trim();
-      if (!ma || !(ngayCan1 instanceof Date) || isNaN(ngayCan1.getTime())) return;
-      if (!byMa[ma]) byMa[ma] = [];
-      byMa[ma].push(ngayCan1.getTime());
-    });
-  }
+  // Cột A(1)..Q(17): idx1=Ngày cân 1 (cột B), idx16=Mã ĐG (cột Q)
+  const dataPC = LT_docPhieuCanGopLuuTru_(null, null, 17);
+  dataPC.forEach(pc => {
+    const ngayCan1 = pc[1];
+    const ma = String(pc[16] || "").trim();
+    if (!ma || !(ngayCan1 instanceof Date) || isNaN(ngayCan1.getTime())) return;
+    if (!byMa[ma]) byMa[ma] = [];
+    byMa[ma].push(ngayCan1.getTime());
+  });
   return byMa;
 }
 

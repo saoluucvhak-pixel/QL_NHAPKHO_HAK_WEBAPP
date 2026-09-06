@@ -9,6 +9,32 @@
  */
 'use strict';
 
+// FIX (đa-realm Date - phát hiện qua test archiving): gasEnv.js nạp LẠI toàn
+// bộ Code.gs/Config.gs vào 1 vm context MỚI cho MỖI lần gọi hàm (đúng mô hình
+// thực thi thật của Apps Script - xem ghi chú đầu gasEnv.js), nhưng dữ liệu
+// Date lưu trong các "sheet" giả (mảng 2 chiều trong bộ nhớ) lại "sống lâu"
+// xuyên suốt nhiều lần gọi khác nhau (mô phỏng đúng việc Sheet là dịch vụ
+// NGOÀI, tồn tại thật giữa các lần gọi). Hệ quả: 1 Date object được tạo ra ở
+// LẦN GỌI A rồi đọc lại ở LẦN GỌI B (context khác - "realm" khác của JS) sẽ
+// KHÔNG "instanceof Date" theo Date của context B, dù cùng giá trị/API (đặc
+// điểm chuẩn của JS đa-realm, Code.gs có nhiều chỗ dùng "x instanceof Date" để
+// nhận diện cột Ngày/Giờ - hoàn toàn ĐÚNG trong Apps Script thật vì ở đó luôn
+// chỉ có 1 realm duy nhất, nhưng SAI trong môi trường test nếu không xử lý).
+// Giải pháp: mọi lần ĐỌC giá trị từ "sheet" (getValues/getValue) sẽ TÁI TẠO
+// LẠI Date bằng ĐÚNG constructor Date của context ĐANG THỰC THI lệnh đọc đó
+// (gasEnv.js gọi setActiveDateCtor_ trước mỗi lần chạy hàm) - nhận diện Date
+// gốc (dù thuộc realm nào) qua Object.prototype.toString (tag nội bộ, KHÔNG
+// phụ thuộc identity constructor/prototype, nên hoạt động đúng xuyên realm),
+// còn .getTime() hoạt động đúng xuyên realm vì đọc thẳng internal slot.
+let _activeDateCtor = Date;
+function setActiveDateCtor_(ctor) { _activeDateCtor = ctor || Date; }
+function isDateLike_(v) {
+  return v !== null && typeof v === 'object' && Object.prototype.toString.call(v) === '[object Date]';
+}
+function taiTaoDateNeuCan_(v) {
+  return isDateLike_(v) ? new _activeDateCtor(v.getTime()) : v;
+}
+
 function makeFakePropertiesService() {
   const store = new Map();
   const properties = {
@@ -31,7 +57,8 @@ function makeFakeRange(sheet, row, col, numRows, numCols) {
         const rowArr = [];
         for (let c = 0; c < numCols; c++) {
           const dataRow = sheet.__data[row - 1 + r] || [];
-          rowArr.push(dataRow[col - 1 + c] === undefined ? '' : dataRow[col - 1 + c]);
+          const raw = dataRow[col - 1 + c];
+          rowArr.push(raw === undefined ? '' : taiTaoDateNeuCan_(raw));
         }
         out.push(rowArr);
       }
@@ -89,6 +116,10 @@ function makeFakeSheet(name, initialRows) {
     },
     deleteRow(idx) {
       this.__data.splice(idx - 1, 1);
+      return this;
+    },
+    deleteRows(rowPosition, howMany) {
+      this.__data.splice(rowPosition - 1, howMany);
       return this;
     },
     insertSheet() { return this; },
@@ -233,4 +264,5 @@ module.exports = {
   makeFakeSession,
   makeFakeCacheService,
   makeFakeHtmlService,
+  setActiveDateCtor_,
 };

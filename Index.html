@@ -412,6 +412,7 @@
           <div class="sub-item" data-tab="ht-tab-huongdan" data-group="hethong">Hướng dẫn sử dụng</div>
           <div class="sub-item" data-tab="ht-tab-cauhinh" data-group="hethong">Cấu hình hệ thống</div>
           <div class="sub-item" data-tab="ht-tab-quyen" data-group="hethong">Quản lý người dùng</div>
+          <div class="sub-item" data-tab="ht-tab-luutru" data-group="hethong">Lưu trữ dữ liệu</div>
         </li>
       </ul>
 
@@ -1091,6 +1092,7 @@
           <div class="tabbtn" data-pane="ht-tab-huongdan">📖 Hướng dẫn sử dụng</div>
           <div class="tabbtn" data-pane="ht-tab-cauhinh">⚙️ Cấu hình hệ thống</div>
           <div class="tabbtn" data-pane="ht-tab-quyen">👤 Quản lý người dùng</div>
+          <div class="tabbtn" data-pane="ht-tab-luutru">🗄️ Lưu trữ dữ liệu</div>
         </div>
 
         <!-- TAB: QUY TRÌNH TỔNG QUAN -->
@@ -1427,6 +1429,26 @@
             <div class="guide-warn">Phải giữ lại ít nhất 1 tài khoản Quản trị. Xóa nhầm email đang tự dùng để đăng nhập sẽ khiến chính bạn bị khóa khỏi hệ thống ngay khi Lưu — hãy chắc chắn trước khi bấm Lưu.</div>
           </div>
         </div>
+
+        <!-- TAB: LƯU TRỮ DỮ LIỆU (archiving - chỉ Admin) -->
+        <div class="tabpane" id="ht-tab-luutru">
+          <div class="card">
+            <h2>Lưu trữ phiếu cân theo năm (Chốt sổ)</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Sheet <code>PhieuCan_DN</code> càng nhiều năm dữ liệu càng phình to, khiến nhập phiếu/xem báo cáo/tính giá chậm dần. "Chốt sổ" 1 năm sẽ chuyển các phiếu <b>ĐÃ khóa "OK"</b> của năm đó sang sheet lưu trữ riêng (<code>PhieuCan_DN_&lt;năm&gt;</code>, cùng trong Google Sheet này) — báo cáo vẫn xem lại được bình thường khi cần, chỉ chậm hơn 1 chút cho riêng năm đã chốt. Phiếu <b>chưa "OK"</b> luôn được giữ lại dù thuộc năm nào, để còn sửa được.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Năm</th><th>Số phiếu đã "OK" (có thể chốt)</th><th>Số phiếu chưa "OK" (giữ lại)</th><th>Trạng thái</th><th></th></tr></thead>
+                <tbody id="ht_luutruBody"><tr><td colspan="5" class="empty-state">Đang tải…</td></tr></tbody>
+              </table>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-ghost" id="btnTaiLaiThongKeNam">🔄 Tải lại thống kê</button>
+            </div>
+            <div class="guide-warn">Thao tác "Chốt sổ" di chuyển dữ liệu thật (không phải sao chép) — dữ liệu vẫn còn nguyên vẹn trong sheet lưu trữ, nhưng nên chắc chắn không còn cần sửa gì thêm cho năm đó trước khi bấm.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ============ VIEW: QUẢN LÝ TỒN KHO DĂM GỖ ============ -->
@@ -1593,6 +1615,7 @@
         if (paneId === 'xk-tab-misa' && !state.loadedXuatMisa) { state.loadedXuatMisa = true; locXuatMisa(); }
         if (paneId === 'ht-tab-cauhinh' && !state.loadedCauHinh) { state.loadedCauHinh = true; htLoadCauHinh(); }
         if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadDanhSachQuyen(); }
+        if (paneId === 'ht-tab-luutru' && !state.loadedLuuTru) { state.loadedLuuTru = true; htLoadThongKeNam(); }
       });
     });
     document.querySelectorAll('.sub-item[data-tab]').forEach(sub=>{
@@ -1609,7 +1632,7 @@
       bgHieuLucData: [], bgViewType: 'FINAL', bgUncheckedIds: new Set(), loadedKhoDam: false,
       loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null,
       loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
-      currentUser: null
+      loadedLuuTru: false, currentUser: null
     };
 
     // ---------------------------------------------------------------
@@ -1645,7 +1668,7 @@
             + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : 'Nhân viên');
         }
         if (!res.data.laAdmin) {
-          ['ht-tab-cauhinh', 'ht-tab-quyen'].forEach(tabId=>{
+          ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru'].forEach(tabId=>{
             const subItem = document.querySelector('.sub-item[data-tab="' + tabId + '"]');
             if (subItem) subItem.style.display = 'none';
             const tabBtn = document.querySelector('.tabbtn[data-pane="' + tabId + '"]');
@@ -4294,6 +4317,40 @@
         if (res.status === 'success') await htLoadDanhSachQuyen();
       } catch(err){ toast('Lỗi lưu danh sách người dùng: ' + err, false); } finally { hideOverlay(); }
     });
+
+    // =================================================================
+    // HỆ THỐNG - LƯU TRỮ DỮ LIỆU (chốt sổ theo năm - chỉ Admin)
+    // =================================================================
+    async function htLoadThongKeNam(){
+      const body = document.getElementById('ht_luutruBody');
+      body.innerHTML = '<tr><td colspan="5" class="empty-state">Đang tải…</td></tr>';
+      try {
+        const res = await runServer('HT_layThongKeNamPhieuCan');
+        if (res.status !== 'success') { toast(res.message, false); body.innerHTML = '<tr><td colspan="5" class="empty-state">'+escapeHtml(res.message)+'</td></tr>'; return; }
+        if (res.data.length === 0) { body.innerHTML = '<tr><td colspan="5" class="empty-state">Chưa có dữ liệu phiếu cân.</td></tr>'; return; }
+        body.innerHTML = res.data.map(item => {
+          let trangThai;
+          if (item.laNamHienTai) trangThai = '<span class="badge badge-ok">Năm hiện tại - không chốt sổ</span>';
+          else if (item.daTungLuuTru && item.chuaOk === 0 && item.ok === 0) trangThai = '<span class="badge badge-ok">Đã lưu trữ hết</span>';
+          else if (item.daTungLuuTru) trangThai = '<span class="badge badge-warn">Đã lưu trữ 1 phần - còn phiếu mới đủ điều kiện</span>';
+          else trangThai = '<span class="badge badge-warn">Chưa lưu trữ</span>';
+          const nutChot = item.coTheChotSo
+            ? '<button class="btn btn-primary btn-sm" onclick="htChotSoNam('+item.nam+')">📦 Chốt sổ năm '+item.nam+'</button>'
+            : '';
+          return '<tr><td><b>'+item.nam+'</b></td><td>'+fmtNum(item.ok)+'</td><td>'+fmtNum(item.chuaOk)+'</td><td>'+trangThai+'</td><td>'+nutChot+'</td></tr>';
+        }).join('');
+      } catch(err){ toast('Lỗi tải thống kê lưu trữ: ' + err, false); body.innerHTML = '<tr><td colspan="5" class="empty-state">Lỗi tải dữ liệu.</td></tr>'; }
+    }
+    document.getElementById('btnTaiLaiThongKeNam').addEventListener('click', htLoadThongKeNam);
+    async function htChotSoNam(nam){
+      if (!confirm('Chốt sổ năm ' + nam + '?\n\nToàn bộ phiếu ĐÃ khóa "OK" của năm này sẽ được CHUYỂN (không phải sao chép) sang sheet lưu trữ PhieuCan_DN_' + nam + '. Phiếu chưa "OK" vẫn giữ nguyên ở sheet chính.')) return;
+      showOverlay('Đang chốt sổ năm ' + nam + '…');
+      try {
+        const res = await runServer('HT_chotSoNam', nam);
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') await htLoadThongKeNam();
+      } catch(err){ toast('Lỗi chốt sổ: ' + err, false); } finally { hideOverlay(); }
+    }
 
   </script>
 </body>
