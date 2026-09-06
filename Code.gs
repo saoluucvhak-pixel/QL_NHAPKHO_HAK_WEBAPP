@@ -1094,22 +1094,23 @@ function runCalculatePrice_core() {
  *********************************************************/
 
 // Trả về danh sách xe / khách hàng / NCC để đổ vào dropdown filter phía client
+// FIX (an toàn Lưu trữ theo năm - PHẦN 1C): TRƯỚC ĐÂY chỉ đọc sheet đang hoạt
+// động - 1 xe/khách hàng/đại lý CHỈ xuất hiện trong dữ liệu ĐÃ lưu trữ sẽ
+// không hiện trong dropdown lọc, khiến người dùng tưởng không lọc được dù báo
+// cáo (đã tự gộp lưu trữ) thực ra vẫn tìm thấy nếu gõ đúng. Hàm này chỉ chạy 1
+// lần mỗi lần tải trang (không phải hot path) nên chấp nhận quét thêm tất cả
+// năm đã lưu trữ để danh sách luôn đầy đủ.
 function getFilterOptions() {
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
-    const lastRow = sheet.getLastRow();
     let xeSet = new Set(); let khSet = new Set(); let daiLySet = new Set(); let nguonGocSet = new Set(); let maDonGiaSet = new Set();
-    if (lastRow > 1) {
-      const data = sheet.getRange(2, 1, lastRow - 1, 17).getValues(); // A..Q (cần tới cột Q=Mã ĐG, index16)
-      data.forEach(row => {
-        const xe = String(row[5] || "").trim(); if (xe) xeSet.add(xe);
-        const kh = String(row[11] || "").trim(); if (kh) khSet.add(kh); // Cột L
-        const dl = String(row[13] || "").trim(); if (dl) daiLySet.add(dl); // Cột N - ĐL (Đại lý)
-        const ng = String(row[14] || "").trim(); if (ng) nguonGocSet.add(ng); // Cột O - NG (Nguồn gốc)
-        const madg = String(row[16] || "").trim(); if (madg) maDonGiaSet.add(madg); // Cột Q - Mã ĐG
-      });
-    }
+    const data = LT_docPhieuCanGopLuuTru_(null, null, 17); // A..Q (cần tới cột Q=Mã ĐG, index16) - gộp cả lưu trữ
+    data.forEach(row => {
+      const xe = String(row[5] || "").trim(); if (xe) xeSet.add(xe);
+      const kh = String(row[11] || "").trim(); if (kh) khSet.add(kh); // Cột L
+      const dl = String(row[13] || "").trim(); if (dl) daiLySet.add(dl); // Cột N - ĐL (Đại lý)
+      const ng = String(row[14] || "").trim(); if (ng) nguonGocSet.add(ng); // Cột O - NG (Nguồn gốc)
+      const madg = String(row[16] || "").trim(); if (madg) maDonGiaSet.add(madg); // Cột Q - Mã ĐG
+    });
     let ncSet = new Set();
     try {
       const ssMisa = SpreadsheetApp.openById(CONFIG.MISA_DST_ID);
@@ -1148,20 +1149,21 @@ function getFilterOptions() {
 }
 
 // Map: Mã Chứng Từ (cột V) -> đã lập ĐNTT hay chưa (dựa vào cột AA - ID_DNTT có rỗng hay không)
-function buildDNTTStatusMap_() {
-  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
-  const lastRow = sheet.getLastRow();
+// FIX (an toàn Lưu trữ theo năm - PHẦN 1C): TRƯỚC ĐÂY chỉ đọc sheet đang hoạt
+// động - báo cáo Misa xem lại 1 năm ĐÃ chốt sổ sẽ hiển thị SAI "Chưa lập ĐNTT"
+// cho những phiếu thật ra đã có ĐNTT từ trước khi lưu trữ. Nay nhận thêm
+// fromDate/toDate (CÙNG bộ lọc getBaoCaoMisa đang dùng) để tự gộp thêm đúng
+// (các) sheet lưu trữ năm liên quan, giống hệt các hàm báo cáo khác.
+function buildDNTTStatusMap_(fromDate, toDate) {
   const map = {};
-  if (lastRow > 1) {
-    // Đọc từ cột V(22) đến cột AA(27): index0=V(MãCT) ... index5=AA(ID_DNTT)
-    const data = sheet.getRange(2, 22, lastRow - 1, 6).getValues();
-    data.forEach(row => {
-      const key = String(row[0] || "").trim();
-      const idDntt = String(row[5] || "").trim();
-      if (key) map[key] = !!idDntt; // true = Đã lập ĐNTT, false = Chưa lập ĐNTT
-    });
-  }
+  // Cột V(22)..AA(27): đọc từ cột A cho đủ offset chuẩn với LT_docPhieuCanGopLuuTru_,
+  // idx21=V(Mã CT) ... idx26=AA(ID_DNTT).
+  const data = LT_docPhieuCanGopLuuTru_(fromDate, toDate, 27);
+  data.forEach(row => {
+    const key = String(row[21] || "").trim();
+    const idDntt = String(row[26] || "").trim();
+    if (key) map[key] = !!idDntt; // true = Đã lập ĐNTT, false = Chưa lập ĐNTT
+  });
   return map;
 }
 
@@ -1418,7 +1420,7 @@ function getBaoCaoMisa(filters) {
     if (lastRow <= 1) return { status: "success", data: [], summary: { soLuong: 0, tongKL: 0, tongTien: 0 } };
 
     const data = sheet.getRange(2, 1, lastRow - 1, 12).getValues(); // A..L
-    const dntt = buildDNTTStatusMap_();
+    const dntt = buildDNTTStatusMap_(filters.fromDate, filters.toDate);
 
     const start = filters.fromDate ? new Date(filters.fromDate + "T00:00:00+07:00") : null;
     const end = filters.toDate ? new Date(filters.toDate + "T23:59:59+07:00") : null;
@@ -1600,9 +1602,26 @@ function exportPhieuCanPDF(maChungTu) {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return { status: "error", message: "Không có dữ liệu." };
-    const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
-    const found = data.find(row => String(row[21] || "").trim() === String(maChungTu || "").trim());
+    const key = String(maChungTu || "").trim();
+    let found = null;
+    if (lastRow > 1) {
+      const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
+      found = data.find(row => String(row[21] || "").trim() === key) || null;
+    }
+    // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): phiếu đã "chốt sổ" không còn ở
+    // sheet chính - Mã Chứng Từ có dạng "<Số phiếu>/<Năm>/NK" nên tách được
+    // đúng năm cần tìm, chỉ cần mở ĐÚNG 1 sheet lưu trữ năm đó (không cần quét
+    // mọi năm đã lưu trữ) để "In phiếu" vẫn hoạt động với phiếu cũ đã lưu trữ.
+    if (!found) {
+      const namTrongKey = key.match(/\/(\d{4})\/NK$/);
+      if (namTrongKey) {
+        const sheetNam = ss.getSheetByName(LT_tenSheetLuuTru_(parseInt(namTrongKey[1], 10)));
+        if (sheetNam && sheetNam.getLastRow() > 1) {
+          const dataNam = sheetNam.getRange(2, 1, sheetNam.getLastRow() - 1, 27).getValues();
+          found = dataNam.find(row => String(row[21] || "").trim() === key) || null;
+        }
+      }
+    }
     if (!found) return { status: "error", message: "Không tìm thấy phiếu cân " + maChungTu };
 
     const tempSS = SpreadsheetApp.create("PhieuNhapKho_" + String(maChungTu).replace(/\//g, "_"));
