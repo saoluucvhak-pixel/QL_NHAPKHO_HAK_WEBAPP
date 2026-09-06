@@ -745,9 +745,31 @@ function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
 // FIX #2: bản LÕI, KHÔNG khóa — dùng khi được gọi từ bên trong một hàm khác
 // (như step1_ConfirmImport) mà đã tự khóa từ trước. Gọi runCalculatePrice()
 // (bản có khóa) từ trong 1 hàm đang giữ khóa sẽ gây deadlock (tự chờ chính mình).
+// TỐI ƯU LƯU TRỮ (QUAN TRỌNG - ảnh hưởng trực tiếp tới tốc độ theo thời gian):
+// TRƯỚC ĐÂY hàm này, dù chỉ TÍNH LẠI giá cho các dòng CHƯA "OK", vẫn GHI ĐÈ LẠI
+// một dải DUY NHẤT phủ từ dòng 2 đến hết toàn bộ lịch sử (getRange(2, 20,
+// resT.length, 1)...) mỗi lần gọi - kể cả với các dòng đã "OK" (giá trị ghi lại
+// giống hệt cũ, không đổi gì). Hàm này chạy SAU MỖI LẦN IMPORT/NHẬP TAY 1 phiếu
+// cân - nghĩa là càng nhiều năm dữ liệu tích lũy (càng nhiều dòng đã "OK"), mỗi
+// lần nhập 1 phiếu MỚI lại càng phải đọc + ghi lại toàn bộ khối lịch sử ngày
+// càng lớn đó - đây chính là nguyên nhân trực tiếp khiến thao tác hàng ngày
+// (nhập phiếu cân) chậm dần theo thời gian, không phải do PhieuCan_DN "nặng"
+// một cách mơ hồ chung chung.
+// Nay CHỈ ghi lại đúng những dòng THỰC SỰ cần tính (chưa "OK") - dòng nào đã
+// chốt "OK" thì bỏ qua hoàn toàn, không đọc lại giá trị cũ để ghi lại vô ích.
+// Các dòng cần ghi được gom thành từng khối LIÊN TIẾP (thường chỉ 1-2 khối vì
+// các phiếu chưa chốt luôn nằm ở cuối sheet, mới nhập gần đây) để tối thiểu số
+// lượt gọi Sheets API. Phần ĐỌC (sheet.getDataRange()) vẫn phải quét toàn bộ
+// để biết dòng nào đã "OK" - đây là giới hạn cố hữu khi dùng Google Sheets làm
+// nơi lưu dữ liệu kiêm nơi tính toán; muốn giảm tiếp cả bước ĐỌC này cần một
+// giải pháp lưu trữ khác (VD tách riêng sheet "đang chờ tính giá" khỏi sheet
+// lịch sử đã chốt - xem đề xuất kiến trúc lưu trữ đã trao đổi).
 function runCalculatePrice_core() {
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET); const data = sheet.getDataRange().getValues();
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { status: "success", message: "Không có phiếu nào cần tính giá." };
+    const data = sheet.getRange(2, 1, lastRow - 1, 26).getValues();
     // FIX (đồng bộ Liên kết dữ liệu): TRƯỚC ĐÂY dùng thẳng CONFIG.URL_BAO_GIA
     // (URL cố định, KHÔNG nằm trong LIENKET_DANH_SACH nên không đổi được qua
     // Hệ thống → Cấu hình → Liên kết dữ liệu). Nếu admin từng dùng tính năng đó
@@ -759,18 +781,54 @@ function runCalculatePrice_core() {
     // Liên kết dữ liệu) để luôn đồng bộ với đúng 1 nguồn cấu hình duy nhất.
     const ssBG = BG_ss_(); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
     const dataBG = rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
-    const resT = []; const resX = []; const resY = []; const resZ = [];
-    for (let i = 1; i < data.length; i++) {
-      let r = data[i]; let currentStatusY = String(r[24] || "").trim(); if (currentStatusY === "OK") { resT.push([r[19]]); resX.push([r[23]]); resY.push([r[24]]); resZ.push([r[25]]); continue; }
-      let valQ = String(r[16] || "").trim().toUpperCase(); let rVal = parseFloat(r[17]) || 0; let klJ = parseFloat(r[9]) || 0; let klSoSanh = klJ / 1000;
-      let dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
-      let ts = dt.getTime(); let giaFound = 0;
-      if (valQ !== "" && klSoSanh > 0) { let listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (let bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
-      resT.push([giaFound]); let hieuSo = Math.round(giaFound + rVal); resX.push([hieuSo]); let thanhTienRaw = Math.round(klSoSanh * hieuSo); let thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000; resZ.push([thanhTienLamTron]);
-      resY.push((giaFound > 0 && thanhTienLamTron > 0) ? ["Test giá"] : ["Lỗi ĐK/Báo giá"]);
+
+    // Chỉ gom danh sách các DÒNG THỰC SỰ CẦN GHI LẠI (chưa "OK") - dòng đã "OK"
+    // bỏ qua hoàn toàn, không đưa vào đây (khác bản cũ luôn đẩy cả dòng "OK" vào
+    // mảng kết quả chỉ để giữ đúng vị trí khi ghi đè nguyên dải).
+    const capNhat = [];
+    for (let i = 0; i < data.length; i++) {
+      const r = data[i];
+      const currentStatusY = String(r[24] || "").trim();
+      if (currentStatusY === "OK") continue;
+
+      const valQ = String(r[16] || "").trim().toUpperCase(); const rVal = parseFloat(r[17]) || 0; const klJ = parseFloat(r[9]) || 0; const klSoSanh = klJ / 1000;
+      const dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
+      const ts = dt.getTime(); let giaFound = 0;
+      if (valQ !== "" && klSoSanh > 0) { const listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (const bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
+      const hieuSo = Math.round(giaFound + rVal);
+      const thanhTienRaw = Math.round(klSoSanh * hieuSo);
+      const thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000;
+      const trangThai = (giaFound > 0 && thanhTienLamTron > 0) ? "Test giá" : "Lỗi ĐK/Báo giá";
+      capNhat.push({ rowNum: i + 2, gia: giaFound, hieuSo: hieuSo, trangThai: trangThai, thanhTien: thanhTienLamTron });
     }
-    if (resT.length > 0) { sheet.getRange(2, 20, resT.length, 1).setValues(resT); sheet.getRange(2, 24, resX.length, 1).setValues(resX); sheet.getRange(2, 25, resY.length, 1).setValues(resY); sheet.getRange(2, 26, resZ.length, 1).setValues(resZ); sheet.getRange(2, 24, resX.length, 1).setNumberFormat("#,##0"); sheet.getRange(2, 26, resZ.length, 1).setNumberFormat("#,##0"); }
-    return { status: "success", message: "Đã tính lại giá giật cấp!" };
+
+    // Gom các dòng cần ghi thành từng KHỐI LIÊN TIẾP (rowNum liền nhau) - ghi 1
+    // lượt setValues() cho cả khối thay vì từng dòng riêng lẻ.
+    let idx = 0;
+    while (idx < capNhat.length) {
+      let end = idx;
+      while (end + 1 < capNhat.length && capNhat[end + 1].rowNum === capNhat[end].rowNum + 1) end++;
+      const startRow = capNhat[idx].rowNum;
+      const soDong = end - idx + 1;
+      const cotT = []; const cotX = []; const cotY = []; const cotZ = [];
+      for (let k = idx; k <= end; k++) {
+        cotT.push([capNhat[k].gia]); cotX.push([capNhat[k].hieuSo]); cotY.push([capNhat[k].trangThai]); cotZ.push([capNhat[k].thanhTien]);
+      }
+      sheet.getRange(startRow, 20, soDong, 1).setValues(cotT);
+      sheet.getRange(startRow, 24, soDong, 1).setValues(cotX);
+      sheet.getRange(startRow, 25, soDong, 1).setValues(cotY);
+      sheet.getRange(startRow, 26, soDong, 1).setValues(cotZ);
+      sheet.getRange(startRow, 24, soDong, 1).setNumberFormat("#,##0");
+      sheet.getRange(startRow, 26, soDong, 1).setNumberFormat("#,##0");
+      idx = end + 1;
+    }
+
+    return {
+      status: "success",
+      message: capNhat.length > 0
+        ? "Đã tính giá cho " + capNhat.length + " phiếu chưa chốt."
+        : "Không có phiếu nào cần tính lại giá (tất cả đã chốt OK)."
+    };
   } catch (e) { return { status: "error", message: "Lỗi: " + e.toString() }; }
 }
 
