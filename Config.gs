@@ -475,10 +475,25 @@ function DS_QUYEN_() {
 }
 
 // Lấy thông tin quyền của người đang mở webapp, dựa vào email tài khoản Google
-// đang đăng nhập (Session.getActiveUser() chỉ đọc được email khi web app yêu
-// cầu đăng nhập - đúng cấu hình access:"ANYONE" hiện tại của appsscript.json;
-// nếu sau này đổi sang "ANYONE_ANONYMOUS" hàm này sẽ luôn trả về rỗng và KHÔNG
-// AI vào được - phải giữ nguyên "ANYONE", không đổi sang "ANYONE_ANONYMOUS").
+// đang đăng nhập. PHỤ THUỘC 2 CẤU HÌNH TRONG appsscript.json:
+//  1) access:"ANYONE" (yêu cầu ĐÃ đăng nhập Google) - giữ nguyên, KHÔNG đổi
+//     sang "ANYONE_ANONYMOUS" (nếu đổi, hàm này luôn trả về rỗng, KHÔNG AI vào được).
+//  2) webapp.executeAs:"USER_ACCESSING" (chạy dưới danh nghĩa CHÍNH người đang
+//     truy cập) - BẮT BUỘC phải là "USER_ACCESSING", KHÔNG được để
+//     "USER_DEPLOYING" ("Thực thi với tư cách: Tôi"). ĐÃ THỰC TẾ GẶP LỖI: với
+//     "USER_DEPLOYING", Session.getActiveUser().getEmail() CHỈ đọc được email
+//     nếu người truy cập cùng miền Google Workspace với tài khoản deploy -
+//     với nhân viên dùng Gmail cá nhân (@gmail.com, không có miền riêng), hàm
+//     này LUÔN trả về CHUỖI RỖNG cho MỌI người, kể cả chính Admin - khiến
+//     TOÀN BỘ hệ thống bị khóa ngoài không ai vào được (không phải lỗi sai
+//     tài khoản, mà lỗi không đọc được danh tính người truy cập).
+//     ĐÁNH ĐỔI khi dùng "USER_ACCESSING": mỗi người dùng phải tự cấp quyền
+//     (OAuth) cho script ở lần truy cập đầu tiên, VÀ mỗi người dùng phải được
+//     CHIA SẺ (Editor) trực tiếp tất cả Google Sheet/Thư mục Drive mà hệ
+//     thống dùng tới (CONFIG/BAOGIA_CONFIG/KHODAM_CONFIG/XUATHANG_CONFIG ở
+//     trên) - script giờ chạy dưới quyền CHÍNH họ, không còn "mượn" quyền của
+//     tài khoản deploy nữa. Nên tạo 1 Google Group gồm toàn bộ nhân viên rồi
+//     chia sẻ 1 lần cho cả Group, thay vì chia sẻ riêng lẻ từng người.
 function layThongTinNguoiDungHienTai_() {
   let email = "";
   try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { email = ""; }
