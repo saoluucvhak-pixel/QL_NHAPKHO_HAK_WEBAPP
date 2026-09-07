@@ -27,8 +27,14 @@ const CONFIG = {
   // mỗi lần (khác bản cũ trước đây) - giữ tốc độ nhanh, không tốn Drive API.
   PREVIEW_DRAFT_SHEET: "PhieuCan_DN_Draft",
 
-  // Đường dẫn/spreadsheet Báo giá dùng để tra giá khi tính tiền phiếu cân
-  // (chính là spreadsheet của BAOGIA_CONFIG bên dưới - xem thêm ghi chú ở đó)
+  // LƯU Ý (đã sửa lỗi đồng bộ): giá trị này KHÔNG còn được engine tính giá
+  // (runCalculatePrice_core) dùng nữa - trước đây hàm đó mở thẳng URL cố định
+  // này, tách rời khỏi BAOGIA_CONFIG.SPREADSHEET_ID (có thể đổi qua giao diện
+  // Liên kết dữ liệu), gây nguy cơ tính giá theo sheet Báo giá SAI/CŨ nếu admin
+  // từng đổi liên kết. Nay engine tính giá dùng BG_ss_() (mở theo
+  // BAOGIA_CONFIG.SPREADSHEET_ID) để chỉ có 1 nguồn sự thật duy nhất. Giữ lại
+  // hằng số này chỉ để tham khảo/tương thích ngược, không dùng để mở Sheet ở
+  // bất kỳ đâu trong code nữa.
   URL_BAO_GIA: "https://docs.google.com/spreadsheets/d/1SIhfjP5-6ouRPDj265lAMmI5yWs1XcnedjqpzDwaIC0/edit",
   SHEET_BAO_GIA: "Baogia_DN_SAVE",
 
@@ -37,7 +43,15 @@ const CONFIG = {
   // Spreadsheet đích chứa dữ liệu đã map sẵn theo đúng cấu trúc import MISA
   MISA_DST_ID: "1vkeu2YxME6fsp9ed8DokdtV1jxla5pA-H7heHBt-BRs",
   MISA_DST_SHEET: "Update_MiSa_PC",
-  // Sheet Đề Nghị Thanh Toán tạm dùng khi map số hợp đồng cho MISA
+  // GHI CHÚ QUAN TRỌNG (làm rõ phạm vi, không phải lỗi): Spreadsheet ĐNTT này
+  // là 1 hệ thống NGOÀI, KHÔNG do webapp này quản lý. Toàn bộ chỗ dùng
+  // DNTT_FILE_ID/DNTT_SHEET trong Code.gs (copyDataWithFinalLookup,
+  // buildDNTTStatusMap_) CHỈ ĐỌC (map số hợp đồng cho MISA, hiển thị "Đã/Chưa
+  // lập ĐNTT") - webapp này KHÔNG có chức năng TẠO/SỬA/XÓA Đề Nghị Thanh Toán.
+  // Việc lập ĐNTT vẫn phải thực hiện trực tiếp trên Spreadsheet ĐNTT gốc (hoặc
+  // quy trình hiện có của kế toán) - nếu cần đưa việc lập ĐNTT vào webapp này,
+  // đó là 1 TÍNH NĂNG MỚI cần thiết kế riêng (form nhập, quy tắc duyệt...),
+  // không phải một lỗi cần sửa trong phạm vi các bản vá hiện tại.
   DNTT_FILE_ID: "1oUm87_gbDbnuPc_We0dyZ_e4kHXBHXs95AQAxp5okYo",
   DNTT_SHEET: "DNTT_GK_DN_CT",
 
@@ -198,6 +212,11 @@ function MISA_FORMAT() {
 // cho giao diện Cấu hình hệ thống hiển thị đúng trạng thái đang áp dụng.
 function HT_layCauHinhVungMien() {
   try {
+    // FIX (phân quyền - phát hiện qua test tự động): hàm này bị BỎ SÓT khi gate
+    // quyền Admin cho cả mục "Cấu hình hệ thống" - dù giá trị trả về (VN/US) ít
+    // nhạy cảm, vẫn nên nhất quán với các hàm HT_lay*/HT_luu* còn lại trong cùng
+    // mục cấu hình (đã chặn Admin-only), tránh 1 điểm hở dù nhỏ.
+    yeuCauQuyenAdmin_();
     const rf = REGION_FORMAT();
     const mf = MISA_FORMAT();
     return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN };
@@ -211,6 +230,7 @@ function HT_layCauHinhVungMien() {
 // nhất để biết chắc có bị lệch hay không, thay vì đoán.
 function HT_layLocaleThatCuaSheet() {
   try {
+    yeuCauQuyenAdmin_();
     const dsSheet = [
       { ten: "PhieuCan_DN", id: CONFIG.SPREADSHEET_ID },
       { ten: "Update_MiSa_PC", id: CONFIG.MISA_DST_ID },
@@ -249,6 +269,7 @@ function HT_layLocaleThatCuaSheet() {
 // Lưu TOÀN BỘ cấu hình mới - áp dụng NGAY LẬP TỨC cho mọi lần ghi Sheet tiếp theo
 function HT_luuCauHinhVungMien(mien, mienMisa) {
   try {
+    yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi Locale toàn hệ thống ảnh hưởng mọi người dùng - chỉ Admin
     const props = PropertiesService.getScriptProperties();
     mien = (String(mien || "").toUpperCase() === "US") ? "US" : "VN";
     mienMisa = (String(mienMisa || "").toUpperCase() === "US") ? "US" : "VN";
@@ -294,11 +315,12 @@ function MISA_DEFAULTS() {
 }
 
 function HT_layMisaDefaults() {
-  try { return { status: "success", data: MISA_DEFAULTS() }; } catch (e) { return { status: "error", message: e.toString() }; }
+  try { yeuCauQuyenAdmin_(); return { status: "success", data: MISA_DEFAULTS() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
 function HT_luuMisaDefaults(data) {
   try {
+    yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi giá trị mặc định báo cáo Misa (TK kế toán, mã hàng...) ảnh hưởng toàn công ty - chỉ Admin
     data = data || {};
     const d = MISA_DEFAULTS_MAC_DINH;
     const clean = {
@@ -373,6 +395,7 @@ apDungOverrideLienKet_(); // chạy ngay khi project được nạp
 
 function HT_layLienKetDuLieu() {
   try {
+    yeuCauQuyenAdmin_(); // FIX (phân quyền): trước đây AI có link đăng nhập Google cũng xem/đổi được ID Spreadsheet/Thư mục toàn hệ thống
     const props = PropertiesService.getScriptProperties();
     const data = LIENKET_DANH_SACH.map(function (item) {
       const obj = _layObjectTheoNhom_(item.nhom);
@@ -391,6 +414,12 @@ function HT_layLienKetDuLieu() {
 // là khôi phục lại giá trị GỐC trong code cho đúng trường đó.
 function HT_luuLienKetDuLieu(overrides) {
   try {
+    // FIX (NGHIÊM TRỌNG - phân quyền): TRƯỚC ĐÂY hàm này không có bất kỳ kiểm
+    // tra quyền nào - bất kỳ ai đăng nhập Google mở được webapp đều có thể đổi
+    // ID Spreadsheet/Thư mục CHÍNH của toàn hệ thống, chuyển hướng dữ liệu công
+    // ty sang nơi khác. Nay CHỈ ADMIN mới gọi được (chặn cứng ở server, không
+    // chỉ ẩn nút trên giao diện).
+    yeuCauQuyenAdmin_();
     overrides = overrides || {};
     const props = PropertiesService.getScriptProperties();
     LIENKET_DANH_SACH.forEach(function (item) {
@@ -406,5 +435,139 @@ function HT_luuLienKetDuLieu(overrides) {
     apDungOverrideLienKet_(); // áp dụng ngay trong phiên hiện tại, không cần deploy lại
     logAudit_("CAUHINH_LIENKET", "OK", JSON.stringify(overrides));
     return { status: "success", message: "✅ Đã lưu liên kết dữ liệu, áp dụng ngay lập tức." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/* ---------- PHÂN QUYỀN NGƯỜI DÙNG (chống truy cập trái phép) ---------- */
+// TRƯỚC ĐÂY webapp không có BẤT KỲ rào chắn nào ngoài việc appsscript.json đặt
+// access:"ANYONE" (yêu cầu đăng nhập bằng 1 tài khoản Google BẤT KỲ, nhưng
+// KHÔNG giới hạn tài khoản nào) - nghĩa là ai có link, đăng nhập bằng bất kỳ
+// Gmail nào, cũng dùng được MỌI chức năng, kể cả xóa dữ liệu và đổi cấu hình
+// toàn hệ thống. Nay bổ sung 1 lớp allowlist tối thiểu: chỉ những email được
+// liệt kê dưới đây (hoặc đã được ADMIN thêm qua giao diện Hệ thống → Quản lý
+// người dùng) mới mở được webapp. Nhân viên dùng Gmail cá nhân (không có
+// domain công ty riêng để giới hạn theo tên miền) nên bắt buộc dùng danh sách
+// email cụ thể thay vì giới hạn theo domain.
+//
+// 2 vai trò:
+//  - ADMIN: toàn quyền, bao gồm cả Cấu hình hệ thống / Liên kết dữ liệu /
+//    Cấu hình Misa mặc định / Quản lý người dùng (những mục có thể ảnh hưởng
+//    TOÀN BỘ hệ thống và mọi người dùng khác nếu chỉnh sai).
+//  - NHANVIEN: dùng các chức năng nghiệp vụ hàng ngày (import phiếu cân, nhập
+//    liệu, báo cáo, báo giá, kho dăm, xuất hàng...) nhưng KHÔNG vào được các
+//    mục cấu hình toàn hệ thống nói trên.
+//
+// Danh sách THẬT được lưu trong PropertiesService (đổi được ngay trên giao
+// diện Hệ thống → Quản lý người dùng, không cần sửa code/deploy lại). Mảng
+// dưới đây chỉ là giá trị KHỞI TẠO LẦN ĐẦU (dùng khi chưa từng lưu danh sách
+// nào) - Admin đầu tiên do người triển khai hệ thống xác nhận.
+const DANH_SACH_QUYEN_MAC_DINH = [
+  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN" }
+];
+
+function DS_QUYEN_() {
+  const saved = PropertiesService.getScriptProperties().getProperty("DANH_SACH_QUYEN_JSON");
+  if (!saved) return DANH_SACH_QUYEN_MAC_DINH;
+  try {
+    const parsed = JSON.parse(saved);
+    return (Array.isArray(parsed) && parsed.length > 0) ? parsed : DANH_SACH_QUYEN_MAC_DINH;
+  } catch (e) { return DANH_SACH_QUYEN_MAC_DINH; }
+}
+
+// Lấy thông tin quyền của người đang mở webapp, dựa vào email tài khoản Google
+// đang đăng nhập. PHỤ THUỘC 2 CẤU HÌNH TRONG appsscript.json:
+//  1) access:"ANYONE" (yêu cầu ĐÃ đăng nhập Google) - giữ nguyên, KHÔNG đổi
+//     sang "ANYONE_ANONYMOUS" (nếu đổi, hàm này luôn trả về rỗng, KHÔNG AI vào được).
+//  2) webapp.executeAs:"USER_ACCESSING" (chạy dưới danh nghĩa CHÍNH người đang
+//     truy cập) - BẮT BUỘC phải là "USER_ACCESSING", KHÔNG được để
+//     "USER_DEPLOYING" ("Thực thi với tư cách: Tôi"). ĐÃ THỰC TẾ GẶP LỖI: với
+//     "USER_DEPLOYING", Session.getActiveUser().getEmail() CHỈ đọc được email
+//     nếu người truy cập cùng miền Google Workspace với tài khoản deploy -
+//     với nhân viên dùng Gmail cá nhân (@gmail.com, không có miền riêng), hàm
+//     này LUÔN trả về CHUỖI RỖNG cho MỌI người, kể cả chính Admin - khiến
+//     TOÀN BỘ hệ thống bị khóa ngoài không ai vào được (không phải lỗi sai
+//     tài khoản, mà lỗi không đọc được danh tính người truy cập).
+//     ĐÁNH ĐỔI khi dùng "USER_ACCESSING": mỗi người dùng phải tự cấp quyền
+//     (OAuth) cho script ở lần truy cập đầu tiên, VÀ mỗi người dùng phải được
+//     CHIA SẺ (Editor) trực tiếp tất cả Google Sheet/Thư mục Drive mà hệ
+//     thống dùng tới (CONFIG/BAOGIA_CONFIG/KHODAM_CONFIG/XUATHANG_CONFIG ở
+//     trên) - script giờ chạy dưới quyền CHÍNH họ, không còn "mượn" quyền của
+//     tài khoản deploy nữa. Nên tạo 1 Google Group gồm toàn bộ nhân viên rồi
+//     chia sẻ 1 lần cho cả Group, thay vì chia sẻ riêng lẻ từng người.
+function layThongTinNguoiDungHienTai_() {
+  let email = "";
+  try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { email = ""; }
+  const ds = DS_QUYEN_();
+  const found = ds.find(function (u) { return String(u.email || "").trim().toLowerCase() === email; });
+  return {
+    email: email,
+    vaiTro: found ? found.vaiTro : null,
+    coQuyen: !!found,
+    laAdmin: !!found && found.vaiTro === "ADMIN"
+  };
+}
+
+// Chặn cứng Ở SERVER (không chỉ ẩn nút trên giao diện - người dùng vẫn có thể
+// tự gọi hàm qua Console trình duyệt) cho các hàm CHỈ ADMIN được phép gọi.
+// Gọi hàm này ở NGAY ĐẦU mỗi hàm loại đó, ném lỗi rõ ràng nếu không đủ quyền.
+function yeuCauQuyenAdmin_() {
+  const nd = layThongTinNguoiDungHienTai_();
+  if (!nd.laAdmin) {
+    const dsAdmin = DS_QUYEN_().filter(function (u) { return u.vaiTro === "ADMIN"; }).map(function (u) { return u.email; }).join(", ");
+    throw new Error("Bạn không có quyền Quản trị để thực hiện thao tác này" + (nd.email ? " (tài khoản: " + nd.email + ")" : "") + ". Liên hệ Quản trị viên (" + dsAdmin + ") nếu cần được cấp quyền.");
+  }
+  return nd;
+}
+
+// Chặn cứng cho các hàm CẦN ĐĂNG NHẬP HỢP LỆ (bất kỳ vai trò nào trong danh
+// sách) - phòng trường hợp 1 hàm bị gọi trực tiếp ngoài luồng bình thường của
+// giao diện (doGet() đã chặn chính, đây là lớp phòng thủ thứ 2).
+function yeuCauDangNhap_() {
+  const nd = layThongTinNguoiDungHienTai_();
+  if (!nd.coQuyen) {
+    throw new Error("Tài khoản " + (nd.email || "(chưa xác định)") + " chưa được cấp quyền sử dụng hệ thống này. Liên hệ Quản trị viên để được thêm vào danh sách truy cập.");
+  }
+  return nd;
+}
+
+// Cho giao diện gọi để tự nhận biết đang đăng nhập là ai / có quyền gì (ẩn
+// hiện đúng menu, hiện đúng thông báo) - KHÔNG dùng để CHẶN (chặn thật luôn ở
+// server qua yeuCauQuyenAdmin_()/yeuCauDangNhap_() và ở doGet() - xem Code.gs).
+function HT_layThongTinNguoiDungHienTai() {
+  try { return { status: "success", data: layThongTinNguoiDungHienTai_() }; } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_layDanhSachQuyen() {
+  try {
+    yeuCauQuyenAdmin_();
+    return { status: "success", data: DS_QUYEN_() };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// danhSach = [{email, vaiTro}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
+function HT_luuDanhSachQuyen(danhSach) {
+  try {
+    yeuCauQuyenAdmin_();
+    if (!Array.isArray(danhSach) || danhSach.length === 0) {
+      throw new Error("Danh sách người dùng không được để trống.");
+    }
+    const clean = danhSach.map(function (u) {
+      const email = String(u.email || "").trim().toLowerCase();
+      const vaiTro = (String(u.vaiTro || "").toUpperCase() === "ADMIN") ? "ADMIN" : "NHANVIEN";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error("Email '" + email + "' không hợp lệ.");
+      }
+      return { email: email, vaiTro: vaiTro };
+    });
+    // Loại email trùng (giữ lần xuất hiện đầu tiên)
+    const seen = {}; const finalList = [];
+    clean.forEach(function (u) { if (!seen[u.email]) { seen[u.email] = true; finalList.push(u); } });
+    if (!finalList.some(function (u) { return u.vaiTro === "ADMIN"; })) {
+      throw new Error("Phải giữ lại ít nhất 1 tài khoản ADMIN, không thể xóa hết (nếu không sẽ không còn ai quản trị được hệ thống).");
+    }
+
+    PropertiesService.getScriptProperties().setProperty("DANH_SACH_QUYEN_JSON", JSON.stringify(finalList));
+    logAudit_("CAUHINH_PHANQUYEN", "OK", JSON.stringify(finalList));
+    return { status: "success", message: "✅ Đã lưu danh sách " + finalList.length + " người dùng." };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
