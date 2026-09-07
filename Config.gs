@@ -462,7 +462,7 @@ function HT_luuLienKetDuLieu(overrides) {
 // dưới đây chỉ là giá trị KHỞI TẠO LẦN ĐẦU (dùng khi chưa từng lưu danh sách
 // nào) - Admin đầu tiên do người triển khai hệ thống xác nhận.
 const DANH_SACH_QUYEN_MAC_DINH = [
-  { email: "phuthuy.apple@gmail.com", vaiTro: "ADMIN" }
+  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN" }
 ];
 
 function DS_QUYEN_() {

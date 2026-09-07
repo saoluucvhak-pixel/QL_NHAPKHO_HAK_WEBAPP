@@ -2,10 +2,10 @@ const { createGasEnv } = require('./gasEnv');
 
 describe('layThongTinNguoiDungHienTai_() / DS_QUYEN_() - allowlist mặc định', () => {
   test('chưa từng cấu hình -> chỉ admin bootstrap (Config.gs) có quyền', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const nd = env.call('layThongTinNguoiDungHienTai_');
     expect(nd).toEqual({
-      email: 'phuthuy.apple@gmail.com',
+      email: 'saoluucvhak@gmail.com',
       vaiTro: 'ADMIN',
       coQuyen: true,
       laAdmin: true,
@@ -28,7 +28,7 @@ describe('layThongTinNguoiDungHienTai_() / DS_QUYEN_() - allowlist mặc định
   });
 
   test('so khớp email KHÔNG phân biệt hoa/thường và khoảng trắng thừa', () => {
-    const env = createGasEnv({ email: '  PhuThuy.Apple@GMAIL.com  ' });
+    const env = createGasEnv({ email: '  SaoLuuCVHak@GMAIL.com  ' });
     const nd = env.call('layThongTinNguoiDungHienTai_');
     expect(nd.coQuyen).toBe(true);
     expect(nd.laAdmin).toBe(true);
@@ -37,7 +37,7 @@ describe('layThongTinNguoiDungHienTai_() / DS_QUYEN_() - allowlist mặc định
 
 describe('yeuCauQuyenAdmin_() / yeuCauDangNhap_() - chặn cứng ở server', () => {
   test('yeuCauQuyenAdmin_() không throw với Admin', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     expect(() => env.call('yeuCauQuyenAdmin_')).not.toThrow();
   });
 
@@ -47,9 +47,9 @@ describe('yeuCauQuyenAdmin_() / yeuCauDangNhap_() - chặn cứng ở server', (
   });
 
   test('yeuCauDangNhap_() không throw với bất kỳ ai TRONG danh sách (kể cả không phải Admin)', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     env.call('HT_luuDanhSachQuyen', [
-      { email: 'phuthuy.apple@gmail.com', vaiTro: 'ADMIN' },
+      { email: 'saoluucvhak@gmail.com', vaiTro: 'ADMIN' },
       { email: 'nhanvien1@gmail.com', vaiTro: 'NHANVIEN' },
     ]);
     env.session.__setEmail('nhanvien1@gmail.com');
@@ -72,7 +72,7 @@ describe('doGet() - chặn trang ngay từ đầu cho người không có quyề
   });
 
   test('admin hợp lệ -> KHÔNG trả về trang chặn (đi tiếp vào nhánh render app thật)', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const out = env.call('doGet');
     expect(out.__html).toBeUndefined(); // nhánh chặn không được kích hoạt
   });
@@ -80,11 +80,11 @@ describe('doGet() - chặn trang ngay từ đầu cho người không có quyề
 
 describe('HT_luuDanhSachQuyen() - validate danh sách người dùng', () => {
   let env;
-  beforeEach(() => { env = createGasEnv({ email: 'phuthuy.apple@gmail.com' }); });
+  beforeEach(() => { env = createGasEnv({ email: 'saoluucvhak@gmail.com' }); });
 
   test('lưu danh sách hợp lệ mới - áp dụng ngay, không cần khởi động lại', () => {
     const res = env.call('HT_luuDanhSachQuyen', [
-      { email: 'phuthuy.apple@gmail.com', vaiTro: 'ADMIN' },
+      { email: 'saoluucvhak@gmail.com', vaiTro: 'ADMIN' },
       { email: 'ketoan@gmail.com', vaiTro: 'NHANVIEN' },
     ]);
     expect(res.status).toBe('success');
@@ -113,7 +113,7 @@ describe('HT_luuDanhSachQuyen() - validate danh sách người dùng', () => {
 
   test('từ chối email không hợp lệ', () => {
     const res = env.call('HT_luuDanhSachQuyen', [
-      { email: 'phuthuy.apple@gmail.com', vaiTro: 'ADMIN' },
+      { email: 'saoluucvhak@gmail.com', vaiTro: 'ADMIN' },
       { email: 'khong-phai-email', vaiTro: 'NHANVIEN' },
     ]);
     expect(res.status).toBe('error');
@@ -164,7 +164,7 @@ describe('Các hàm cấu hình admin-only khác đều bị chặn đúng cách
     ['HT_layCauHinhVungMien', []],
     ['HT_layDanhSachQuyen', []],
   ])('%s hoạt động bình thường khi gọi bởi Admin', (fnName, args) => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const res = env.call(fnName, ...args);
     expect(res.status).toBe('success');
   });
@@ -172,7 +172,7 @@ describe('Các hàm cấu hình admin-only khác đều bị chặn đúng cách
 
 describe('HT_layThongTinNguoiDungHienTai() - hàm public cho client, KHÔNG chặn', () => {
   test('trả về đúng thông tin cho cả người CÓ và KHÔNG có quyền (không throw)', () => {
-    const env1 = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env1 = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     expect(env1.call('HT_layThongTinNguoiDungHienTai').data.laAdmin).toBe(true);
 
     const env2 = createGasEnv({ email: 'ai-cung-duoc@gmail.com' });

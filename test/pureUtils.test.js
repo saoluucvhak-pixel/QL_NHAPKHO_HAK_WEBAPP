@@ -67,7 +67,7 @@ describe('REGION_FORMAT() / MISA_FORMAT() - cấu hình vùng miền', () => {
   });
 
   test('sau khi ADMIN lưu US, REGION_FORMAT() đổi theo ngay (không cần deploy lại)', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' }); // admin mặc định (Config.gs)
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' }); // admin mặc định (Config.gs)
     const res = env.call('HT_luuCauHinhVungMien', 'US', 'VN');
     expect(res.status).toBe('success');
     const rf = env.call('REGION_FORMAT');
@@ -78,7 +78,7 @@ describe('REGION_FORMAT() / MISA_FORMAT() - cấu hình vùng miền', () => {
   test('NHÂN VIÊN thường (không phải Admin) KHÔNG đổi được cấu hình vùng miền', () => {
     const env = createGasEnv({ email: 'nhanvien@gmail.com' });
     env.call('HT_luuDanhSachQuyen', [
-      { email: 'phuthuy.apple@gmail.com', vaiTro: 'ADMIN' },
+      { email: 'saoluucvhak@gmail.com', vaiTro: 'ADMIN' },
       { email: 'nhanvien@gmail.com', vaiTro: 'NHANVIEN' },
     ]);
     const res = env.call('HT_luuCauHinhVungMien', 'US', 'VN');
@@ -89,7 +89,7 @@ describe('REGION_FORMAT() / MISA_FORMAT() - cấu hình vùng miền', () => {
   });
 
   test('MISA_FORMAT() độc lập với REGION_FORMAT() (đổi 1 bên không ảnh hưởng bên kia)', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     env.call('HT_luuCauHinhVungMien', 'US', 'VN');
     expect(env.call('REGION_FORMAT').MIEN).toBe('US');
     expect(env.call('MISA_FORMAT').MIEN).toBe('VN');
@@ -105,7 +105,7 @@ describe('MISA_DEFAULTS() - giá trị mặc định báo cáo Misa', () => {
   });
 
   test('ADMIN lưu giá trị mới -> merge với mặc định gốc (không mất trường chưa gửi)', () => {
-    const env = createGasEnv({ email: 'phuthuy.apple@gmail.com' });
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const res = env.call('HT_luuMisaDefaults', { maHang: '999.ZZZ' });
     expect(res.status).toBe('success');
     const d = env.call('MISA_DEFAULTS');

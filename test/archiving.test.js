@@ -2,7 +2,7 @@ const { createGasEnv } = require('./gasEnv');
 
 const PHIEUCAN_SPREADSHEET_ID = '1vqMVxccBA7zlAMHrGsVBydGFwZJ6QuDZW10zJ74V29g';
 const DATA_SHEET = 'PhieuCan_DN';
-const ADMIN_EMAIL = 'phuthuy.apple@gmail.com';
+const ADMIN_EMAIL = 'saoluucvhak@gmail.com';
 
 /** Dựng 1 dòng PhieuCan_DN đủ 27 cột (A..AA). */
 function makeRow(overrides) {

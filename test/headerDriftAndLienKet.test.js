@@ -81,7 +81,7 @@ describe('HT_xacNhanCauTrucSheetHienTai() / HT_datLaiChuanHeaderSheet_() - Admin
 });
 
 describe('Liên kết dữ liệu (LIENKET) - ghi đè ID Spreadsheet/Thư mục qua giao diện', () => {
-  const ADMIN_EMAIL = 'phuthuy.apple@gmail.com';
+  const ADMIN_EMAIL = 'saoluucvhak@gmail.com';
 
   test('chưa ghi đè gì -> HT_layLienKetDuLieu trả về đúng giá trị GỐC trong code, daGhiDe=false', () => {
     const env = createGasEnv({ email: ADMIN_EMAIL });
