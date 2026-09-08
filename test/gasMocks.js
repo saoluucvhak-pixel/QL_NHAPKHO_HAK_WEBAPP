@@ -174,15 +174,36 @@ function makeFakeSpreadsheetApp() {
   };
 }
 
+/**
+ * Mock DriveApp theo dõi đúng ID được thao tác (khác bản cũ trả về 1 object
+ * cố định bất kể ID gì) - cần thiết để test HT_chiaSeTaiNguyenChoDanhSachQuyen
+ * kiểm tra được addEditor() gọi đúng ID/email, và mô phỏng được lỗi quyền cho
+ * riêng 1 ID cụ thể (test.__lamLoiChoId(id) trước khi gọi).
+ */
 function makeFakeDriveApp() {
-  const folder = {
-    createFile: () => ({ getId: () => 'fake-file-id' }),
-    addFile: () => folder,
-  };
+  const idLoi = new Set();
+  const editorsByFile = new Map(); // id -> Set(email)
+  const editorsByFolder = new Map();
+  function makeResource(id, editorsMap) {
+    if (!editorsMap.has(id)) editorsMap.set(id, new Set());
+    return {
+      getId: () => id,
+      addEditor(email) {
+        if (idLoi.has(id)) throw new Error('Bạn không có quyền chia sẻ tài nguyên này (không phải chủ sở hữu).');
+        editorsMap.get(id).add(String(email || '').toLowerCase());
+        return this;
+      },
+      createFile: () => ({ getId: () => 'fake-file-id' }),
+      addFile: () => makeResource(id, editorsMap),
+    };
+  }
   return {
-    getFolderById: () => folder,
-    getFileById: () => ({ getId: () => 'fake-file-id' }),
+    getFolderById: (id) => makeResource(id, editorsByFolder),
+    getFileById: (id) => makeResource(id, editorsByFile),
     getRootFolder: () => ({ removeFile: () => {} }),
+    __lamLoiChoId: (id) => idLoi.add(id),
+    __layEditorsFile: (id) => Array.from((editorsByFile.get(id) || new Set())),
+    __layEditorsFolder: (id) => Array.from((editorsByFolder.get(id) || new Set())),
   };
 }
 

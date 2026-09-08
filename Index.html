@@ -1428,6 +1428,18 @@
             </div>
             <div class="guide-warn">Phải giữ lại ít nhất 1 tài khoản Quản trị. Xóa nhầm email đang tự dùng để đăng nhập sẽ khiến chính bạn bị khóa khỏi hệ thống ngay khi Lưu — hãy chắc chắn trước khi bấm Lưu.</div>
           </div>
+
+          <div class="card">
+            <h2>Chia sẻ quyền truy cập Google Sheet/Drive cho danh sách trên</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Hệ thống chạy dưới quyền của CHÍNH người đang đăng nhập, nên mỗi tài khoản trong danh sách ở trên còn cần được chia sẻ quyền Chỉnh sửa trên các Google Sheet/Thư mục Drive mà webapp dùng tới thì mới nhập liệu/xuất báo cáo được — nếu không sẽ gặp lỗi "không có quyền truy cập" khi thao tác. Bấm nút dưới đây để tự động chia sẻ 1 lần cho toàn bộ danh sách, thay vì vào Google Drive chia sẻ tay từng file.
+            </p>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnChiaSeTaiNguyen">🔗 Chia sẻ tự động cho danh sách người dùng</button>
+            </div>
+            <div class="guide-warn">Chỉ chia sẻ thành công các file mà TÀI KHOẢN ĐANG ĐĂNG NHẬP là chủ sở hữu (Owner). Nếu Sheet/Thư mục do tài khoản khác tạo ra, cần đăng nhập bằng đúng tài khoản đó rồi bấm lại nút này.</div>
+            <div id="ht_chiaSeKetQua" style="margin-top:10px;"></div>
+          </div>
         </div>
 
         <!-- TAB: LƯU TRỮ DỮ LIỆU (archiving - chỉ Admin) -->
@@ -4316,6 +4328,24 @@
         toast(res.message, res.status === 'success');
         if (res.status === 'success') await htLoadDanhSachQuyen();
       } catch(err){ toast('Lỗi lưu danh sách người dùng: ' + err, false); } finally { hideOverlay(); }
+    });
+    document.getElementById('btnChiaSeTaiNguyen').addEventListener('click', async ()=>{
+      if (!confirm('Chia sẻ quyền Chỉnh sửa trên toàn bộ Google Sheet/Thư mục Drive mà webapp dùng tới cho tất cả tài khoản trong danh sách trên?')) return;
+      const ketQuaDiv = document.getElementById('ht_chiaSeKetQua');
+      showOverlay('Đang chia sẻ tài nguyên…');
+      try {
+        const res = await runServer('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+        if (res.status !== 'success') { toast(res.message, false); ketQuaDiv.innerHTML = ''; return; }
+        const soLoi = res.data.filter(r => !r.ok).length;
+        toast(soLoi === 0 ? '✅ Đã chia sẻ thành công toàn bộ tài nguyên.' : '⚠️ Chia sẻ xong, còn ' + soLoi + ' mục lỗi (xem chi tiết bên dưới).', soLoi === 0);
+        ketQuaDiv.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Tài nguyên</th><th>Email</th><th>Kết quả</th></tr></thead><tbody>'
+          + res.data.map(r => '<tr>'
+            + '<td>'+escapeHtml(r.tenTaiNguyen)+'</td>'
+            + '<td>'+escapeHtml(r.email)+'</td>'
+            + '<td>'+(r.ok ? '<span class="badge badge-ok">✅ OK</span>' : '<span class="badge badge-warn" title="'+escapeHtml(r.loi||'')+'">❌ Lỗi</span>')+'</td>'
+            + '</tr>').join('')
+          + '</tbody></table></div>';
+      } catch(err){ toast('Lỗi chia sẻ tài nguyên: ' + err, false); } finally { hideOverlay(); }
     });
 
     // =================================================================

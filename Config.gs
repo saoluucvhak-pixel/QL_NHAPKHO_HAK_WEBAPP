@@ -438,6 +438,52 @@ function HT_luuLienKetDuLieu(overrides) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
+// Chia sẻ (Share) quyền Chỉnh sửa TỰ ĐỘNG toàn bộ Spreadsheet/Thư mục Drive
+// mà webapp dùng tới (đúng danh sách LIENKET_DANH_SACH ở trên, đã áp dụng
+// override nếu có) cho TẤT CẢ tài khoản đang có trong danh sách quyền -
+// tránh phải vào Google Drive chia sẻ tay từng file x từng người (dễ sót).
+//
+// LƯU Ý QUAN TRỌNG: hàm này chỉ chia sẻ được file nào mà người BẤM NÚT (hoặc
+// người CHẠY hàm này) đang có quyền "Quản lý chia sẻ" (thường là chủ sở hữu
+// - Owner). Nếu các Spreadsheet/Thư mục này do 1 tài khoản KHÁC tạo ra
+// (không phải tài khoản Admin đang dùng webapp), cần đăng nhập bằng đúng tài
+// khoản chủ sở hữu đó để chạy hàm này (qua nút trên giao diện, hoặc mở thẳng
+// trong trình soạn thảo Apps Script rồi bấm Run) - nếu không sẽ thấy lỗi ở
+// từng dòng kết quả tương ứng, KHÔNG dừng cả quá trình.
+function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
+  try {
+    yeuCauQuyenAdmin_();
+    const emails = DS_QUYEN_().map(function (u) { return String(u.email || "").trim().toLowerCase(); }).filter(Boolean);
+    if (!emails.length) return { status: "error", message: "Danh sách quyền đang trống." };
+
+    const taiNguyen = LIENKET_DANH_SACH.map(function (item) {
+      const obj = _layObjectTheoNhom_(item.nhom);
+      return { ten: item.ten, id: obj ? String(obj[item.truong] || "") : "", loai: item.loai };
+    }).filter(function (r) { return r.id; });
+
+    // Loại ID trùng nhau (VD Draft Chưa TT mặc định dùng chung ID với PhieuCan_DN)
+    const idDaXuLy = {};
+    const ketQua = [];
+    taiNguyen.forEach(function (tn) {
+      if (idDaXuLy[tn.id]) return;
+      idDaXuLy[tn.id] = true;
+      emails.forEach(function (email) {
+        try {
+          if (tn.loai === "folder") DriveApp.getFolderById(tn.id).addEditor(email);
+          else DriveApp.getFileById(tn.id).addEditor(email);
+          ketQua.push({ tenTaiNguyen: tn.ten, email: email, ok: true });
+        } catch (e) {
+          ketQua.push({ tenTaiNguyen: tn.ten, email: email, ok: false, loi: e.toString() });
+        }
+      });
+    });
+
+    const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
+    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: Object.keys(idDaXuLy).length, soNguoiDung: emails.length, soLoi: soLoi }));
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 /* ---------- PHÂN QUYỀN NGƯỜI DÙNG (chống truy cập trái phép) ---------- */
 // TRƯỚC ĐÂY webapp không có BẤT KỲ rào chắn nào ngoài việc appsscript.json đặt
 // access:"ANYONE" (yêu cầu đăng nhập bằng 1 tài khoản Google BẤT KỲ, nhưng

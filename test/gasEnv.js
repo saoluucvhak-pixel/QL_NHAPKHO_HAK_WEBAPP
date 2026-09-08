@@ -84,6 +84,7 @@ function createGasEnv(opts) {
     propertiesService,
     spreadsheetApp,
     session,
+    driveApp,
     /**
      * Gọi 1 hàm global trong Code.gs/Config.gs - NẠP LẠI TOÀN BỘ SCRIPT TỪ ĐẦU
      * trước mỗi lần gọi (đúng mô hình thực thi thật của Apps Script - xem ghi
