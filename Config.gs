@@ -461,19 +461,11 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
     }).filter(function (u) { return u.email; });
     if (!nguoiDung.length) return { status: "error", message: "Danh sách quyền đang trống." };
 
-    const taiNguyen = LIENKET_DANH_SACH.map(function (item) {
-      const obj = _layObjectTheoNhom_(item.nhom);
-      return { ten: item.ten, id: obj ? String(obj[item.truong] || "") : "", loai: item.loai };
-    }).filter(function (r) { return r.id; });
-
+    const taiNguyen = _layDanhSachTaiNguyenDaGopId_();
     const tenQuyenHienThi = { VIEWER: "Xem", COMMENTER: "Bình luận", EDITOR: "Chỉnh sửa" };
 
-    // Loại ID trùng nhau (VD Draft Chưa TT mặc định dùng chung ID với PhieuCan_DN)
-    const idDaXuLy = {};
     const ketQua = [];
     taiNguyen.forEach(function (tn) {
-      if (idDaXuLy[tn.id]) return;
-      idDaXuLy[tn.id] = true;
       nguoiDung.forEach(function (nd) {
         try {
           const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
@@ -488,7 +480,93 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
     });
 
     const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
-    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: Object.keys(idDaXuLy).length, soNguoiDung: nguoiDung.length, soLoi: soLoi }));
+    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: taiNguyen.length, soNguoiDung: nguoiDung.length, soLoi: soLoi }));
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Lấy danh sách RÕ RÀNG các tài nguyên đã liệt kê ở trên (Config, deduped bởi ID).
+function _layDanhSachTaiNguyenDaGopId_() {
+  const taiNguyen = LIENKET_DANH_SACH.map(function (item) {
+    const obj = _layObjectTheoNhom_(item.nhom);
+    return { ten: item.ten, id: obj ? String(obj[item.truong] || "") : "", loai: item.loai };
+  }).filter(function (r) { return r.id; });
+  const idDaXuLy = {};
+  return taiNguyen.filter(function (tn) {
+    if (idDaXuLy[tn.id]) return false;
+    idDaXuLy[tn.id] = true;
+    return true;
+  });
+}
+
+// Xem CHÍNH XÁC email nào hiện đang có quyền gì (Chỉnh sửa / Xem-Bình luận)
+// trên từng Sheet/Thư mục Drive mà webapp dùng - dùng để rà soát định kỳ (VD
+// phát hiện người đã được share tay ngoài ý muốn, hoặc người đã nghỉ việc
+// nhưng chưa bị thu hồi quyền). GHI CHÚ: Google Apps Script (DriveApp cơ bản)
+// KHÔNG tách riêng được "Xem" và "Bình luận" khi ĐỌC lại quyền hiện có
+// (getViewers() gộp chung cả 2 nhóm) - đây là giới hạn của chính API, không
+// phải lỗi code.
+function HT_layTinhTrangChiaSeTaiNguyen() {
+  try {
+    yeuCauQuyenAdmin_();
+    const ketQua = [];
+    _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
+      try {
+        const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+        resource.getEditors().forEach(function (u) {
+          ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: u.getEmail(), quyen: "Chỉnh sửa", ok: true });
+        });
+        resource.getViewers().forEach(function (u) {
+          ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: u.getEmail(), quyen: "Xem/Bình luận", ok: true });
+        });
+      } catch (e) {
+        ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: "", quyen: "", ok: false, loi: e.toString() });
+      }
+    });
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Thu hồi quyền Drive của 1 email trên ĐÚNG 1 tài nguyên cụ thể (id/loai lấy
+// từ chính dòng do HT_layTinhTrangChiaSeTaiNguyen() trả về).
+function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
+  try {
+    yeuCauQuyenAdmin_();
+    email = String(email || "").trim().toLowerCase();
+    if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
+    const resource = loai === "folder" ? DriveApp.getFolderById(id) : DriveApp.getFileById(id);
+    resource.removeEditor(email);
+    resource.removeViewer(email); // removeViewer() cũng gỡ luôn quyền Bình luận (DriveApp gộp chung 2 nhóm này)
+    logAudit_("THUHOI_QUYEN_TAINGUYEN", "OK", JSON.stringify({ id: id, email: email }));
+    return { status: "success", message: "✅ Đã thu hồi quyền của " + email + " trên tài nguyên này." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Thu hồi TOÀN BỘ quyền Drive của 1 email trên MỌI Sheet/Thư mục webapp dùng
+// (dùng khi nhân viên nghỉ việc) - KHÔNG tự động xoá khỏi danh sách quyền
+// webapp (làm việc đó ở "Danh sách người dùng được cấp quyền truy cập" phía
+// trên + bấm Lưu danh sách) - 2 việc này ĐỘC LẬP: xoá khỏi danh sách quyền
+// chỉ chặn đăng nhập webapp, KHÔNG tự thu hồi quyền họ đã có trực tiếp trên
+// Google Sheet (họ vẫn mở/sửa được Sheet nếu vào thẳng Google Drive).
+function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
+  try {
+    yeuCauQuyenAdmin_();
+    email = String(email || "").trim().toLowerCase();
+    if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
+
+    const ketQua = [];
+    _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
+      try {
+        const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+        resource.removeEditor(email);
+        resource.removeViewer(email);
+        ketQua.push({ tenTaiNguyen: tn.ten, ok: true });
+      } catch (e) {
+        ketQua.push({ tenTaiNguyen: tn.ten, ok: false, loi: e.toString() });
+      }
+    });
+    const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
+    logAudit_("THUHOI_QUYEN_TOANBO", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ email: email, soLoi: soLoi }));
     return { status: "success", data: ketQua };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }

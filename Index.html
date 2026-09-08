@@ -1441,6 +1441,26 @@
             <div class="guide-warn">Chỉ chia sẻ thành công các file mà TÀI KHOẢN ĐANG ĐĂNG NHẬP là chủ sở hữu (Owner). Nếu Sheet/Thư mục do tài khoản khác tạo ra, cần đăng nhập bằng đúng tài khoản đó rồi bấm lại nút này.</div>
             <div id="ht_chiaSeKetQua" style="margin-top:10px;"></div>
           </div>
+
+          <div class="card">
+            <h2>Tình trạng chia sẻ Google Sheet/Drive hiện tại &amp; Thu hồi quyền</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Xem CHÍNH XÁC email nào đang có quyền gì trên từng Sheet/Thư mục — dùng để rà soát định kỳ (VD phát hiện người được share tay ngoài ý muốn, hoặc nhân viên đã nghỉ việc nhưng chưa bị thu hồi quyền). <b>Lưu ý:</b> xoá email khỏi "Danh sách người dùng" ở trên chỉ chặn họ đăng nhập webapp — KHÔNG tự thu hồi quyền họ đang có trực tiếp trên Google Sheet (họ vẫn mở/sửa được nếu vào thẳng Google Drive) — phải thu hồi riêng ở đây.
+            </p>
+            <div class="btnrow">
+              <button class="btn btn-ghost" id="btnTaiTinhTrangChiaSe">🔄 Xem tình trạng chia sẻ</button>
+            </div>
+            <div class="table-wrap" style="margin-top:10px;">
+              <table>
+                <thead><tr><th>Tài nguyên</th><th>Email</th><th>Quyền hiện tại</th><th></th></tr></thead>
+                <tbody id="ht_tinhTrangChiaSeBody"><tr><td colspan="4" class="empty-state">Bấm "Xem tình trạng chia sẻ" để tải.</td></tr></tbody>
+              </table>
+            </div>
+            <div class="btnrow" style="margin-top:14px;">
+              <input type="email" id="ht_thuHoiEmail" placeholder="Email cần thu hồi TOÀN BỘ quyền (VD nhân viên đã nghỉ việc)" style="flex:1;min-width:260px;font-size:12.5px;">
+              <button class="btn btn-ghost" id="btnThuHoiToanBo">🚫 Thu hồi toàn bộ quyền Drive của email này</button>
+            </div>
+          </div>
         </div>
 
         <!-- TAB: LƯU TRỮ DỮ LIỆU (archiving - chỉ Admin) -->
@@ -4354,6 +4374,48 @@
             + '</tr>').join('')
           + '</tbody></table></div>';
       } catch(err){ toast('Lỗi chia sẻ tài nguyên: ' + err, false); } finally { hideOverlay(); }
+    });
+
+    async function htLoadTinhTrangChiaSe(){
+      const body = document.getElementById('ht_tinhTrangChiaSeBody');
+      body.innerHTML = '<tr><td colspan="4" class="empty-state">Đang tải…</td></tr>';
+      try {
+        const res = await runServer('HT_layTinhTrangChiaSeTaiNguyen');
+        if (res.status !== 'success') { toast(res.message, false); body.innerHTML = '<tr><td colspan="4" class="empty-state">'+escapeHtml(res.message)+'</td></tr>'; return; }
+        const dong = res.data.filter(r => r.email); // bỏ dòng lỗi đọc tài nguyên (r.email rỗng)
+        if (dong.length === 0) { body.innerHTML = '<tr><td colspan="4" class="empty-state">Chưa có email nào được chia sẻ (bấm "Chia sẻ tự động" ở trên trước).</td></tr>'; return; }
+        body.innerHTML = dong.map(r => '<tr>'
+          + '<td>'+escapeHtml(r.tenTaiNguyen)+'</td>'
+          + '<td>'+escapeHtml(r.email)+'</td>'
+          + '<td>'+escapeHtml(r.quyen)+'</td>'
+          + '<td><button class="btn btn-ghost btn-sm ht-thuhoi-1" type="button" data-id="'+escapeHtml(r.id)+'" data-loai="'+escapeHtml(r.loai)+'" data-email="'+escapeHtml(r.email)+'" data-ten="'+escapeHtml(r.tenTaiNguyen)+'">🚫 Thu hồi</button></td>'
+          + '</tr>').join('');
+        body.querySelectorAll('.ht-thuhoi-1').forEach(btn => btn.addEventListener('click', async ()=>{
+          const { id, loai, email, ten } = btn.dataset;
+          if (!confirm('Thu hồi quyền của ' + email + ' trên "' + ten + '"?')) return;
+          showOverlay('Đang thu hồi…');
+          try {
+            const res = await runServer('HT_thuHoiQuyenTaiNguyen', id, loai, email);
+            toast(res.message, res.status === 'success');
+            if (res.status === 'success') await htLoadTinhTrangChiaSe();
+          } catch(err){ toast('Lỗi thu hồi quyền: ' + err, false); } finally { hideOverlay(); }
+        }));
+      } catch(err){ toast('Lỗi tải tình trạng chia sẻ: ' + err, false); }
+    }
+    document.getElementById('btnTaiTinhTrangChiaSe').addEventListener('click', htLoadTinhTrangChiaSe);
+    document.getElementById('btnThuHoiToanBo').addEventListener('click', async ()=>{
+      const email = document.getElementById('ht_thuHoiEmail').value.trim();
+      if (!email) { toast('Vui lòng nhập email cần thu hồi.', false); return; }
+      if (!confirm('Thu hồi TOÀN BỘ quyền Drive của "' + email + '" trên mọi Sheet/Thư mục webapp dùng? Người này sẽ không còn mở/sửa được các Sheet đó nữa (kể cả mở trực tiếp trên Google Drive).')) return;
+      showOverlay('Đang thu hồi toàn bộ quyền…');
+      try {
+        const res = await runServer('HT_thuHoiToanBoQuyenDriveChoEmail', email);
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        const soLoi = res.data.filter(r => !r.ok).length;
+        toast(soLoi === 0 ? '✅ Đã thu hồi toàn bộ quyền của ' + email + '.' : '⚠️ Thu hồi xong, còn ' + soLoi + ' mục lỗi.', soLoi === 0);
+        document.getElementById('ht_thuHoiEmail').value = '';
+        await htLoadTinhTrangChiaSe();
+      } catch(err){ toast('Lỗi thu hồi quyền: ' + err, false); } finally { hideOverlay(); }
     });
 
     // =================================================================

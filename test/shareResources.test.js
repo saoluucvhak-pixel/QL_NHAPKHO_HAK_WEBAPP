@@ -95,3 +95,102 @@ describe('HT_chiaSeTaiNguyenChoDanhSachQuyen() - tự động share Sheet/Drive 
     expect(ds.find((u) => u.email === 'nv@gmail.com').quyenDrive).toBe('EDITOR');
   });
 });
+
+describe('HT_layTinhTrangChiaSeTaiNguyen() - xem CHÍNH XÁC email nào đang có quyền gì trên từng tài nguyên', () => {
+  test('CHỈ ADMIN mới xem được', () => {
+    const env = createGasEnv({ email: 'ai-do@gmail.com' });
+    const res = env.call('HT_layTinhTrangChiaSeTaiNguyen');
+    expect(res.status).toBe('error');
+    expect(res.message).toMatch(/quyền Quản trị/);
+  });
+
+  test('liệt kê đúng từng (tài nguyên, email, quyền) sau khi chia sẻ - phân biệt đúng Chỉnh sửa vs Xem/Bình luận', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN', quyenDrive: 'EDITOR' },
+      { email: 'chi-xem@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'VIEWER' },
+    ]);
+    env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+
+    const res = env.call('HT_layTinhTrangChiaSeTaiNguyen');
+    expect(res.status).toBe('success');
+
+    const dongConfigAdmin = res.data.find((r) => r.id === CONFIG_SPREADSHEET_ID && r.email === ADMIN_EMAIL);
+    expect(dongConfigAdmin.quyen).toBe('Chỉnh sửa');
+    const dongConfigChiXem = res.data.find((r) => r.id === CONFIG_SPREADSHEET_ID && r.email === 'chi-xem@gmail.com');
+    expect(dongConfigChiXem.quyen).toBe('Xem/Bình luận');
+
+    // Không lặp lại tài nguyên trùng ID (Draft Chưa TT = CONFIG_SPREADSHEET_ID)
+    const soDongConfigAdmin = res.data.filter((r) => r.id === CONFIG_SPREADSHEET_ID && r.email === ADMIN_EMAIL).length;
+    expect(soDongConfigAdmin).toBe(1);
+  });
+
+  test('chưa chia sẻ gì -> trả về danh sách rỗng (không lỗi)', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    const res = env.call('HT_layTinhTrangChiaSeTaiNguyen');
+    expect(res.status).toBe('success');
+    expect(res.data).toEqual([]);
+  });
+});
+
+describe('HT_thuHoiQuyenTaiNguyen() / HT_thuHoiToanBoQuyenDriveChoEmail() - thu hồi quyền Drive', () => {
+  test('CHỈ ADMIN mới thu hồi được', () => {
+    const env = createGasEnv({ email: 'ai-do@gmail.com' });
+    expect(env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', 'nv@gmail.com').status).toBe('error');
+    expect(env.call('HT_thuHoiToanBoQuyenDriveChoEmail', 'nv@gmail.com').status).toBe('error');
+  });
+
+  test('thu hồi trên 1 tài nguyên cụ thể -> chỉ mất quyền ĐÚNG tài nguyên đó, các tài nguyên khác của cùng email vẫn còn', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN', quyenDrive: 'EDITOR' },
+      { email: 'nv@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'EDITOR' },
+    ]);
+    env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nv@gmail.com')).toBe('EDITOR');
+    expect(env.driveApp.__layQuyenFile(BAOGIA_SPREADSHEET_ID, 'nv@gmail.com')).toBe('EDITOR');
+
+    const res = env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', 'nv@gmail.com');
+    expect(res.status).toBe('success');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nv@gmail.com')).toBeUndefined();
+    expect(env.driveApp.__layQuyenFile(BAOGIA_SPREADSHEET_ID, 'nv@gmail.com')).toBe('EDITOR'); // KHÔNG bị đụng tới
+  });
+
+  test('thu hồi quyền VIEWER/COMMENTER cũng dùng removeViewer() (DriveApp gộp chung 2 nhóm) - vẫn mất quyền', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN', quyenDrive: 'EDITOR' },
+      { email: 'nv-binhluan@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'COMMENTER' },
+    ]);
+    env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nv-binhluan@gmail.com')).toBe('COMMENTER');
+
+    env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', 'nv-binhluan@gmail.com');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nv-binhluan@gmail.com')).toBeUndefined();
+  });
+
+  test('thu hồi TOÀN BỘ cho 1 email -> mất quyền trên MỌI tài nguyên, người khác không bị ảnh hưởng', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN', quyenDrive: 'EDITOR' },
+      { email: 'nghi-viec@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'EDITOR' },
+    ]);
+    env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+
+    const res = env.call('HT_thuHoiToanBoQuyenDriveChoEmail', 'nghi-viec@gmail.com');
+    expect(res.status).toBe('success');
+    expect(res.data.every((r) => r.ok)).toBe(true);
+
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nghi-viec@gmail.com')).toBeUndefined();
+    expect(env.driveApp.__layQuyenFile(BAOGIA_SPREADSHEET_ID, 'nghi-viec@gmail.com')).toBeUndefined();
+    expect(env.driveApp.__layQuyenFolder(CONFIG_FOLDER_DONE, 'nghi-viec@gmail.com')).toBeUndefined();
+    // Admin không bị đụng tới
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, ADMIN_EMAIL)).toBe('EDITOR');
+  });
+
+  test('thiếu email -> báo lỗi rõ ràng, không throw', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    expect(env.call('HT_thuHoiToanBoQuyenDriveChoEmail', '').status).toBe('error');
+    expect(env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', '').status).toBe('error');
+  });
+});

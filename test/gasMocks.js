@@ -190,11 +190,26 @@ function makeFakeDriveApp() {
       if (idLoi.has(id)) throw new Error('Bạn không có quyền chia sẻ tài nguyên này (không phải chủ sở hữu).');
       rolesMap.get(id).set(String(email || '').toLowerCase(), quyen);
     }
+    function boQuyenNeu(email, ...quyenCanBo) {
+      if (idLoi.has(id)) throw new Error('Bạn không có quyền chia sẻ tài nguyên này (không phải chủ sở hữu).');
+      const key = String(email || '').toLowerCase();
+      if (quyenCanBo.indexOf(rolesMap.get(id).get(key)) !== -1) rolesMap.get(id).delete(key);
+    }
+    function layTheoQuyen(...quyen) {
+      return Array.from(rolesMap.get(id).entries())
+        .filter(([, r]) => quyen.indexOf(r) !== -1)
+        .map(([email]) => ({ getEmail: () => email }));
+    }
     return {
       getId: () => id,
       addEditor(email) { ganQuyen(email, 'EDITOR'); return this; },
       addViewer(email) { ganQuyen(email, 'VIEWER'); return this; },
       addCommenter(email) { ganQuyen(email, 'COMMENTER'); return this; },
+      removeEditor(email) { boQuyenNeu(email, 'EDITOR'); return this; },
+      // removeViewer() thật của DriveApp gỡ luôn cả quyền Bình luận (2 nhóm gộp chung).
+      removeViewer(email) { boQuyenNeu(email, 'VIEWER', 'COMMENTER'); return this; },
+      getEditors: () => layTheoQuyen('EDITOR'),
+      getViewers: () => layTheoQuyen('VIEWER', 'COMMENTER'),
       createFile: () => ({ getId: () => 'fake-file-id' }),
       addFile: () => makeResource(id, rolesMap),
     };
