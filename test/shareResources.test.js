@@ -61,4 +61,37 @@ describe('HT_chiaSeTaiNguyenChoDanhSachQuyen() - tự động share Sheet/Drive 
     expect(res.data.every((r) => r.email === ADMIN_EMAIL)).toBe(true);
     expect(res.data.length).toBeGreaterThan(0);
   });
+
+  test('mỗi người dùng chia sẻ ĐÚNG quyền Drive riêng (Xem/Bình luận/Chỉnh sửa) theo quyenDrive đã lưu, không phải mặc định EDITOR cho tất cả', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN', quyenDrive: 'EDITOR' },
+      { email: 'ketoan-xem@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'VIEWER' },
+      { email: 'nv-binhluan@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'COMMENTER' },
+    ]);
+
+    const res = env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
+    expect(res.status).toBe('success');
+    expect(res.data.every((r) => r.ok)).toBe(true);
+
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, ADMIN_EMAIL)).toBe('EDITOR');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'ketoan-xem@gmail.com')).toBe('VIEWER');
+    expect(env.driveApp.__layQuyenFile(CONFIG_SPREADSHEET_ID, 'nv-binhluan@gmail.com')).toBe('COMMENTER');
+    expect(env.driveApp.__layQuyenFolder(CONFIG_FOLDER_DONE, 'ketoan-xem@gmail.com')).toBe('VIEWER');
+
+    const dongXem = res.data.find((r) => r.email === 'ketoan-xem@gmail.com' && r.tenTaiNguyen.indexOf('PhieuCan_DN') !== -1);
+    expect(dongXem.quyenDrive).toBe('Xem');
+  });
+
+  test('quyenDrive không hợp lệ/thiếu -> HT_luuDanhSachQuyen tự chuẩn hoá về EDITOR (an toàn, giữ hành vi cũ)', () => {
+    const env = createGasEnv({ email: ADMIN_EMAIL });
+    const saveRes = env.call('HT_luuDanhSachQuyen', [
+      { email: ADMIN_EMAIL, vaiTro: 'ADMIN' }, // không gửi quyenDrive
+      { email: 'nv@gmail.com', vaiTro: 'NHANVIEN', quyenDrive: 'khong-hop-le' },
+    ]);
+    expect(saveRes.status).toBe('success');
+    const ds = env.call('DS_QUYEN_');
+    expect(ds.find((u) => u.email === ADMIN_EMAIL).quyenDrive).toBe('EDITOR');
+    expect(ds.find((u) => u.email === 'nv@gmail.com').quyenDrive).toBe('EDITOR');
+  });
 });

@@ -1412,10 +1412,11 @@
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Trước đây webapp cho phép <b>BẤT KỲ ai đăng nhập bằng tài khoản Google</b> (kể cả không phải nhân viên) sử dụng mọi chức năng, kể cả xóa dữ liệu. Nay chỉ những email trong danh sách dưới đây mới mở được hệ thống. Nhân viên dùng Gmail cá nhân nên phải nhập <b>đúng email Gmail</b> đang dùng để đăng nhập.
               Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống.
+              Cột <b>Quyền Drive</b> là quyền trên chính Google Sheet/Drive khi bấm nút "Chia sẻ tự động" bên dưới — <b>Chỉnh sửa</b> cho ai cần nhập/sửa dữ liệu (đa số nhân viên), <b>Xem</b>/<b>Bình luận</b> chỉ phù hợp cho người CHỈ xem báo cáo, không thao tác trên webapp (chọn Xem/Bình luận cho người cần nhập liệu sẽ khiến họ bị lỗi "không có quyền" khi thao tác).
             </p>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Email</th><th>Vai trò</th><th></th></tr></thead>
+                <thead><tr><th>Email</th><th>Vai trò</th><th>Quyền Drive</th><th></th></tr></thead>
                 <tbody id="ht_quyenBody"></tbody>
               </table>
             </div>
@@ -1432,7 +1433,7 @@
           <div class="card">
             <h2>Chia sẻ quyền truy cập Google Sheet/Drive cho danh sách trên</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Hệ thống chạy dưới quyền của CHÍNH người đang đăng nhập, nên mỗi tài khoản trong danh sách ở trên còn cần được chia sẻ quyền Chỉnh sửa trên các Google Sheet/Thư mục Drive mà webapp dùng tới thì mới nhập liệu/xuất báo cáo được — nếu không sẽ gặp lỗi "không có quyền truy cập" khi thao tác. Bấm nút dưới đây để tự động chia sẻ 1 lần cho toàn bộ danh sách, thay vì vào Google Drive chia sẻ tay từng file.
+              Hệ thống chạy dưới quyền của CHÍNH người đang đăng nhập, nên mỗi tài khoản trong danh sách ở trên còn cần được chia sẻ quyền trên các Google Sheet/Thư mục Drive mà webapp dùng tới thì mới thao tác được — nếu không sẽ gặp lỗi "không có quyền truy cập". Bấm nút dưới đây để tự động chia sẻ 1 lần cho toàn bộ danh sách, đúng theo mức <b>Quyền Drive</b> (Xem/Bình luận/Chỉnh sửa) đã chọn cho từng người ở bảng trên — thay vì vào Google Drive chia sẻ tay từng file.
             </p>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnChiaSeTaiNguyen">🔗 Chia sẻ tự động cho danh sách người dùng</button>
@@ -4286,12 +4287,17 @@
     // =================================================================
     // HỆ THỐNG - QUẢN LÝ NGƯỜI DÙNG (phân quyền truy cập - chỉ Admin)
     // =================================================================
-    function htVeDongQuyen(email, vaiTro){
+    function htVeDongQuyen(email, vaiTro, quyenDrive){
       return '<tr>'
         + '<td><input type="email" class="ht-quyen-email" value="'+escapeHtml(email || '')+'" placeholder="ten@gmail.com" style="width:100%;font-size:12px;"></td>'
         + '<td><select class="ht-quyen-vaitro" style="font-size:12px;">'
           + '<option value="NHANVIEN"'+(vaiTro !== 'ADMIN' ? ' selected' : '')+'>Nhân viên</option>'
           + '<option value="ADMIN"'+(vaiTro === 'ADMIN' ? ' selected' : '')+'>Quản trị</option>'
+          + '</select></td>'
+        + '<td><select class="ht-quyen-drive" style="font-size:12px;" title="Quyền trên Google Sheet/Drive khi bấm Chia sẻ tự động">'
+          + '<option value="VIEWER"'+(quyenDrive === 'VIEWER' ? ' selected' : '')+'>👁️ Xem</option>'
+          + '<option value="COMMENTER"'+(quyenDrive === 'COMMENTER' ? ' selected' : '')+'>💬 Bình luận</option>'
+          + '<option value="EDITOR"'+(quyenDrive !== 'VIEWER' && quyenDrive !== 'COMMENTER' ? ' selected' : '')+'>✏️ Chỉnh sửa</option>'
           + '</select></td>'
         + '<td><button class="btn btn-ghost btn-sm ht-quyen-xoa" type="button" title="Xóa">🗑️</button></td>'
         + '</tr>';
@@ -4301,14 +4307,14 @@
         const res = await runServer('HT_layDanhSachQuyen');
         if (res.status !== 'success') { toast(res.message, false); return; }
         const body = document.getElementById('ht_quyenBody');
-        body.innerHTML = res.data.map(u => htVeDongQuyen(u.email, u.vaiTro)).join('');
+        body.innerHTML = res.data.map(u => htVeDongQuyen(u.email, u.vaiTro, u.quyenDrive)).join('');
         body.querySelectorAll('.ht-quyen-xoa').forEach(btn => btn.addEventListener('click', () => btn.closest('tr').remove()));
       } catch(err){ toast('Lỗi tải danh sách người dùng: ' + err, false); }
     }
     document.getElementById('btnTaiLaiDanhSachQuyen').addEventListener('click', htLoadDanhSachQuyen);
     document.getElementById('btnThemNguoiDung').addEventListener('click', ()=>{
       const body = document.getElementById('ht_quyenBody');
-      body.insertAdjacentHTML('beforeend', htVeDongQuyen('', 'NHANVIEN'));
+      body.insertAdjacentHTML('beforeend', htVeDongQuyen('', 'NHANVIEN', 'EDITOR'));
       const rows = body.querySelectorAll('tr');
       const lastRow = rows[rows.length - 1];
       lastRow.querySelector('.ht-quyen-xoa').addEventListener('click', () => lastRow.remove());
@@ -4318,7 +4324,8 @@
       const rows = document.querySelectorAll('#ht_quyenBody tr');
       const danhSach = Array.from(rows).map(row => ({
         email: row.querySelector('.ht-quyen-email').value.trim(),
-        vaiTro: row.querySelector('.ht-quyen-vaitro').value
+        vaiTro: row.querySelector('.ht-quyen-vaitro').value,
+        quyenDrive: row.querySelector('.ht-quyen-drive').value
       })).filter(u => u.email);
       if (danhSach.length === 0) { toast('Danh sách người dùng không được để trống.', false); return; }
       if (!confirm('Lưu danh sách ' + danhSach.length + ' người dùng? Email KHÔNG có trong danh sách sau khi lưu sẽ mất quyền truy cập ngay lập tức.')) return;
@@ -4330,7 +4337,7 @@
       } catch(err){ toast('Lỗi lưu danh sách người dùng: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnChiaSeTaiNguyen').addEventListener('click', async ()=>{
-      if (!confirm('Chia sẻ quyền Chỉnh sửa trên toàn bộ Google Sheet/Thư mục Drive mà webapp dùng tới cho tất cả tài khoản trong danh sách trên?')) return;
+      if (!confirm('Chia sẻ quyền trên toàn bộ Google Sheet/Thư mục Drive mà webapp dùng tới cho tất cả tài khoản trong danh sách trên (đúng mức Xem/Bình luận/Chỉnh sửa đã chọn cho từng người, đã Lưu danh sách trước đó)?')) return;
       const ketQuaDiv = document.getElementById('ht_chiaSeKetQua');
       showOverlay('Đang chia sẻ tài nguyên…');
       try {
@@ -4338,10 +4345,11 @@
         if (res.status !== 'success') { toast(res.message, false); ketQuaDiv.innerHTML = ''; return; }
         const soLoi = res.data.filter(r => !r.ok).length;
         toast(soLoi === 0 ? '✅ Đã chia sẻ thành công toàn bộ tài nguyên.' : '⚠️ Chia sẻ xong, còn ' + soLoi + ' mục lỗi (xem chi tiết bên dưới).', soLoi === 0);
-        ketQuaDiv.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Tài nguyên</th><th>Email</th><th>Kết quả</th></tr></thead><tbody>'
+        ketQuaDiv.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Tài nguyên</th><th>Email</th><th>Quyền</th><th>Kết quả</th></tr></thead><tbody>'
           + res.data.map(r => '<tr>'
             + '<td>'+escapeHtml(r.tenTaiNguyen)+'</td>'
             + '<td>'+escapeHtml(r.email)+'</td>'
+            + '<td>'+escapeHtml(r.quyenDrive||'')+'</td>'
             + '<td>'+(r.ok ? '<span class="badge badge-ok">✅ OK</span>' : '<span class="badge badge-warn" title="'+escapeHtml(r.loi||'')+'">❌ Lỗi</span>')+'</td>'
             + '</tr>').join('')
           + '</tbody></table></div>';

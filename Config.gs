@@ -453,13 +453,20 @@ function HT_luuLienKetDuLieu(overrides) {
 function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
   try {
     yeuCauQuyenAdmin_();
-    const emails = DS_QUYEN_().map(function (u) { return String(u.email || "").trim().toLowerCase(); }).filter(Boolean);
-    if (!emails.length) return { status: "error", message: "Danh sách quyền đang trống." };
+    const nguoiDung = DS_QUYEN_().map(function (u) {
+      const email = String(u.email || "").trim().toLowerCase();
+      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
+      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
+      return { email: email, quyenDrive: quyenDrive };
+    }).filter(function (u) { return u.email; });
+    if (!nguoiDung.length) return { status: "error", message: "Danh sách quyền đang trống." };
 
     const taiNguyen = LIENKET_DANH_SACH.map(function (item) {
       const obj = _layObjectTheoNhom_(item.nhom);
       return { ten: item.ten, id: obj ? String(obj[item.truong] || "") : "", loai: item.loai };
     }).filter(function (r) { return r.id; });
+
+    const tenQuyenHienThi = { VIEWER: "Xem", COMMENTER: "Bình luận", EDITOR: "Chỉnh sửa" };
 
     // Loại ID trùng nhau (VD Draft Chưa TT mặc định dùng chung ID với PhieuCan_DN)
     const idDaXuLy = {};
@@ -467,19 +474,21 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
     taiNguyen.forEach(function (tn) {
       if (idDaXuLy[tn.id]) return;
       idDaXuLy[tn.id] = true;
-      emails.forEach(function (email) {
+      nguoiDung.forEach(function (nd) {
         try {
-          if (tn.loai === "folder") DriveApp.getFolderById(tn.id).addEditor(email);
-          else DriveApp.getFileById(tn.id).addEditor(email);
-          ketQua.push({ tenTaiNguyen: tn.ten, email: email, ok: true });
+          const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+          if (nd.quyenDrive === "VIEWER") resource.addViewer(nd.email);
+          else if (nd.quyenDrive === "COMMENTER") resource.addCommenter(nd.email);
+          else resource.addEditor(nd.email);
+          ketQua.push({ tenTaiNguyen: tn.ten, email: nd.email, quyenDrive: tenQuyenHienThi[nd.quyenDrive], ok: true });
         } catch (e) {
-          ketQua.push({ tenTaiNguyen: tn.ten, email: email, ok: false, loi: e.toString() });
+          ketQua.push({ tenTaiNguyen: tn.ten, email: nd.email, quyenDrive: tenQuyenHienThi[nd.quyenDrive], ok: false, loi: e.toString() });
         }
       });
     });
 
     const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
-    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: Object.keys(idDaXuLy).length, soNguoiDung: emails.length, soLoi: soLoi }));
+    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: Object.keys(idDaXuLy).length, soNguoiDung: nguoiDung.length, soLoi: soLoi }));
     return { status: "success", data: ketQua };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -508,7 +517,7 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
 // dưới đây chỉ là giá trị KHỞI TẠO LẦN ĐẦU (dùng khi chưa từng lưu danh sách
 // nào) - Admin đầu tiên do người triển khai hệ thống xác nhận.
 const DANH_SACH_QUYEN_MAC_DINH = [
-  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN" }
+  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN", quyenDrive: "EDITOR" }
 ];
 
 function DS_QUYEN_() {
@@ -590,7 +599,17 @@ function HT_layDanhSachQuyen() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-// danhSach = [{email, vaiTro}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
+// Quyền chia sẻ Google Drive (Xem/Bình luận/Chỉnh sửa) - ĐỘC LẬP với vaiTro
+// (vaiTro là quyền TRONG webapp: ADMIN/NHANVIEN; quyenDrive là quyền TRÊN
+// chính Google Sheet/Drive khi HT_chiaSeTaiNguyenChoDanhSachQuyen() chạy).
+// LƯU Ý: đa số chức năng nghiệp vụ (nhập phiếu cân, sửa, xuất hàng...) GHI
+// dữ liệu trực tiếp vào Sheet dưới danh nghĩa CHÍNH người dùng (executeAs:
+// USER_ACCESSING) - nên hầu hết nhân viên vẫn cần "Chỉnh sửa" (EDITOR) thì
+// mới thao tác được. "Xem"/"Bình luận" chỉ phù hợp cho người CHỈ xem báo
+// cáo, không nhập/sửa gì.
+const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
+
+// danhSach = [{email, vaiTro, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
 function HT_luuDanhSachQuyen(danhSach) {
   try {
     yeuCauQuyenAdmin_();
@@ -600,10 +619,12 @@ function HT_luuDanhSachQuyen(danhSach) {
     const clean = danhSach.map(function (u) {
       const email = String(u.email || "").trim().toLowerCase();
       const vaiTro = (String(u.vaiTro || "").toUpperCase() === "ADMIN") ? "ADMIN" : "NHANVIEN";
+      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
+      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error("Email '" + email + "' không hợp lệ.");
       }
-      return { email: email, vaiTro: vaiTro };
+      return { email: email, vaiTro: vaiTro, quyenDrive: quyenDrive };
     });
     // Loại email trùng (giữ lần xuất hiện đầu tiên)
     const seen = {}; const finalList = [];

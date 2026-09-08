@@ -182,28 +182,32 @@ function makeFakeSpreadsheetApp() {
  */
 function makeFakeDriveApp() {
   const idLoi = new Set();
-  const editorsByFile = new Map(); // id -> Set(email)
-  const editorsByFolder = new Map();
-  function makeResource(id, editorsMap) {
-    if (!editorsMap.has(id)) editorsMap.set(id, new Set());
+  const rolesByFile = new Map(); // id -> Map(email -> 'VIEWER'|'COMMENTER'|'EDITOR')
+  const rolesByFolder = new Map();
+  function makeResource(id, rolesMap) {
+    if (!rolesMap.has(id)) rolesMap.set(id, new Map());
+    function ganQuyen(email, quyen) {
+      if (idLoi.has(id)) throw new Error('Bạn không có quyền chia sẻ tài nguyên này (không phải chủ sở hữu).');
+      rolesMap.get(id).set(String(email || '').toLowerCase(), quyen);
+    }
     return {
       getId: () => id,
-      addEditor(email) {
-        if (idLoi.has(id)) throw new Error('Bạn không có quyền chia sẻ tài nguyên này (không phải chủ sở hữu).');
-        editorsMap.get(id).add(String(email || '').toLowerCase());
-        return this;
-      },
+      addEditor(email) { ganQuyen(email, 'EDITOR'); return this; },
+      addViewer(email) { ganQuyen(email, 'VIEWER'); return this; },
+      addCommenter(email) { ganQuyen(email, 'COMMENTER'); return this; },
       createFile: () => ({ getId: () => 'fake-file-id' }),
-      addFile: () => makeResource(id, editorsMap),
+      addFile: () => makeResource(id, rolesMap),
     };
   }
   return {
-    getFolderById: (id) => makeResource(id, editorsByFolder),
-    getFileById: (id) => makeResource(id, editorsByFile),
+    getFolderById: (id) => makeResource(id, rolesByFolder),
+    getFileById: (id) => makeResource(id, rolesByFile),
     getRootFolder: () => ({ removeFile: () => {} }),
     __lamLoiChoId: (id) => idLoi.add(id),
-    __layEditorsFile: (id) => Array.from((editorsByFile.get(id) || new Set())),
-    __layEditorsFolder: (id) => Array.from((editorsByFolder.get(id) || new Set())),
+    __layEditorsFile: (id) => Array.from((rolesByFile.get(id) || new Map()).entries()).filter(([, r]) => r === 'EDITOR').map(([e]) => e),
+    __layEditorsFolder: (id) => Array.from((rolesByFolder.get(id) || new Map()).entries()).filter(([, r]) => r === 'EDITOR').map(([e]) => e),
+    __layQuyenFile: (id, email) => (rolesByFile.get(id) || new Map()).get(String(email || '').toLowerCase()),
+    __layQuyenFolder: (id, email) => (rolesByFolder.get(id) || new Map()).get(String(email || '').toLowerCase()),
   };
 }
 
