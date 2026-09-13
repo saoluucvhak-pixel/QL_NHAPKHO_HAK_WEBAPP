@@ -438,6 +438,139 @@ function HT_luuLienKetDuLieu(overrides) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
+// Chia sẻ (Share) quyền Chỉnh sửa TỰ ĐỘNG toàn bộ Spreadsheet/Thư mục Drive
+// mà webapp dùng tới (đúng danh sách LIENKET_DANH_SACH ở trên, đã áp dụng
+// override nếu có) cho TẤT CẢ tài khoản đang có trong danh sách quyền -
+// tránh phải vào Google Drive chia sẻ tay từng file x từng người (dễ sót).
+//
+// LƯU Ý QUAN TRỌNG: hàm này chỉ chia sẻ được file nào mà người BẤM NÚT (hoặc
+// người CHẠY hàm này) đang có quyền "Quản lý chia sẻ" (thường là chủ sở hữu
+// - Owner). Nếu các Spreadsheet/Thư mục này do 1 tài khoản KHÁC tạo ra
+// (không phải tài khoản Admin đang dùng webapp), cần đăng nhập bằng đúng tài
+// khoản chủ sở hữu đó để chạy hàm này (qua nút trên giao diện, hoặc mở thẳng
+// trong trình soạn thảo Apps Script rồi bấm Run) - nếu không sẽ thấy lỗi ở
+// từng dòng kết quả tương ứng, KHÔNG dừng cả quá trình.
+function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
+  try {
+    yeuCauQuyenAdmin_();
+    const nguoiDung = DS_QUYEN_().map(function (u) {
+      const email = String(u.email || "").trim().toLowerCase();
+      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
+      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
+      return { email: email, quyenDrive: quyenDrive };
+    }).filter(function (u) { return u.email; });
+    if (!nguoiDung.length) return { status: "error", message: "Danh sách quyền đang trống." };
+
+    const taiNguyen = _layDanhSachTaiNguyenDaGopId_();
+    const tenQuyenHienThi = { VIEWER: "Xem", COMMENTER: "Bình luận", EDITOR: "Chỉnh sửa" };
+
+    const ketQua = [];
+    taiNguyen.forEach(function (tn) {
+      nguoiDung.forEach(function (nd) {
+        try {
+          const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+          if (nd.quyenDrive === "VIEWER") resource.addViewer(nd.email);
+          else if (nd.quyenDrive === "COMMENTER") resource.addCommenter(nd.email);
+          else resource.addEditor(nd.email);
+          ketQua.push({ tenTaiNguyen: tn.ten, email: nd.email, quyenDrive: tenQuyenHienThi[nd.quyenDrive], ok: true });
+        } catch (e) {
+          ketQua.push({ tenTaiNguyen: tn.ten, email: nd.email, quyenDrive: tenQuyenHienThi[nd.quyenDrive], ok: false, loi: e.toString() });
+        }
+      });
+    });
+
+    const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
+    logAudit_("CHIASE_TAINGUYEN", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ soTaiNguyen: taiNguyen.length, soNguoiDung: nguoiDung.length, soLoi: soLoi }));
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Lấy danh sách RÕ RÀNG các tài nguyên đã liệt kê ở trên (Config, deduped bởi ID).
+function _layDanhSachTaiNguyenDaGopId_() {
+  const taiNguyen = LIENKET_DANH_SACH.map(function (item) {
+    const obj = _layObjectTheoNhom_(item.nhom);
+    return { ten: item.ten, id: obj ? String(obj[item.truong] || "") : "", loai: item.loai };
+  }).filter(function (r) { return r.id; });
+  const idDaXuLy = {};
+  return taiNguyen.filter(function (tn) {
+    if (idDaXuLy[tn.id]) return false;
+    idDaXuLy[tn.id] = true;
+    return true;
+  });
+}
+
+// Xem CHÍNH XÁC email nào hiện đang có quyền gì (Chỉnh sửa / Xem-Bình luận)
+// trên từng Sheet/Thư mục Drive mà webapp dùng - dùng để rà soát định kỳ (VD
+// phát hiện người đã được share tay ngoài ý muốn, hoặc người đã nghỉ việc
+// nhưng chưa bị thu hồi quyền). GHI CHÚ: Google Apps Script (DriveApp cơ bản)
+// KHÔNG tách riêng được "Xem" và "Bình luận" khi ĐỌC lại quyền hiện có
+// (getViewers() gộp chung cả 2 nhóm) - đây là giới hạn của chính API, không
+// phải lỗi code.
+function HT_layTinhTrangChiaSeTaiNguyen() {
+  try {
+    yeuCauQuyenAdmin_();
+    const ketQua = [];
+    _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
+      try {
+        const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+        resource.getEditors().forEach(function (u) {
+          ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: u.getEmail(), quyen: "Chỉnh sửa", ok: true });
+        });
+        resource.getViewers().forEach(function (u) {
+          ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: u.getEmail(), quyen: "Xem/Bình luận", ok: true });
+        });
+      } catch (e) {
+        ketQua.push({ tenTaiNguyen: tn.ten, id: tn.id, loai: tn.loai, email: "", quyen: "", ok: false, loi: e.toString() });
+      }
+    });
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Thu hồi quyền Drive của 1 email trên ĐÚNG 1 tài nguyên cụ thể (id/loai lấy
+// từ chính dòng do HT_layTinhTrangChiaSeTaiNguyen() trả về).
+function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
+  try {
+    yeuCauQuyenAdmin_();
+    email = String(email || "").trim().toLowerCase();
+    if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
+    const resource = loai === "folder" ? DriveApp.getFolderById(id) : DriveApp.getFileById(id);
+    resource.removeEditor(email);
+    resource.removeViewer(email); // removeViewer() cũng gỡ luôn quyền Bình luận (DriveApp gộp chung 2 nhóm này)
+    logAudit_("THUHOI_QUYEN_TAINGUYEN", "OK", JSON.stringify({ id: id, email: email }));
+    return { status: "success", message: "✅ Đã thu hồi quyền của " + email + " trên tài nguyên này." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Thu hồi TOÀN BỘ quyền Drive của 1 email trên MỌI Sheet/Thư mục webapp dùng
+// (dùng khi nhân viên nghỉ việc) - KHÔNG tự động xoá khỏi danh sách quyền
+// webapp (làm việc đó ở "Danh sách người dùng được cấp quyền truy cập" phía
+// trên + bấm Lưu danh sách) - 2 việc này ĐỘC LẬP: xoá khỏi danh sách quyền
+// chỉ chặn đăng nhập webapp, KHÔNG tự thu hồi quyền họ đã có trực tiếp trên
+// Google Sheet (họ vẫn mở/sửa được Sheet nếu vào thẳng Google Drive).
+function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
+  try {
+    yeuCauQuyenAdmin_();
+    email = String(email || "").trim().toLowerCase();
+    if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
+
+    const ketQua = [];
+    _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
+      try {
+        const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+        resource.removeEditor(email);
+        resource.removeViewer(email);
+        ketQua.push({ tenTaiNguyen: tn.ten, ok: true });
+      } catch (e) {
+        ketQua.push({ tenTaiNguyen: tn.ten, ok: false, loi: e.toString() });
+      }
+    });
+    const soLoi = ketQua.filter(function (r) { return !r.ok; }).length;
+    logAudit_("THUHOI_QUYEN_TOANBO", soLoi === 0 ? "OK" : "MOT_PHAN", JSON.stringify({ email: email, soLoi: soLoi }));
+    return { status: "success", data: ketQua };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 /* ---------- PHÂN QUYỀN NGƯỜI DÙNG (chống truy cập trái phép) ---------- */
 // TRƯỚC ĐÂY webapp không có BẤT KỲ rào chắn nào ngoài việc appsscript.json đặt
 // access:"ANYONE" (yêu cầu đăng nhập bằng 1 tài khoản Google BẤT KỲ, nhưng
@@ -462,7 +595,7 @@ function HT_luuLienKetDuLieu(overrides) {
 // dưới đây chỉ là giá trị KHỞI TẠO LẦN ĐẦU (dùng khi chưa từng lưu danh sách
 // nào) - Admin đầu tiên do người triển khai hệ thống xác nhận.
 const DANH_SACH_QUYEN_MAC_DINH = [
-  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN" }
+  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN", quyenDrive: "EDITOR" }
 ];
 
 function DS_QUYEN_() {
@@ -544,7 +677,17 @@ function HT_layDanhSachQuyen() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-// danhSach = [{email, vaiTro}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
+// Quyền chia sẻ Google Drive (Xem/Bình luận/Chỉnh sửa) - ĐỘC LẬP với vaiTro
+// (vaiTro là quyền TRONG webapp: ADMIN/NHANVIEN; quyenDrive là quyền TRÊN
+// chính Google Sheet/Drive khi HT_chiaSeTaiNguyenChoDanhSachQuyen() chạy).
+// LƯU Ý: đa số chức năng nghiệp vụ (nhập phiếu cân, sửa, xuất hàng...) GHI
+// dữ liệu trực tiếp vào Sheet dưới danh nghĩa CHÍNH người dùng (executeAs:
+// USER_ACCESSING) - nên hầu hết nhân viên vẫn cần "Chỉnh sửa" (EDITOR) thì
+// mới thao tác được. "Xem"/"Bình luận" chỉ phù hợp cho người CHỈ xem báo
+// cáo, không nhập/sửa gì.
+const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
+
+// danhSach = [{email, vaiTro, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
 function HT_luuDanhSachQuyen(danhSach) {
   try {
     yeuCauQuyenAdmin_();
@@ -554,10 +697,12 @@ function HT_luuDanhSachQuyen(danhSach) {
     const clean = danhSach.map(function (u) {
       const email = String(u.email || "").trim().toLowerCase();
       const vaiTro = (String(u.vaiTro || "").toUpperCase() === "ADMIN") ? "ADMIN" : "NHANVIEN";
+      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
+      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error("Email '" + email + "' không hợp lệ.");
       }
-      return { email: email, vaiTro: vaiTro };
+      return { email: email, vaiTro: vaiTro, quyenDrive: quyenDrive };
     });
     // Loại email trùng (giữ lần xuất hiện đầu tiên)
     const seen = {}; const finalList = [];
