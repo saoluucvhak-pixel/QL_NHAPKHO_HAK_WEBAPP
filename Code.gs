@@ -1250,6 +1250,75 @@ function getBaoCaoTongHop(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
+/* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh thu ---------- */
+// Tổng hợp nhanh cho trang Dashboard - TÁI DÙNG getBaoCaoTongHop() (đã có sẵn,
+// đã tự động gộp sheet lưu trữ theo năm nếu bộ lọc ngày chạm tới) thay vì viết
+// lại logic đọc/lọc phiếu cân từ đầu - dữ liệu "Hôm nay"/"Tháng này" luôn khớp
+// 100% với báo cáo tổng hợp thật (không có 2 nguồn tính khác nhau). KHÔNG giới
+// hạn Admin - đây chỉ là xem số liệu tổng hợp, giống các báo cáo khác.
+function HT_layDashboard() {
+  try {
+    const homNayStr = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
+    const d = new Date();
+    const dauThangStr = Utilities.formatDate(new Date(d.getFullYear(), d.getMonth(), 1), "GMT+7", "yyyy-MM-dd");
+
+    const bcHomNay = getBaoCaoTongHop({ fromDate: homNayStr, toDate: homNayStr });
+    if (bcHomNay.status !== "success") throw new Error(bcHomNay.message);
+    const bcThangNay = getBaoCaoTongHop({ fromDate: dauThangStr, toDate: homNayStr });
+    if (bcThangNay.status !== "success") throw new Error(bcThangNay.message);
+
+    const dataThang = bcThangNay.data;
+
+    // Top 5 khách hàng theo doanh thu (thành tiền) tháng này - gộp trong bộ
+    // nhớ tạm từ dữ liệu đã đọc ở trên, KHÔNG đọc lại Sheet lần nữa.
+    const theoKhachHang = {};
+    dataThang.forEach(function (r) {
+      const key = r.khachHang || "(Không rõ)";
+      if (!theoKhachHang[key]) theoKhachHang[key] = { khachHang: key, soPhieu: 0, tongKL: 0, tongTien: 0 };
+      theoKhachHang[key].soPhieu += 1;
+      theoKhachHang[key].tongKL += r.klHang;
+      theoKhachHang[key].tongTien += r.thanhTien;
+    });
+    const topKhachHang = Object.keys(theoKhachHang).map(function (k) { return theoKhachHang[k]; })
+      .sort(function (a, b) { return b.tongTien - a.tongTien; }).slice(0, 5);
+
+    // Doanh thu/khối lượng theo từng ngày trong tháng (cho biểu đồ cột) - sort
+    // đúng thứ tự thời gian (chuyển dd/MM/yyyy -> yyyyMMdd để so sánh chuỗi).
+    const theoNgay = {};
+    dataThang.forEach(function (r) {
+      if (!theoNgay[r.ngayCan1]) theoNgay[r.ngayCan1] = { ngay: r.ngayCan1, soPhieu: 0, tongKL: 0, tongTien: 0 };
+      theoNgay[r.ngayCan1].soPhieu += 1;
+      theoNgay[r.ngayCan1].tongKL += r.klHang;
+      theoNgay[r.ngayCan1].tongTien += r.thanhTien;
+    });
+    const bieuDoTheoNgay = Object.keys(theoNgay).map(function (k) { return theoNgay[k]; })
+      .sort(function (a, b) {
+        const toKey = function (s) { const p = s.split('/'); return p[2] + p[1] + p[0]; };
+        return toKey(a.ngay) < toKey(b.ngay) ? -1 : 1;
+      });
+
+    // Phiếu CẦN CHÚ Ý trong tháng: chưa tính giá xong (trạng thái khác OK/Test giá)
+    const canChuY = dataThang.filter(function (r) {
+      const tt = String(r.trangThaiGia || "").trim();
+      return tt !== "OK" && tt !== "Test giá" && tt !== "Test Giá";
+    }).length;
+    const chuaLapDntt = dataThang.filter(function (r) { return !r.idDntt; }).length;
+
+    return {
+      status: "success",
+      data: {
+        homNay: bcHomNay.summary,
+        thangNay: bcThangNay.summary,
+        topKhachHang: topKhachHang,
+        bieuDoTheoNgay: bieuDoTheoNgay,
+        canChuY: canChuY,
+        chuaLapDntt: chuaLapDntt,
+        capNhatLuc: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy HH:mm:ss")
+      }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 /* ---------- Bảng tổng hợp cân THEO BÁO GIÁ (xem đơn giá áp dụng thế nào) ---------- */
 
 // Map: Mã Báo Giá (vd "DT_ĐL_Y") -> Nội dung diễn giải (từ danh mục Ma_BaoGia)
