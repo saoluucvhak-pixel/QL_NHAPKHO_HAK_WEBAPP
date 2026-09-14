@@ -1250,7 +1250,7 @@ function getBaoCaoTongHop(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-/* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh thu ---------- */
+/* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh số mua ---------- */
 // Tổng hợp nhanh cho trang Dashboard - TÁI DÙNG getBaoCaoTongHop() (đã có sẵn,
 // đã tự động gộp sheet lưu trữ theo năm nếu bộ lọc ngày chạm tới) thay vì viết
 // lại logic đọc/lọc phiếu cân từ đầu - dữ liệu "Hôm nay"/"Tháng này" luôn khớp
@@ -1269,7 +1269,7 @@ function HT_layDashboard() {
 
     const dataThang = bcThangNay.data;
 
-    // Top 5 khách hàng theo doanh thu (thành tiền) tháng này - gộp trong bộ
+    // Top 5 khách hàng theo doanh số mua (thành tiền) tháng này - gộp trong bộ
     // nhớ tạm từ dữ liệu đã đọc ở trên, KHÔNG đọc lại Sheet lần nữa.
     const theoKhachHang = {};
     dataThang.forEach(function (r) {
@@ -1282,7 +1282,7 @@ function HT_layDashboard() {
     const topKhachHang = Object.keys(theoKhachHang).map(function (k) { return theoKhachHang[k]; })
       .sort(function (a, b) { return b.tongTien - a.tongTien; }).slice(0, 5);
 
-    // Doanh thu/khối lượng theo từng ngày trong tháng (cho biểu đồ cột) - sort
+    // Doanh số mua/khối lượng theo từng ngày trong tháng (cho biểu đồ cột) - sort
     // đúng thứ tự thời gian (chuyển dd/MM/yyyy -> yyyyMMdd để so sánh chuỗi).
     const theoNgay = {};
     dataThang.forEach(function (r) {
@@ -1304,6 +1304,16 @@ function HT_layDashboard() {
     }).length;
     const chuaLapDntt = dataThang.filter(function (r) { return !r.idDntt; }).length;
 
+    // Thống kê đơn giá đang hiệu lực - TÁCH try/catch riêng để 1 sự cố ở
+    // Spreadsheet Báo giá (VD thiếu sheet Ma_BaoGia) không làm hỏng luôn cả
+    // phần thống kê phiếu cân ở trên, vốn không phụ thuộc gì tới Báo giá.
+    let thongKeGia;
+    try {
+      thongKeGia = BG_layThongKeGiaHieuLuc_();
+    } catch (e) {
+      thongKeGia = { soLuong: 0, giaCaoNhat: 0, giaThapNhat: 0, giaTrungBinh: 0, khuVucGiaCaoNhat: "", khuVucGiaThapNhat: "", loi: e.toString() };
+    }
+
     return {
       status: "success",
       data: {
@@ -1313,6 +1323,7 @@ function HT_layDashboard() {
         bieuDoTheoNgay: bieuDoTheoNgay,
         canChuY: canChuY,
         chuaLapDntt: chuaLapDntt,
+        thongKeGia: thongKeGia,
         capNhatLuc: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy HH:mm:ss")
       }
     };
@@ -2704,6 +2715,46 @@ function BG_coreLogicProcessor_(blockedIDs) {
     }
   }
   return { finalRows, displayData };
+}
+
+// Thống kê nhanh đơn giá nhập keo đang CÓ HIỆU LỰC ngay tại thời điểm gọi -
+// dùng cho Dashboard. Tính TRỰC TIẾP từ Baogia_DN (nguồn dữ liệu gốc) qua
+// BG_coreLogicProcessor_ (đúng logic BG_updateHieuLuc() dùng để xác định
+// "Còn hiệu lực"), KHÔNG đọc lại Baogia_DN_FINAL - vì sheet đó chỉ được ghi
+// mới mỗi khi có người bấm "Cập nhật hiệu lực" ở tab Báo giá, có thể đang cũ
+// nếu lâu rồi chưa ai mở tab đó, trong khi Dashboard cần đúng NGAY LÚC XEM.
+// "Khu vực" = trường Nguồn gốc trong danh mục Ma_BaoGia (Đại lý_Nguồn gốc_Hình ảnh).
+function BG_layThongKeGiaHieuLuc_() {
+  const ss = BG_ss_();
+  const maData = ss.getSheetByName(BAOGIA_CONFIG.MA_SHEET).getDataRange().getValues();
+  const nguonGocLookup = new Map(); // Mã Báo Giá -> Nguồn gốc
+  for (let i = 1; i < maData.length; i++) {
+    if (maData[i][1]) nguonGocLookup.set(maData[i][1].toString().trim(), String(maData[i][3] || "").trim());
+  }
+
+  const result = BG_coreLogicProcessor_(new Set());
+  const dangHieuLuc = result.displayData.filter(function (r) { return r.trangThai === "Còn hiệu lực"; });
+
+  if (dangHieuLuc.length === 0) {
+    return { soLuong: 0, giaCaoNhat: 0, giaThapNhat: 0, giaTrungBinh: 0, khuVucGiaCaoNhat: "", khuVucGiaThapNhat: "" };
+  }
+
+  let tong = 0, caoNhat = null, thapNhat = null;
+  dangHieuLuc.forEach(function (r) {
+    const gia = parseFloat(r.gia) || 0;
+    tong += gia;
+    if (!caoNhat || gia > caoNhat.gia) caoNhat = { gia: gia, ma: r.ma };
+    if (!thapNhat || gia < thapNhat.gia) thapNhat = { gia: gia, ma: r.ma };
+  });
+
+  return {
+    soLuong: dangHieuLuc.length,
+    giaCaoNhat: caoNhat.gia,
+    giaThapNhat: thapNhat.gia,
+    giaTrungBinh: Math.round(tong / dangHieuLuc.length),
+    khuVucGiaCaoNhat: nguonGocLookup.get(caoNhat.ma) || "(Không rõ)",
+    khuVucGiaThapNhat: nguonGocLookup.get(thapNhat.ma) || "(Không rõ)"
+  };
 }
 
 function BG_exportFileSmart(dateStr, currentView, filteredIds) {

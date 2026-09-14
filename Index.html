@@ -437,7 +437,7 @@
       <section id="view-dashboard" class="view active">
         <div class="page-head">
           <h1>Dashboard</h1>
-          <p>Tổng quan nhanh Phiếu cân nhập và Báo giá/Doanh thu. <span id="dash_capNhatLuc" style="color:var(--ink-soft);"></span></p>
+          <p>Tổng quan nhanh Phiếu cân nhập và Báo giá/Doanh số mua. <span id="dash_capNhatLuc" style="color:var(--ink-soft);"></span></p>
         </div>
 
         <div class="btnrow" style="margin-bottom:14px;">
@@ -460,16 +460,35 @@
           <div class="stat stat-warn"><div class="label">CHƯA LẬP ĐNTT</div><div class="value" id="dash_chuaLapDntt">0</div></div>
         </div>
 
+        <h2 style="font-size:13.5px;margin:18px 0 10px;color:var(--ink-soft);">ĐƠN GIÁ NHẬP KEO ĐANG HIỆU LỰC (theo bảng giá, đ/tấn)</h2>
+        <div class="summary-row">
+          <div class="stat">
+            <div class="label">ĐƠN GIÁ CAO NHẤT</div>
+            <div class="value" id="dash_giaCaoNhat">0</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:3px;">Khu vực: <b id="dash_khuVucGiaCaoNhat">—</b></div>
+          </div>
+          <div class="stat">
+            <div class="label">ĐƠN GIÁ THẤP NHẤT</div>
+            <div class="value" id="dash_giaThapNhat">0</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:3px;">Khu vực: <b id="dash_khuVucGiaThapNhat">—</b></div>
+          </div>
+          <div class="stat">
+            <div class="label">ĐƠN GIÁ TRUNG BÌNH</div>
+            <div class="value" id="dash_giaTrungBinh">0</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:3px;">Trên <b id="dash_soLuongGia">0</b> mức giá đang hiệu lực</div>
+          </div>
+        </div>
+
         <div class="card">
-          <h2>Doanh thu theo ngày (tháng này)</h2>
+          <h2>Doanh số mua theo ngày (tháng này)</h2>
           <div id="dash_bieuDo" class="dash-chart"></div>
         </div>
 
         <div class="card">
-          <h2>Top 5 khách hàng theo doanh thu (tháng này)</h2>
+          <h2>Top 5 khách hàng theo doanh số mua (tháng này)</h2>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Khách hàng</th><th>Số phiếu</th><th>Tổng KL (kg)</th><th>Tổng thành tiền (VNĐ)</th></tr></thead>
+              <thead><tr><th>Khách hàng</th><th class="num">Số phiếu</th><th class="num">Tổng KL (kg)</th><th class="num">Tổng thành tiền (VNĐ)</th></tr></thead>
               <tbody id="dash_topKhachHangBody"><tr><td colspan="4" class="empty-state">Đang tải…</td></tr></tbody>
             </table>
           </div>
@@ -1768,7 +1787,7 @@
     }
 
     // ---------------------------------------------------------------
-    // DASHBOARD (view-dashboard) - Tổng quan Phiếu cân nhập + Báo giá/Doanh thu
+    // DASHBOARD (view-dashboard) - Tổng quan Phiếu cân nhập + Báo giá/Doanh số mua
     // ---------------------------------------------------------------
     async function htLoadDashboard(){
       try {
@@ -1785,6 +1804,14 @@
         document.getElementById('dash_thangNayTien').textContent = fmtNum(d.thangNay.tongTien);
         document.getElementById('dash_canChuY').textContent = fmtNum(d.canChuY);
         document.getElementById('dash_chuaLapDntt').textContent = fmtNum(d.chuaLapDntt);
+
+        const tk = d.thongKeGia || {};
+        document.getElementById('dash_giaCaoNhat').textContent = fmtNum(tk.giaCaoNhat);
+        document.getElementById('dash_khuVucGiaCaoNhat').textContent = tk.khuVucGiaCaoNhat || '—';
+        document.getElementById('dash_giaThapNhat').textContent = fmtNum(tk.giaThapNhat);
+        document.getElementById('dash_khuVucGiaThapNhat').textContent = tk.khuVucGiaThapNhat || '—';
+        document.getElementById('dash_giaTrungBinh').textContent = fmtNum(tk.giaTrungBinh);
+        document.getElementById('dash_soLuongGia').textContent = fmtNum(tk.soLuong);
 
         const chartEl = document.getElementById('dash_bieuDo');
         if (d.bieuDoTheoNgay.length === 0) {
