@@ -1250,7 +1250,7 @@ function getBaoCaoTongHop(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-/* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh thu ---------- */
+/* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh số mua ---------- */
 // Tổng hợp nhanh cho trang Dashboard - TÁI DÙNG getBaoCaoTongHop() (đã có sẵn,
 // đã tự động gộp sheet lưu trữ theo năm nếu bộ lọc ngày chạm tới) thay vì viết
 // lại logic đọc/lọc phiếu cân từ đầu - dữ liệu "Hôm nay"/"Tháng này" luôn khớp
@@ -1269,7 +1269,7 @@ function HT_layDashboard() {
 
     const dataThang = bcThangNay.data;
 
-    // Top 5 khách hàng theo doanh thu (thành tiền) tháng này - gộp trong bộ
+    // Top 5 khách hàng theo doanh số mua (thành tiền) tháng này - gộp trong bộ
     // nhớ tạm từ dữ liệu đã đọc ở trên, KHÔNG đọc lại Sheet lần nữa.
     const theoKhachHang = {};
     dataThang.forEach(function (r) {
@@ -1282,7 +1282,7 @@ function HT_layDashboard() {
     const topKhachHang = Object.keys(theoKhachHang).map(function (k) { return theoKhachHang[k]; })
       .sort(function (a, b) { return b.tongTien - a.tongTien; }).slice(0, 5);
 
-    // Doanh thu/khối lượng theo từng ngày trong tháng (cho biểu đồ cột) - sort
+    // Doanh số mua/khối lượng theo từng ngày trong tháng (cho biểu đồ cột) - sort
     // đúng thứ tự thời gian (chuyển dd/MM/yyyy -> yyyyMMdd để so sánh chuỗi).
     const theoNgay = {};
     dataThang.forEach(function (r) {

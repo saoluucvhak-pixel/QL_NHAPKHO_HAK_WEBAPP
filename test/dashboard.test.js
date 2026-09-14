@@ -33,7 +33,7 @@ function setupPhieuCan(env, rows) {
   return ss;
 }
 
-describe('HT_layDashboard() - tổng quan Phiếu cân nhập + Báo giá/Doanh thu', () => {
+describe('HT_layDashboard() - tổng quan Phiếu cân nhập + Báo giá/Doanh số mua', () => {
   test('tính đúng "Hôm nay" và "Tháng này", KHÔNG lẫn dữ liệu tháng trước', () => {
     const env = createGasEnv();
     setupPhieuCan(env, [
@@ -49,7 +49,7 @@ describe('HT_layDashboard() - tổng quan Phiếu cân nhập + Báo giá/Doanh 
     expect(res.data.thangNay.tongKL).toBe(10000);
   });
 
-  test('Top khách hàng theo doanh thu tháng này - gộp đúng theo khách hàng, sắp xếp giảm dần', () => {
+  test('Top khách hàng theo doanh số mua tháng này - gộp đúng theo khách hàng, sắp xếp giảm dần', () => {
     const env = createGasEnv();
     setupPhieuCan(env, [
       ticket('T1', ngayTruaHomNayCong_(0), 10000, 'KH LỚN'),

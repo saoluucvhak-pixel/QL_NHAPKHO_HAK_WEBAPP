@@ -437,7 +437,7 @@
       <section id="view-dashboard" class="view active">
         <div class="page-head">
           <h1>Dashboard</h1>
-          <p>Tổng quan nhanh Phiếu cân nhập và Báo giá/Doanh thu. <span id="dash_capNhatLuc" style="color:var(--ink-soft);"></span></p>
+          <p>Tổng quan nhanh Phiếu cân nhập và Báo giá/Doanh số mua. <span id="dash_capNhatLuc" style="color:var(--ink-soft);"></span></p>
         </div>
 
         <div class="btnrow" style="margin-bottom:14px;">
@@ -480,12 +480,12 @@
         </div>
 
         <div class="card">
-          <h2>Doanh thu theo ngày (tháng này)</h2>
+          <h2>Doanh số mua theo ngày (tháng này)</h2>
           <div id="dash_bieuDo" class="dash-chart"></div>
         </div>
 
         <div class="card">
-          <h2>Top 5 khách hàng theo doanh thu (tháng này)</h2>
+          <h2>Top 5 khách hàng theo doanh số mua (tháng này)</h2>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Khách hàng</th><th class="num">Số phiếu</th><th class="num">Tổng KL (kg)</th><th class="num">Tổng thành tiền (VNĐ)</th></tr></thead>
@@ -1787,7 +1787,7 @@
     }
 
     // ---------------------------------------------------------------
-    // DASHBOARD (view-dashboard) - Tổng quan Phiếu cân nhập + Báo giá/Doanh thu
+    // DASHBOARD (view-dashboard) - Tổng quan Phiếu cân nhập + Báo giá/Doanh số mua
     // ---------------------------------------------------------------
     async function htLoadDashboard(){
       try {
