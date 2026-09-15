@@ -2934,7 +2934,7 @@
       renderScreen(`
         <div class="form-container">
           <b>📈 BÁO CÁO TỒN KHO</b>
-          <div style="background:#eff6ff; padding:10px; border-radius:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div style="background:#dbeafe; padding:10px; border-radius:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <span style="font-weight:bold; font-size:12px;">Từ ngày:</span><input type="date" id="baocaoTuNgay" value="${tuNgay}" style="width:150px;">
             <span style="font-weight:bold; font-size:12px;">Đến ngày:</span><input type="date" id="baocaoDenNgay" value="${denNgay}" style="width:150px;">
             <span style="font-weight:bold; font-size:12px;">Nhà máy:</span>
@@ -3016,7 +3016,7 @@
       renderScreen(`
         <div class="form-container">
           <b>⏱️ BÁO CÁO THEO KỲ VÉT BÃI</b>
-          <div style="background:#eff6ff; padding:10px; border-radius:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div style="background:#dbeafe; padding:10px; border-radius:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <span style="font-weight:bold; font-size:12px;">Từ ngày:</span><input type="date" id="bcKyTuNgay" value="${tuNgay}" style="width:150px;">
             <span style="font-weight:bold; font-size:12px;">Đến ngày:</span><input type="date" id="bcKyDenNgay" value="${denNgay}" style="width:150px;">
             <span style="font-weight:bold; font-size:12px;">Kho:</span>
@@ -3170,7 +3170,7 @@
           renderScreen(`
             <div class="form-container">
               <b>📊 QUẢN LÝ ĐỘ KHÔ</b>
-              <div style="background: #eff6ff; padding: 10px; border-radius: 6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <div style="background: #dbeafe; padding: 10px; border-radius: 6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <span style="font-weight:bold;">Lọc từ ngày:</span><input type="date" id="locTuNgayDK" value="${tuNgay}">
                 <span style="font-weight:bold;">Đến ngày:</span><input type="date" id="locDenNgayDK" value="${denNgay}">
                 <button class="nav-btn" style="background:#2563eb; color:#fff;" onclick="taiDanhSachDoKho(document.getElementById('locTuNgayDK').value, document.getElementById('locDenNgayDK').value, 1)">Lọc Dữ Liệu</button>
@@ -3316,7 +3316,7 @@
       let khuVucTaiPhieuCanHtml = "";
       if (loai === 'NHẬP' && tab === 'Dăm sản xuất') {
         khuVucTaiPhieuCanHtml = `
-          <div style="background: #e2f0ed; padding: 12px; border-radius: 6px; margin: 10px 0; border: 1px dashed #16a34a;">
+          <div style="background: #dcfce7; padding: 12px; border-radius: 6px; margin: 10px 0; border: 1px dashed #16a34a;">
             <label style="color: #16a34a; font-weight: bold; font-size: 13px;">🔗 TẢI DỮ LIỆU PHIẾU CÂN</label>
             <button type="button" id="btnTaiPhieuCan" class="btn-scan" onclick="taiPhieuCanThucTe('${loai}', '${tab}', null, this)">🔄 TẢI DỮ LIỆU PHIẾU CÂN NGÀY NÀY</button>
             <div id="infoScanText_NHẬP" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 8px;"></div>
@@ -3327,7 +3327,7 @@
       renderScreen(`
         <div class="form-container">
           <b>${loai === 'NHẬP' ? '📥 QUẢN LÝ NHẬP KHO - ' + tab : '📤 QUẢN LÝ XUẤT KHO - ' + tab}</b>
-          <div style="background: #eff6ff; padding: 10px; border-radius: 6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div style="background: #dbeafe; padding: 10px; border-radius: 6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <span style="font-weight:bold;">Lọc từ ngày:</span><input type="date" id="locTuNgay" value="${tuNgay}">
             <span style="font-weight:bold;">Đến ngày:</span><input type="date" id="locDenNgay" value="${denNgay}">
             <button class="nav-btn" style="background:#2563eb; color:#fff;" onclick="moFormGiaoDich('${loai}', '${tab}', document.getElementById('locTuNgay').value, document.getElementById('locDenNgay').value, 1)">Lọc Dữ Liệu</button>
@@ -4453,8 +4453,5 @@
     }
 
   </script>
-<div id="hak-back-to-portal" style="position:fixed;top:12px;right:12px;z-index:2147483647;">
-  <button onclick="(function(){var u='https://script.google.com/macros/s/AKfycbysX94dpfan0bKLrF2T075Re77l11cmvilgYDRM02EPL4qvO-J8tnJmM82WDs2hRHVy/exec';try{if(window.top!==window.self){window.top.location.href=u;}else{window.location.href=u;}}catch(e){window.location.href=u;}})()" style="background:#2563eb;color:#fff;border:none;border-radius:999px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">🏠 Về Portal</button>
-</div>
 </body>
 </html>
