@@ -122,8 +122,19 @@ function makeFakeRange(sheet, row, col, numRows, numCols) {
       kiemTraTiemLoi_('setValue');
       return this.__ghiNoiBo([[v]]);
     },
-    setNumberFormat() { return this; },
-    setNumberFormats() { return this; },
+    __datDinhDang(fmt) {
+      for (let r = 0; r < numRows; r++) for (let c = 0; c < numCols; c++) sheet.__formats[(row + r) + ',' + (col + c)] = fmt;
+    },
+    setNumberFormat(fmt) {
+      demApi_('setNumberFormat');
+      for (let r = 0; r < numRows; r++) for (let c = 0; c < numCols; c++) sheet.__formats[(row + r) + ',' + (col + c)] = fmt;
+      return this;
+    },
+    setNumberFormats(fmts) {
+      demApi_('setNumberFormats');
+      fmts.forEach((rowArr, r) => rowArr.forEach((fmt, c) => { sheet.__formats[(row + r) + ',' + (col + c)] = fmt; }));
+      return this;
+    },
     setFontWeight() { return this; },
     setBackground() { return this; },
     setFontColor() { return this; },
@@ -143,6 +154,7 @@ function makeFakeSheet(name, initialRows) {
   const sheet = {
     __name: name,
     __data: (initialRows || []).map((r) => r.slice()),
+    __formats: {},
     getName: () => name,
     getLastRow() { return this.__data.length; },
     getLastColumn() {
@@ -151,6 +163,22 @@ function makeFakeSheet(name, initialRows) {
     getRange(row, col, numRows, numCols) {
       demApi_('getRange');
       return makeFakeRange(this, row, col, numRows === undefined ? 1 : numRows, numCols === undefined ? 1 : numCols);
+    },
+    // Hỗ trợ A1 dạng "X5" hoặc "X5:X9" (1 cột chữ cái) - đủ cho RangeList định dạng số.
+    getRangeList(a1List) {
+      demApi_('getRangeList');
+      const self = this;
+      const ranges = a1List.map((a1) => {
+        const m = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(a1);
+        if (!m) throw new Error('A1 không hợp lệ trong mock: ' + a1);
+        const cot = (s) => s.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+        const r1 = +m[2], c1 = cot(m[1]), r2 = m[4] ? +m[4] : r1, c2 = m[3] ? cot(m[3]) : c1;
+        return makeFakeRange(self, r1, c1, r2 - r1 + 1, c2 - c1 + 1);
+      });
+      return {
+        getRanges: () => ranges,
+        setNumberFormat(fmt) { demApi_('RangeList.setNumberFormat'); ranges.forEach((r) => r.__datDinhDang(fmt)); return this; },
+      };
     },
     getDataRange() {
       demApi_('getDataRange');
@@ -164,11 +192,13 @@ function makeFakeSheet(name, initialRows) {
     },
     deleteRow(idx) {
       demApi_('deleteRow');
+      kiemTraTiemLoi_('deleteRow');
       this.__data.splice(idx - 1, 1);
       return this;
     },
     deleteRows(rowPosition, howMany) {
       demApi_('deleteRows');
+      kiemTraTiemLoi_('deleteRows');
       this.__data.splice(rowPosition - 1, howMany);
       return this;
     },
@@ -342,9 +372,11 @@ function makeFakeSession(initialEmail) {
 function makeFakeCacheService() {
   const store = new Map();
   return {
+    __store: store,
     getScriptCache: () => ({
       get: (k) => (store.has(k) ? store.get(k) : null),
       put: (k, v) => { store.set(k, v); },
+      remove: (k) => { store.delete(k); },
     }),
   };
 }

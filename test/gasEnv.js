@@ -86,6 +86,7 @@ function createGasEnv(opts) {
     spreadsheetApp,
     session,
     driveApp,
+    cacheService,
     lockService,
     /**
      * Gọi 1 hàm global trong Code.gs/Config.gs - NẠP LẠI TOÀN BỘ SCRIPT TỪ ĐẦU

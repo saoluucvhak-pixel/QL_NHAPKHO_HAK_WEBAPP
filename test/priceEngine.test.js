@@ -136,3 +136,46 @@ describe('runCalculatePrice_core() - tối ưu lưu trữ: CHỈ ghi lại dòng
     expect(all[5][19]).toBe(500000); // tính đúng (khối 2, dòng liền kề)
   });
 });
+
+describe('PERF-04 runCalculatePrice_core: gộp lệnh ghi - GIÁ TRỊ và ĐỊNH DẠNG ghi ra phải y hệt', () => {
+  function chayKichBan() {
+    const env = createGasEnv();
+    setupBaoGia(env, [[new Date(), new Date(2000, 0, 1), new Date(2100, 0, 1), 'A_B_Y', 0, 1000, 1000000]]);
+    const ngay = new Date(2026, 5, 15);
+    const cho = (kl, ma, r) => makeRow({ 1: ngay, 9: kl, 16: ma, 17: r });
+    setupPhieuCan(env, [
+      makeRow({ 19: 5, 23: 5, 24: 'OK', 25: 5 }), // dòng 2: OK
+      cho(20000, 'A_B_Y', 0), // dòng 3
+      cho(20000, 'KHONG_CO', 0), // dòng 4 (liền dòng 3)
+      makeRow({ 19: 6, 23: 6, 24: 'OK', 25: 6 }), // dòng 5: OK
+      cho(12345, 'A_B_Y', 500), // dòng 6
+      cho(1000, 'A_B_Y', 0), // dòng 7 (liền dòng 6)
+      makeRow({ 19: 7, 23: 7, 24: 'OK', 25: 7 }), // dòng 8: OK
+      cho(5000, 'a_b_y', 0), // dòng 9 (khối lẻ 1 dòng)
+    ]);
+    const res = env.call('runCalculatePrice_core');
+    const sheet = env.spreadsheetApp.openById(PHIEUCAN_SPREADSHEET_ID).getSheetByName(DATA_SHEET);
+    return { res, sheet };
+  }
+
+  test('giá trị cột T/X/Y/Z đúng từng dòng, dòng OK không bị đụng', () => {
+    const { res, sheet } = chayKichBan();
+    expect(res.status).toBe('success');
+    const tXYZ = (r) => { const v = sheet.__data[r - 1]; return [v[19], v[23], v[24], v[25]]; };
+    expect(tXYZ(2)).toEqual([5, 5, 'OK', 5]);
+    expect(tXYZ(3)).toEqual([1000000, 1000000, 'Test giá', 20000000]);
+    expect(tXYZ(4)).toEqual([0, 0, 'Lỗi ĐK/Báo giá', 0]);
+    expect(tXYZ(5)).toEqual([6, 6, 'OK', 6]);
+    expect(tXYZ(6)).toEqual([1000000, 1000500, 'Test giá', 12351000]);
+    expect(tXYZ(7)).toEqual([1000000, 1000000, 'Test giá', 1000000]);
+    expect(tXYZ(8)).toEqual([7, 7, 'OK', 7]);
+    expect(tXYZ(9)).toEqual([1000000, 1000000, 'Test giá', 5000000]);
+  });
+
+  test('định dạng "#,##0" CHỈ đặt ở cột X và Z của đúng các dòng vừa tính giá', () => {
+    const { sheet } = chayKichBan();
+    const mongDoi = {};
+    [3, 4, 6, 7, 9].forEach((r) => { mongDoi[r + ',24'] = '#,##0'; mongDoi[r + ',26'] = '#,##0'; });
+    expect(sheet.__formats).toEqual(mongDoi);
+  });
+});
