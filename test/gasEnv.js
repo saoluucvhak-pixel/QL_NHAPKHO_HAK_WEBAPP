@@ -52,6 +52,7 @@ function createGasEnv(opts) {
   const session = mocks.makeFakeSession(opts.email || '');
   const driveApp = mocks.makeFakeDriveApp();
   const cacheService = mocks.makeFakeCacheService();
+  const lockService = mocks.makeFakeLockService(); // khóa toàn cục dùng chung - xem gasMocks
 
   function loadFreshContext() {
     const sandbox = {
@@ -60,7 +61,7 @@ function createGasEnv(opts) {
       SpreadsheetApp: spreadsheetApp,
       DriveApp: driveApp,
       Utilities: mocks.makeFakeUtilities(),
-      LockService: mocks.makeFakeLockService(),
+      LockService: lockService,
       Session: session,
       CacheService: cacheService,
       HtmlService: mocks.makeFakeHtmlService(),
@@ -85,6 +86,7 @@ function createGasEnv(opts) {
     spreadsheetApp,
     session,
     driveApp,
+    lockService,
     /**
      * Gọi 1 hàm global trong Code.gs/Config.gs - NẠP LẠI TOÀN BỘ SCRIPT TỪ ĐẦU
      * trước mỗi lần gọi (đúng mô hình thực thi thật của Apps Script - xem ghi

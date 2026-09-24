@@ -326,6 +326,14 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
   // FIX #2: khóa toàn bộ quá trình xác nhận ghi dữ liệu. Nếu 2 người dùng bấm
   // "Xác nhận" gần như đồng thời, nếu không khóa thì cả hai sẽ đọc cùng
   // getLastRow() và ghi đè lên CÙNG một dải hàng, làm mất dữ liệu của một bên.
+  // FIX (BUG-001 QA Audit): yeuCauDangNhap_() trước đây được ĐỊNH NGHĨA ở
+  // Config.gs nhưng KHÔNG được gọi ở bất kỳ hàm ghi dữ liệu nào trong Code.gs -
+  // nghĩa là thu hồi quyền qua "Quản lý người dùng" KHÔNG có hiệu lực ngay với
+  // người đang mở sẵn webapp (chỉ chặn ở doGet() lúc tải trang, không re-check
+  // mỗi lần gọi). Nay re-check NGAY ĐẦU mỗi hàm ghi dữ liệu chính - đúng lớp
+  // phòng thủ thứ 2 mà yeuCauDangNhap_() vốn được thiết kế để làm.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
@@ -525,6 +533,9 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
 // giao diện đã sửa thành "Mã Đại Lý - ĐL" để tránh nhầm lẫn khi nhập liệu thật.
 // "maNG" là Mã Nguồn Gốc (cột O "NG"), tên gọi khớp đúng ý nghĩa.
 function addManualPhieuCan(fields) {
+  // FIX (BUG-001 QA Audit): xem ghi chú ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
@@ -2036,6 +2047,10 @@ function BG_getMaBaoGiaList() {
 
 // fields: {daiLyMa, daiLyTen, nguonGocMa, nguonGocTen, hinhAnh:'Y'|'N'}
 function BG_addMaBaoGia(fields) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2089,6 +2104,10 @@ function BG_nextMaBaoGiaCode_(sheet, lastRow) {
 }
 
 function BG_deleteMaBaoGia(maBaoGia) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2128,6 +2147,10 @@ function BG_getMaKLList() {
 
 // fields: {klMinTan, klMaxTan} - nhập theo đơn vị TẤN cho thân thiện
 function BG_addMaKL(fields) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2160,6 +2183,10 @@ function BG_addMaKL(fields) {
 }
 
 function BG_deleteMaKL(maKL) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2339,6 +2366,10 @@ function BG_getBaogiaRowByHash(idBgct) {
 
 // payload = { idBgct, maList:[...], klCode, gia, hieuLuc:'yyyy-MM-ddTHH:mm' }
 function BG_updateBaogiaRow(payload) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2387,6 +2418,10 @@ function BG_updateBaogiaRow(payload) {
 }
 
 function BG_deleteBaogiaRow(idBgct) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2507,6 +2542,10 @@ function BG_getQuoteListWithStatus() {
 // TẤT CẢ nhóm giá thuộc phiếu đều editable (BG_checkQuoteDeletable_) - kiểm
 // tra lại ngay trước khi xóa (defense in depth), không tin dữ liệu đã tải sẵn ở client.
 function BG_deleteQuote(soBaoGia) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2553,6 +2592,9 @@ function BG_deleteQuote(soBaoGia) {
 // nhiều mã thành nhiều nhóm 1 mã trước khi gửi) - không cần hàm backend riêng.
 // payload = { ngayBaoGia:'yyyy-MM-dd', hieuLuc:'yyyy-MM-ddTHH:mm', idTam:'', groups:[{maList:[...], klCode, gia}] }
 function BG_createQuote(payload) {
+  // FIX (BUG-001 QA Audit): xem ghi chú ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây." };
@@ -2607,6 +2649,10 @@ function BG_createQuote(payload) {
 
 /* ---------- 5.5 Xử lý hiệu lực & Xem dữ liệu (port nguyên vẹn từ hệ thống Báo giá gốc) ---------- */
 function BG_updateHieuLuc() {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2634,6 +2680,10 @@ function BG_updateHieuLuc() {
 }
 
 function BG_showAllData() {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -4081,6 +4131,11 @@ function layBaoCaoTheoKyVetBai(params) {
 // hỏng module Kho Dăm đang chạy thật - chỉ mới nơi nào MỚI thêm/sửa (VD
 // PHẦN 6 dùng sanitize()) mới cần tuân theo quy ước {status,message}.
 function processFormData(action, data) {
+  // FIX (BUG-001 QA Audit): processFormData là điểm vào DUY NHẤT cho toàn bộ
+  // module Kho Dăm (8 hàm xuLy*/lay* con) - re-check quyền đăng nhập ở đây
+  // là đủ bao phủ cả module. Để ném lỗi tự nhiên (không bọc try/catch) vì mọi
+  // điểm gọi ở Index.html đều có .withFailureHandler() sẵn.
+  yeuCauDangNhap_();
   kiemTraVaTaoTieuDeSheets();
   var lock = LockService.getScriptLock();
   try {
@@ -4354,6 +4409,9 @@ function XH_step1_PreviewDraft(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
 }
 
 function XH_step1_ConfirmImport(confirmedDataList) {
+  // FIX (BUG-001 QA Audit): xem ghi chú ở step1_ConfirmImport (PhieuCan_DN).
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
@@ -4475,6 +4533,10 @@ function XH_tinhDoKhoNhaMay(tuNgay, denNgay) {
 //           klMT, klBDMT, khoXuat, tuNgay, denNgay, doKhoNhaMay, loaiXe}
 function XH_saveDonHang(payload) {
   XH_dambaoHeaderDonHang_();
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -4580,6 +4642,10 @@ function XH_getDonHangByRow(rowIndex) {
 
 // Cập nhật 1 đơn hàng đã có, theo đúng dòng thật (rowIndex) - ghi đè toàn bộ dữ liệu
 function XH_updateDonHang(rowIndex, payload) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -4623,6 +4689,10 @@ function XH_updateDonHang(rowIndex, payload) {
 }
 
 function XH_deleteDonHang(rowIndex) {
+  // FIX (BUG-001 QA Audit): re-check quyền đăng nhập NGAY ĐẦU (trước cả lock) -
+  // xem ghi chú đầy đủ ở step1_ConfirmImport.
+  try { yeuCauDangNhap_(); } catch (e) { return { status: "error", message: e.toString() }; }
+
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };

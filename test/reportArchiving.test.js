@@ -129,7 +129,7 @@ describe('BG_getPhieuCanByMaDG_() - PHẢI thấy được phiếu cân đã lư
 
 describe('Chống nhập trùng với dữ liệu đã lưu trữ (import + nhập tay)', () => {
   test('step1_ConfirmImport: re-import 1 phiếu đã CHỐT SỔ (nằm trong sheet lưu trữ) -> "Bỏ qua", KHÔNG bị thêm trùng vào sheet chính', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     // "500/2024/NK" đã archive - không còn ở sheet chính.
     setupPhieuCan(
       env,
@@ -154,7 +154,7 @@ describe('Chống nhập trùng với dữ liệu đã lưu trữ (import + nh�
   });
 
   test('addManualPhieuCan: nhập tay trùng đúng số phiếu/năm đã lưu trữ -> báo lỗi rõ ràng, KHÔNG cho thêm', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     setupPhieuCan(env, [], { 2024: [ticket('777/2024/NK', new Date(2024, 5, 1), 5000)] });
 
     const res = env.call('addManualPhieuCan', {
@@ -169,7 +169,7 @@ describe('Chống nhập trùng với dữ liệu đã lưu trữ (import + nh�
   });
 
   test('addManualPhieuCan: số phiếu khác năm đã lưu trữ (không trùng thật) vẫn thêm được bình thường', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     setupPhieuCan(env, [], { 2024: [ticket('777/2024/NK', new Date(2024, 5, 1), 5000)] });
 
     const res = env.call('addManualPhieuCan', {

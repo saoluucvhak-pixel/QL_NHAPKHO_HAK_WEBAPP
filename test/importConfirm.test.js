@@ -21,7 +21,7 @@ function setupSpreadsheets(env, existingRow) {
 
 describe('step1_ConfirmImport() - cập nhật phiếu đã tồn tại (chưa khóa OK) khi re-import file đã sửa', () => {
   test('BUG ĐÃ SỬA: re-import cập nhật ĐÚNG cả khối lượng/ngày giờ/số xe, không chỉ mã khách hàng/đại lý/nguồn gốc', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const oldRow = new Array(25).fill('');
     oldRow[0] = '500';                          // A - Số phiếu
     oldRow[1] = new Date(2026, 0, 1);           // B - Ngày cân 1 (SAI, sẽ được sửa)
@@ -80,7 +80,7 @@ describe('step1_ConfirmImport() - cập nhật phiếu đã tồn tại (chưa k
   });
 
   test('phiếu đã khóa "OK" thì BỎ QUA hoàn toàn khi re-import (không ghi đè số liệu đã chốt)', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     const oldRow = new Array(25).fill('');
     oldRow[0] = '501';
     oldRow[7] = 30000; oldRow[8] = 10000; oldRow[9] = 20000;
@@ -105,7 +105,7 @@ describe('step1_ConfirmImport() - cập nhật phiếu đã tồn tại (chưa k
   });
 
   test('phiếu HOÀN TOÀN MỚI được thêm vào cuối sheet (không đụng dòng đã có)', () => {
-    const env = createGasEnv();
+    const env = createGasEnv({ email: 'saoluucvhak@gmail.com' });
     setupSpreadsheets(env, null); // sheet trống, chỉ có header
 
     const res = env.call('step1_ConfirmImport', [{

@@ -35,6 +35,36 @@ function taiTaoDateNeuCan_(v) {
   return isDateLike_(v) ? new _activeDateCtor(v.getTime()) : v;
 }
 
+// Bộ đếm lời gọi Sheets API - trong Apps Script thật, MỖI lời gọi getRange/
+// getValues/setValues... là 1 lượt round-trip mạng tới Google Sheets (50-500ms),
+// nên SỐ LỜI GỌI + SỐ Ô đọc/ghi mới là thước đo hiệu năng đúng, không phải
+// thời gian CPU của Node. Dùng cho test hiệu năng/tải (test/loadPerformance.test.js).
+const _apiCounter = { calls: {}, oRead: 0, oWrite: 0 };
+function demApi_(ten, soO, laGhi) {
+  _apiCounter.calls[ten] = (_apiCounter.calls[ten] || 0) + 1;
+  if (soO) { if (laGhi) _apiCounter.oWrite += soO; else _apiCounter.oRead += soO; }
+}
+function resetApiCounter_() { _apiCounter.calls = {}; _apiCounter.oRead = 0; _apiCounter.oWrite = 0; }
+function getApiCounter_() {
+  const tong = Object.keys(_apiCounter.calls).reduce((s, k) => s + _apiCounter.calls[k], 0);
+  return { calls: Object.assign({}, _apiCounter.calls), tongLoiGoi: tong, oRead: _apiCounter.oRead, oWrite: _apiCounter.oWrite };
+}
+
+// Tiêm lỗi (fault injection) để mô phỏng "luồng dữ liệu bị kẹt" - VD Google
+// Sheets trả lỗi timeout giữa chừng lúc đang ghi. { method: 'setValues', lanThu: 1 }
+// -> lần gọi setValues thứ 1 (tính từ lúc đặt) sẽ ném lỗi giống Apps Script thật.
+let _loiTiem = null;
+function tiemLoiSheets_(cauHinh) { _loiTiem = cauHinh ? { method: cauHinh.method, conLai: cauHinh.lanThu || 1, thongBao: cauHinh.thongBao } : null; }
+function kiemTraTiemLoi_(ten) {
+  if (!_loiTiem || _loiTiem.method !== ten) return;
+  _loiTiem.conLai -= 1;
+  if (_loiTiem.conLai === 0) {
+    const tb = _loiTiem.thongBao || 'Service Spreadsheets timed out while accessing document with id.';
+    _loiTiem = null;
+    throw new Error(tb);
+  }
+}
+
 function makeFakePropertiesService() {
   const store = new Map();
   const properties = {
@@ -52,6 +82,11 @@ function makeFakePropertiesService() {
 function makeFakeRange(sheet, row, col, numRows, numCols) {
   return {
     getValues() {
+      demApi_('getValues', numRows * numCols, false);
+      kiemTraTiemLoi_('getValues');
+      return this.__docNoiBo();
+    },
+    __docNoiBo() {
       const out = [];
       for (let r = 0; r < numRows; r++) {
         const rowArr = [];
@@ -65,9 +100,16 @@ function makeFakeRange(sheet, row, col, numRows, numCols) {
       return out;
     },
     getValue() {
-      return this.getValues()[0][0];
+      demApi_('getValue', 1, false);
+      kiemTraTiemLoi_('getValue');
+      return this.__docNoiBo()[0][0];
     },
     setValues(values) {
+      demApi_('setValues', values.length * (values[0] ? values[0].length : 0), true);
+      kiemTraTiemLoi_('setValues');
+      return this.__ghiNoiBo(values);
+    },
+    __ghiNoiBo(values) {
       values.forEach((rowArr, r) => {
         while (sheet.__data.length < row + r) sheet.__data.push([]);
         const target = sheet.__data[row - 1 + r];
@@ -76,7 +118,9 @@ function makeFakeRange(sheet, row, col, numRows, numCols) {
       return this;
     },
     setValue(v) {
-      return this.setValues([[v]]);
+      demApi_('setValue', 1, true);
+      kiemTraTiemLoi_('setValue');
+      return this.__ghiNoiBo([[v]]);
     },
     setNumberFormat() { return this; },
     setNumberFormats() { return this; },
@@ -105,20 +149,26 @@ function makeFakeSheet(name, initialRows) {
       return this.__data.reduce((max, row) => Math.max(max, row.length), 0);
     },
     getRange(row, col, numRows, numCols) {
+      demApi_('getRange');
       return makeFakeRange(this, row, col, numRows === undefined ? 1 : numRows, numCols === undefined ? 1 : numCols);
     },
     getDataRange() {
-      return this.getRange(1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1));
+      demApi_('getDataRange');
+      return makeFakeRange(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1));
     },
     appendRow(arr) {
+      demApi_('appendRow', arr.length, true);
+      kiemTraTiemLoi_('appendRow');
       this.__data.push(arr.slice());
       return this;
     },
     deleteRow(idx) {
+      demApi_('deleteRow');
       this.__data.splice(idx - 1, 1);
       return this;
     },
     deleteRows(rowPosition, howMany) {
+      demApi_('deleteRows');
       this.__data.splice(rowPosition - 1, howMany);
       return this;
     },
@@ -136,7 +186,7 @@ function makeFakeSpreadsheet(id) {
   const spreadsheet = {
     __id: id,
     getId: () => id,
-    getSheetByName(name) { return sheets.has(name) ? sheets.get(name) : null; },
+    getSheetByName(name) { demApi_('getSheetByName'); return sheets.has(name) ? sheets.get(name) : null; },
     insertSheet(name) {
       const sh = makeFakeSheet(name, []);
       sheets.set(name, sh);
@@ -159,6 +209,7 @@ function makeFakeSpreadsheetApp() {
   const byUrl = new Map();
   return {
     openById(id) {
+      demApi_('openById');
       if (!byId.has(id)) byId.set(id, makeFakeSpreadsheet(id));
       return byId.get(id);
     },
@@ -247,13 +298,36 @@ function makeFakeUtilities() {
   };
 }
 
+/**
+ * Script Lock có TRẠNG THÁI, dùng chung cho cả env (giống Apps Script thật:
+ * Script Lock là khóa toàn cục của cả dự án, xuyên suốt mọi lần gọi).
+ * - __giuBoiPhienKhac=true: mô phỏng 1 người dùng khác đang giữ khóa lâu (luồng
+ *   bị kẹt) -> waitLock() ném lỗi timeout như Apps Script thật, KHÔNG treo.
+ * - __nhatKy: thứ tự các thao tác khóa, để kiểm tra khóa có được TRẢ đúng
+ *   sau mọi lối thoát (kể cả khi lỗi giữa chừng) - khóa không được trả chính
+ *   là nguyên nhân khiến MỌI người dùng sau đó đều bị "treo" chờ khóa.
+ */
 function makeFakeLockService() {
-  return {
-    getScriptLock: () => ({
-      waitLock: () => {},
-      releaseLock: () => {},
-    }),
+  const state = { __giuBoiPhienKhac: false, __dangGiu: false, __soLanCho: 0, __soLanLay: 0, __soLanTra: 0, __timeoutYeuCau: [], __nhatKy: [] };
+  const lock = {
+    waitLock(ms) {
+      state.__soLanCho += 1;
+      state.__timeoutYeuCau.push(ms);
+      state.__nhatKy.push('waitLock');
+      if (state.__giuBoiPhienKhac) throw new Error('Lock timeout: another process was holding the lock for too long.');
+      state.__dangGiu = true;
+      state.__soLanLay += 1;
+    },
+    tryLock(ms) {
+      try { this.waitLock(ms); return true; } catch (e) { return false; }
+    },
+    hasLock() { return state.__dangGiu; },
+    releaseLock() {
+      state.__nhatKy.push('releaseLock');
+      if (state.__dangGiu) { state.__dangGiu = false; state.__soLanTra += 1; }
+    },
   };
+  return Object.assign(state, { getScriptLock: () => lock, getUserLock: () => lock, getDocumentLock: () => lock });
 }
 
 function makeFakeSession(initialEmail) {
@@ -305,4 +379,7 @@ module.exports = {
   makeFakeCacheService,
   makeFakeHtmlService,
   setActiveDateCtor_,
+  resetApiCounter_,
+  getApiCounter_,
+  tiemLoiSheets_,
 };
