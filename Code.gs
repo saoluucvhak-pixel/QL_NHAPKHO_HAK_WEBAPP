@@ -659,6 +659,23 @@ function combineDateTime_(dateStr, timeStr) {
 // được làm mất cột nào so với sheet gốc.
 const LT_SO_COT_DAY_DU = 27;
 
+// Xóa nhiều dòng (số dòng thật trên sheet) an toàn + nhanh: xóa TỪ DƯỚI LÊN để
+// xóa dòng phía trên không làm lệch số dòng của các dòng còn chờ xóa, và gom
+// các dòng liền nhau thành 1 lệnh deleteRows() (mỗi lệnh là 1 lượt gọi Sheets
+// API chậm - xóa 200 dòng liền nhau: 1 lượt thay vì 200). Trả về số dòng đã xóa.
+function xoaCacDong_(sheet, dsDong) {
+  const giam = dsDong.filter(function (r, i, a) { return r >= 2 && a.indexOf(r) === i; })
+    .sort(function (a, b) { return b - a; });
+  let i = 0;
+  while (i < giam.length) {
+    let j = i;
+    while (j + 1 < giam.length && giam[j + 1] === giam[j] - 1) j++;
+    sheet.deleteRows(giam[j], j - i + 1); // giam[j] = dòng NHỎ NHẤT của khối
+    i = j + 1;
+  }
+  return giam.length;
+}
+
 function LT_tenSheetLuuTru_(nam) {
   return CONFIG.DATA_SHEET + "_" + nam;
 }
@@ -844,20 +861,8 @@ function HT_chotSoNam(nam) {
     sheetLuuTru.getRange(startRowLuuTru, 4, dongCanChuyen.length, 1).setNumberFormat(_rfLT.DATE_FMT);
     sheetLuuTru.getRange(startRowLuuTru, 5, dongCanChuyen.length, 1).setNumberFormat(_rfLT.TIME_FMT);
 
-    // XÓA đúng các dòng đã chuyển khỏi sheet đang hoạt động - XÓA TỪ DƯỚI LÊN
-    // (rowNum giảm dần, đã tính trước nên không phụ thuộc thứ tự xóa) để việc
-    // xóa dòng phía trên không làm lệch rowNum của các dòng còn chờ xóa phía
-    // dưới. Gom thành khối liên tiếp để giảm số lượt gọi deleteRows().
-    const rowNumsGiam = dongCanChuyen.map(function (d) { return d.rowNum; }).sort(function (a, b) { return b - a; });
-    let i = 0;
-    while (i < rowNumsGiam.length) {
-      let j = i;
-      while (j + 1 < rowNumsGiam.length && rowNumsGiam[j + 1] === rowNumsGiam[j] - 1) j++;
-      const soDong = j - i + 1;
-      const rowDauKhoi = rowNumsGiam[j]; // rowNum NHỎ NHẤT của khối (vì đang giảm dần, phần tử cuối khối)
-      sheet.deleteRows(rowDauKhoi, soDong);
-      i = j + 1;
-    }
+    // XÓA đúng các dòng đã chuyển khỏi sheet đang hoạt động.
+    xoaCacDong_(sheet, dongCanChuyen.map(function (d) { return d.rowNum; }));
 
     logAudit_("CHOT_SO_NAM", "OK", "Đã chuyển " + dongCanChuyen.length + " phiếu năm " + nam + " sang sheet lưu trữ " + tenSheetLuuTru + ".");
     return {
@@ -901,7 +906,7 @@ function downloadMisaExcel() {
     const tempSheet = tempSS.getSheets()[0];
 
     tempSheet.getRange(1, 10, data.length, 2).setNumberFormat("@");
-    tempSheet.getRange(1, 1, data.length, 31).setValues(data);
+    tempSheet.getRange(1, 1, data.length, 31).setValues(chongCongThucBang_(data));
     tempSheet.getRange(1, 1, 1, 31).setBackground("#B7B7B7").setFontWeight("bold").setHorizontalAlignment("center");
 
     const tempFile = DriveApp.getFileById(tempSS.getId());
@@ -1569,13 +1574,24 @@ function getBaoCaoMisa(filters) {
 }
 
 // ---- Helper dùng chung để tạo file tạm phục vụ xuất Excel / PDF ----
+// Ô chữ bắt đầu bằng = + - @ bị Sheets/Excel hiểu là CÔNG THỨC. Dữ liệu gốc đã
+// được sanitize() khi nhập (lưu dạng chữ), nhưng đọc ra rồi ghi sang file xuất
+// thì Sheets sẽ tính lại thành công thức (Formula/CSV Injection trong file Excel
+// gửi cho khách/kế toán) - nên mọi dữ liệu ghi vào file xuất phải qua hàm này.
+function chongCongThuc_(v) {
+  return (typeof v === "string" && /^[=+\-@]/.test(v)) ? "'" + v : v;
+}
+function chongCongThucBang_(rows) {
+  return rows.map(function (r) { return r.map(chongCongThuc_); });
+}
+
 function createTempSheetForExport_(title, headers, rows, numberFormatCols) {
   const tempSS = SpreadsheetApp.create(title);
   const tempSheet = tempSS.getSheets()[0];
   tempSheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight("bold").setBackground("#1B4332").setFontColor("#FFFFFF").setHorizontalAlignment("center");
   if (rows.length > 0) {
-    tempSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    tempSheet.getRange(2, 1, rows.length, headers.length).setValues(chongCongThucBang_(rows));
     (numberFormatCols || []).forEach(c => tempSheet.getRange(2, c, rows.length, 1).setNumberFormat("#,##0"));
   }
   tempSheet.autoResizeColumns(1, headers.length);
@@ -1919,7 +1935,14 @@ function logAudit_(action, status, message) {
     // Cột E = người thực hiện: webapp chạy bằng tài khoản Admin (USER_DEPLOYING)
     // nên phải ghi rõ email người đăng nhập, nếu không mọi dòng log đều như Admin làm.
     if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue("Người thực hiện");
-    sheet.getRange(sheet.getLastRow() + 1, 1, 1, 5).setValues([[new Date(), action, status, message, layThongTinNguoiDungHienTai_().email || ""]]);
+    // appendRow() là thao tác nguyên tử của Sheets: 2 người ghi log cùng lúc
+    // không ghi đè lên cùng 1 dòng (khác với tự tính getLastRow()+1 như trước).
+    // Cắt bớt nội dung quá dài (1 ô tối đa 50.000 ký tự - vượt là lỗi, mất log)
+    // và chặn nội dung bị hiểu thành công thức.
+    const noiDung = String(message == null ? "" : message);
+    sheet.appendRow([new Date(), action, status,
+      chongCongThuc_(noiDung.length > 45000 ? noiDung.slice(0, 45000) + "…(đã cắt bớt)" : noiDung),
+      layThongTinNguoiDungHienTai_().email || ""]);
   } catch (e) { /* Không để lỗi ghi log làm hỏng thao tác chính */ }
 }
 function createSimpleMap_(s,k,v) { const d=s.getDataRange().getValues(); let m={}; for(let i=1;i<d.length;i++){ let key=String(d[i][k]).trim(); if(key) m[key]=d[i][v]; } return m; }
@@ -2566,24 +2589,18 @@ function BG_deleteQuote(soBaoGia) {
     let soDongXoa = 0;
     if (lastRowSrc > 1) {
       const data = srcSheet.getRange(2, 1, lastRowSrc - 1, 8).getValues();
-      // Xóa từ DƯỚI LÊN để không bị lệch chỉ số hàng khi deleteRow nhiều lần liên tiếp
-      for (let i = data.length - 1; i >= 0; i--) {
-        if (String(data[i][7] || "").trim() === soBaoGia) {
-          srcSheet.deleteRow(i + 2);
-          soDongXoa++;
-        }
-      }
+      const dsDong = [];
+      data.forEach(function (r, i) { if (String(r[7] || "").trim() === soBaoGia) dsDong.push(i + 2); });
+      soDongXoa = xoaCacDong_(srcSheet, dsDong);
     }
 
     const qlSheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.QL_SHEET);
     const lastRowQL = qlSheet.getLastRow();
     if (lastRowQL > 1) {
       const dataQL = qlSheet.getRange(2, 1, lastRowQL - 1, 5).getValues();
-      for (let i = dataQL.length - 1; i >= 0; i--) {
-        if (String(dataQL[i][1] || "").trim() === soBaoGia) {
-          qlSheet.deleteRow(i + 2);
-        }
-      }
+      const dsDongQL = [];
+      dataQL.forEach(function (r, i) { if (String(r[1] || "").trim() === soBaoGia) dsDongQL.push(i + 2); });
+      xoaCacDong_(qlSheet, dsDongQL);
     }
 
     return { status: "success", message: "Đã xóa toàn bộ báo giá " + soBaoGia + " (" + soDongXoa + " nhóm giá)." };
@@ -2829,7 +2846,7 @@ function BG_exportFileSmart(dateStr, currentView, filteredIds) {
     sheet.getRange(6, 1, 1, 7).setValues([headers]).setFontWeight("bold").setBackground("#B7B7B7").setHorizontalAlignment("center").setBorder(true, true, true, true, true, true);
 
     const exportData = filteredRaw.map((r, index) => [index + 1, r[3], r[12], Number(r[6]) || 0, r[1], r[2], r[13]]);
-    sheet.getRange(7, 1, exportData.length, 7).setValues(exportData).setBorder(true, true, true, true, true, true);
+    sheet.getRange(7, 1, exportData.length, 7).setValues(chongCongThucBang_(exportData)).setBorder(true, true, true, true, true, true);
 
     sheet.getRange(7, 4, exportData.length, 1).setNumberFormat("#,##0");
     sheet.getRange(7, 5, exportData.length, 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
@@ -3740,7 +3757,21 @@ function xuLyKyVetBai(dataEdit) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetCfg = ss.getSheetByName(KHODAM_CONFIG.SHEET_CAUHINH);
   if (dataEdit.hanhDong === "XOA") {
-    sheetCfg.deleteRow(parseInt(dataEdit.rowIndex)); return "🗑️ Đã xóa kỳ.";
+    // TRƯỚC ĐÂY xóa thẳng dòng theo số dòng client gửi lên: gửi sai số (hoặc
+    // danh sách đã cũ) là xóa nhầm dòng bất kỳ của sheet cấu hình, kể cả dòng
+    // tiêu đề. Nay chỉ cho xóa đúng dòng "Thông số kho" MỚI NHẤT - khớp quy tắc
+    // giao diện (các kỳ cũ đã khóa sổ, không được xóa).
+    var dsCfg = sheetCfg.getDataRange().getValues();
+    var dongKyMoiNhat = -1;
+    for (var k = 1; k < dsCfg.length; k++) {
+      var loai = String(dsCfg[k][0]).trim().toLowerCase();
+      if (loai === "thông số kho" || loai === "thong so kho") dongKyMoiNhat = k + 1;
+    }
+    var dongXoa = parseInt(dataEdit.rowIndex, 10);
+    if (dongKyMoiNhat === -1 || dongXoa !== dongKyMoiNhat) {
+      return "❌ Chỉ xóa được kỳ vét bãi MỚI NHẤT (các kỳ cũ đã khóa sổ). Danh sách có thể đã thay đổi - hãy tải lại.";
+    }
+    sheetCfg.deleteRow(dongXoa); return "🗑️ Đã xóa kỳ.";
   } else if (dataEdit.hanhDong === "THEM") {
     if (!dataEdit.tuNgay) return "❌ Lỗi: Bạn chưa chọn Ngày và Giờ bắt đầu cho kỳ mới!";
     var tuMoi = new Date(dataEdit.tuNgay);
@@ -4583,7 +4614,16 @@ function XH_saveDonHang(payload) {
 
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const lastRow = sheet.getLastRow();
-    const stt = lastRow; // header ở dòng 1, dữ liệu bắt đầu dòng 2 -> STT = lastRow (số dòng dữ liệu hiện có + 1, vì lastRow đang TÍNH CẢ header)
+    // STT = STT lớn nhất hiện có + 1. TRƯỚC ĐÂY dùng số dòng (lastRow) nên sau
+    // khi xóa 1 đơn ở giữa, đơn mới bị TRÙNG STT với đơn cuối - mà STT là khóa
+    // để Sửa/Xóa đúng đơn (xem XH_timDongDonHang_).
+    let stt = 1;
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function (r) {
+        const n = parseInt(r[0], 10);
+        if (!isNaN(n) && n >= stt) stt = n + 1;
+      });
+    }
     // FIX (bảo vệ chống lệch cột): xem giải thích ở step1_ConfirmImport (PHẦN 1)
     const _canhBaoHeaderDH = kiemTraLechHeaderSheet_(sheet, "NL_DH_XB", 16);
 
@@ -4644,17 +4684,39 @@ function XH_getDonHangList() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-// Lấy chi tiết 1 đơn hàng theo rowIndex (dòng thật trên sheet) để nạp vào form Sửa
-function XH_getDonHangByRow(rowIndex) {
+// Xác định ĐÚNG dòng của đơn hàng trước khi đọc/sửa/xóa. Danh sách trên giao
+// diện ghi nhớ số dòng lúc tải; nếu trong lúc đó người khác xóa 1 đơn phía
+// trên, số dòng bị lệch và TRƯỚC ĐÂY sẽ sửa/xóa NHẦM đơn khác. Nay giao diện gửi
+// kèm STT của đơn: dòng đó phải đúng STT, nếu lệch thì tìm lại theo STT; không
+// thấy hoặc STT bị trùng (dữ liệu cũ) thì báo lỗi, KHÔNG thao tác bừa.
+function XH_timDongDonHang_(sheet, rowIndex, sttKyVong) {
+  const r = parseInt(rowIndex, 10);
+  const lastRow = sheet.getLastRow();
+  if (sttKyVong === undefined || sttKyVong === null || sttKyVong === "") {
+    if (isNaN(r) || r < 2 || r > lastRow) throw new Error("Không tìm thấy đơn hàng (có thể đã bị xóa) - hãy tải lại danh sách.");
+    return r;
+  }
+  const stt = String(sttKyVong).trim();
+  if (!isNaN(r) && r >= 2 && r <= lastRow && String(sheet.getRange(r, 1).getValue()).trim() === stt) return r;
+  const dsStt = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 1).getValues() : [];
+  const trung = [];
+  dsStt.forEach(function (row, i) { if (String(row[0]).trim() === stt) trung.push(i + 2); });
+  if (trung.length === 1) return trung[0];
+  throw new Error(trung.length === 0
+    ? "Đơn hàng STT " + stt + " không còn tồn tại (có thể người khác vừa xóa) - hãy tải lại danh sách."
+    : "Có " + trung.length + " đơn cùng STT " + stt + " - hãy tải lại danh sách rồi thao tác lại.");
+}
+
+// Lấy chi tiết 1 đơn hàng để nạp vào form Sửa
+function XH_getDonHangByRow(rowIndex, sttKyVong) {
   yeuCauPhien_();
   try {
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
-    const r = parseInt(rowIndex, 10);
-    if (isNaN(r) || r < 2 || r > sheet.getLastRow()) return { status: "error", message: "Không tìm thấy đơn hàng." };
+    const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
     const row = sheet.getRange(r, 1, 1, 16).getValues()[0];
     const layNgayInput = v => (v instanceof Date && !isNaN(v.getTime())) ? Utilities.formatDate(v, "GMT+7", "yyyy-MM-dd") : String(v || "").trim();
     return {
-      status: "success", rowIndex: r,
+      status: "success", rowIndex: r, stt: row[0],
       ngayDonHang: (row[1] instanceof Date) ? Utilities.formatDate(row[1], "GMT+7", "yyyy-MM-dd") : "",
       soTKHQ: row[2], tau: row[3], khachHang: row[4], diaChiKH: row[5], tenHangHoa: row[6],
       donGiaUSD: parseFloat(row[7]) || 0, klMT: parseFloat(row[8]) || 0,
@@ -4667,7 +4729,7 @@ function XH_getDonHangByRow(rowIndex) {
 }
 
 // Cập nhật 1 đơn hàng đã có, theo đúng dòng thật (rowIndex) - ghi đè toàn bộ dữ liệu
-function XH_updateDonHang(rowIndex, payload) {
+function XH_updateDonHang(rowIndex, payload, sttKyVong) {
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
@@ -4675,9 +4737,8 @@ function XH_updateDonHang(rowIndex, payload) {
   }
   try {
     payload = payload || {};
-    const r = parseInt(rowIndex, 10);
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
-    if (isNaN(r) || r < 2 || r > sheet.getLastRow()) return { status: "error", message: "Không tìm thấy đơn hàng để sửa (có thể đã bị xóa)." };
+    const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
     if (!payload.ngayDonHang) return { status: "error", message: "Vui lòng chọn Ngày đơn hàng." };
     if (!String(payload.khachHang || "").trim()) return { status: "error", message: "Vui lòng nhập Khách hàng." };
     const klMT = parseFloat(payload.klMT) || 0;
@@ -4711,18 +4772,18 @@ function XH_updateDonHang(rowIndex, payload) {
   }
 }
 
-function XH_deleteDonHang(rowIndex) {
+function XH_deleteDonHang(rowIndex, sttKyVong) {
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
   }
   try {
-    const r = parseInt(rowIndex, 10);
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
-    if (isNaN(r) || r < 2 || r > sheet.getLastRow()) return { status: "error", message: "Không tìm thấy đơn hàng để xóa (có thể đã bị xóa trước đó)." };
+    const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
+    const thongTin = sheet.getRange(r, 1, 1, 5).getValues()[0];
     sheet.deleteRow(r);
-    logAudit_("XUATHANG_DONHANG", "OK", "Đã xóa đơn hàng xuất bán dòng " + r);
+    logAudit_("XUATHANG_DONHANG", "OK", "Đã xóa đơn hàng xuất bán STT " + thongTin[0] + " (" + thongTin[4] + "), dòng " + r);
     return { status: "success", message: "🗑️ Đã xóa đơn hàng." };
   } catch (e) {
     logAudit_("XUATHANG_DONHANG", "ERROR", e.toString());

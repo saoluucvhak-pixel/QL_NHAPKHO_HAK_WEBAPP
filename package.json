@@ -1,0 +1,14 @@
+{
+  "name": "hak-quan-ly-nhap-kho",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Hệ thống quản lý cân / nhập - xuất kho HAKGROUP (Google Apps Script). Thư mục tests/ chỉ chạy trên máy lập trình, KHÔNG đưa vào dự án Apps Script.",
+  "scripts": {
+    "test": "node tests/server.test.js",
+    "test:ui": "node tests/ui.test.js",
+    "test:all": "node tests/server.test.js && node tests/ui.test.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}

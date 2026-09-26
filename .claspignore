@@ -1,0 +1,7 @@
+# Chỉ đẩy mã nguồn Apps Script (Code.gs, Config.gs, Index.html, appsscript.json)
+tests/**
+docs/**
+node_modules/**
+package.json
+package-lock.json
+*.md

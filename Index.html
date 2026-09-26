@@ -1848,7 +1848,7 @@
       loadedBaoGia:false, loadedDonGia:false, bgGroups: [], bgGroupSeq: 0, bgIdTam: '', bgEditingId: null,
       bgMaBaoGiaList: [], bgMaKLList: [], bgQuoteList: [],
       bgHieuLucData: [], bgViewType: 'FINAL', bgUncheckedIds: new Set(), loadedKhoDam: false,
-      loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null,
+      loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null, dhEditingStt: null,
       loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
       loadedLuuTru: false, currentUser: null
     };
@@ -4339,7 +4339,7 @@
       showOverlay(state.dhEditingRow ? 'Đang cập nhật đơn hàng…' : 'Đang lưu đơn hàng…');
       try {
         const res = state.dhEditingRow
-          ? await runServer('XH_updateDonHang', state.dhEditingRow, payload)
+          ? await runServer('XH_updateDonHang', state.dhEditingRow, payload, state.dhEditingStt)
           : await runServer('XH_saveDonHang', payload);
         toast(res.message, res.status === 'success');
         if (res.status === 'success'){ xhResetDonHangForm(); await xhLoadDonHangList(); }
@@ -4367,14 +4367,17 @@
       document.getElementById('dh_khoXuat').value = '';
       document.getElementById('dh_loaiXe').value = 'Y';
       state.dhEditingRow = null;
+      state.dhEditingStt = null;
       document.getElementById('btnDhSave').textContent = '✔️ Lưu đơn hàng xuất bán';
     }
 
     // Nạp 1 đơn hàng đã có vào form để SỬA
-    async function xhEditDonHang(rowIndex){
+    // Gửi kèm STT để máy chủ kiểm tra đúng đơn (danh sách có thể đã cũ nếu người
+    // khác vừa xóa 1 đơn - xem XH_timDongDonHang_ trong Code.gs).
+    async function xhEditDonHang(rowIndex, stt){
       showOverlay('Đang tải dữ liệu đơn hàng…');
       try {
-        const res = await runServer('XH_getDonHangByRow', rowIndex);
+        const res = await runServer('XH_getDonHangByRow', rowIndex, stt);
         if (res.status !== 'success') { toast(res.message, false); return; }
         document.getElementById('dh_ngayDonHang').value = res.ngayDonHang;
         document.getElementById('dh_soTKHQ').value = res.soTKHQ;
@@ -4393,16 +4396,17 @@
         document.getElementById('dh_doKhoNhaMay').dataset.raw = res.doKhoNhaMay || 0;
         xhCapNhatKLBDMT();
         state.dhEditingRow = res.rowIndex;
+        state.dhEditingStt = res.stt;
         document.getElementById('btnDhSave').textContent = '💾 Cập nhật đơn hàng';
         toast('Đã nạp đơn hàng để sửa. Chỉnh xong bấm "Cập nhật đơn hàng".', true);
       } catch(err){ toast('Lỗi tải dữ liệu: ' + err, false); } finally { hideOverlay(); }
     }
 
-    async function xhDeleteDonHangRow(rowIndex){
+    async function xhDeleteDonHangRow(rowIndex, stt){
       if (!confirm('Bạn có chắc muốn XÓA đơn hàng này? Hành động không thể hoàn tác.')) return;
       showOverlay('Đang xóa đơn hàng…');
       try {
-        const res = await runServer('XH_deleteDonHang', rowIndex);
+        const res = await runServer('XH_deleteDonHang', rowIndex, stt);
         toast(res.message, res.status === 'success');
         if (res.status === 'success') await xhLoadDonHangList();
       } catch(err){ toast('Lỗi xóa đơn hàng: ' + err, false); } finally { hideOverlay(); }
@@ -4424,15 +4428,15 @@
           + '<td>'+(d.tuNgay ? escapeHtml(d.tuNgay) : '—')+'</td><td>'+(d.denNgay ? escapeHtml(d.denNgay) : '—')+'</td>'
           + '<td>'+escapeHtml(d.loaiXe)+'</td>'
           + '<td><div class="btnrow" style="margin:0;gap:6px;">'
-          + '<button class="btn btn-ghost btn-sm" data-editdh="'+d.rowIndex+'">✏️ Sửa</button>'
-          + '<button class="btn btn-danger btn-sm" data-deldh="'+d.rowIndex+'">🗑️ Xóa</button>'
+          + '<button class="btn btn-ghost btn-sm" data-editdh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'">✏️ Sửa</button>'
+          + '<button class="btn btn-danger btn-sm" data-deldh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'">🗑️ Xóa</button>'
           + '</div></td></tr>'
         )).join('');
         body.querySelectorAll('[data-editdh]').forEach(btn=>{
-          btn.addEventListener('click', ()=> xhEditDonHang(btn.getAttribute('data-editdh')));
+          btn.addEventListener('click', ()=> xhEditDonHang(btn.getAttribute('data-editdh'), btn.getAttribute('data-stt')));
         });
         body.querySelectorAll('[data-deldh]').forEach(btn=>{
-          btn.addEventListener('click', ()=> xhDeleteDonHangRow(btn.getAttribute('data-deldh')));
+          btn.addEventListener('click', ()=> xhDeleteDonHangRow(btn.getAttribute('data-deldh'), btn.getAttribute('data-stt')));
         });
       } catch(err){ toast('Lỗi tải danh sách: ' + err, false); }
     }

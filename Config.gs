@@ -606,9 +606,9 @@ function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
 //  - Mỗi hàm công khai (không kết thúc bằng "_") trong Code.gs/Config.gs đều
 //    mở đầu bằng yeuCauPhien_(): gọi thẳng hàm đó qua google.script.run mà
 //    không đi qua API (không có phiên hợp lệ) sẽ bị từ chối. KHI THÊM HÀM MỚI
-//    cho giao diện gọi, BẮT BUỘC thêm dòng yeuCauPhien_() ở đầu hàm - API() cũng
-//    chỉ cho gọi những hàm có dòng này (hàm thiếu sẽ bị chặn, không bị lộ). Nếu
-//    hàm mới CHỈ ĐỌC dữ liệu và người Chỉ xem cũng cần dùng, thêm tên hàm vào
+//    cho giao diện gọi, BẮT BUỘC thêm dòng yeuCauPhien_() ở đầu hàm VÀ thêm tên
+//    hàm vào HAM_API_ - API() chỉ cho gọi hàm thỏa CẢ 2 điều kiện. Nếu hàm mới
+//    CHỈ ĐỌC dữ liệu và người Chỉ xem cũng cần dùng, thêm tên hàm vào
 //    HAM_CHO_PHEP_CHI_XEM_ bên dưới.
 //
 // CÀI ĐẶT 1 LẦN (trang hướng dẫn tự hiện khi chưa cài): trong trình soạn thảo
@@ -731,8 +731,6 @@ function yeuCauQuyenAdmin_() {
   }
   return nd;
 }
-
-function yeuCauDangNhap_() { return yeuCauPhien_(); }
 
 function HT_layThongTinNguoiDungHienTai() {
   yeuCauPhien_();
@@ -870,17 +868,47 @@ function xacThucPhien_(maPhien) {
 }
 
 /* ----- Cổng gọi hàm duy nhất từ giao diện ----- */
-const HAM_KHONG_GOI_QUA_API_ = { doGet: true, API: true, DN_layLinkDangNhap: true, DN_kiemTraPhien: true, DN_dangXuat: true, CAI_DAT_CONG_DANG_NHAP: true };
+// DANH SÁCH TƯỜNG MINH các hàm giao diện được phép gọi qua API(). Các hàm công
+// khai còn lại (VD xuLySuaXoaGiaoDich, taoPhieuDieuChinhKho, sanitize...) là
+// hàm NỘI BỘ: chỉ được gọi qua hàm điều phối có khóa LockService + ghi nhật ký
+// (processFormData...), gọi thẳng sẽ bỏ qua khóa ghi đồng thời và nhật ký nên
+// bị chặn. KHI THÊM CHỨC NĂNG MỚI CHO GIAO DIỆN: thêm tên hàm vào đây (hàm cũng
+// phải mở đầu bằng yeuCauPhien_()); nếu chỉ đọc dữ liệu và vai trò Chỉ xem cần
+// dùng thì thêm cả vào HAM_CHO_PHEP_CHI_XEM_.
+const HAM_API_ = [
+  // Hệ thống / phân quyền / cổng đăng nhập
+  "HT_layThongTinNguoiDungHienTai", "HT_layDashboard", "HT_layThongKeNamPhieuCan", "HT_chotSoNam",
+  "HT_layCauHinhVungMien", "HT_luuCauHinhVungMien", "HT_layLocaleThatCuaSheet", "HT_xacNhanCauTrucSheetHienTai",
+  "HT_layLienKetDuLieu", "HT_luuLienKetDuLieu", "HT_layMisaDefaults", "HT_luuMisaDefaults",
+  "HT_layDanhSachQuyen", "HT_luuDanhSachQuyen", "HT_chiaSeTaiNguyenChoDanhSachQuyen", "HT_layTinhTrangChiaSeTaiNguyen",
+  "HT_thuHoiQuyenTaiNguyen", "HT_thuHoiToanBoQuyenDriveChoEmail",
+  "HT_layCauHinhCong", "HT_layMaNguonCong", "HT_luuLinkCong", "HT_doiKhoaCong",
+  // Import / nhập liệu phiếu cân nhập
+  "step1_PreviewDraft", "step1_ConfirmImport", "addManualPhieuCan", "taoFileMauPhieuCan", "taoFileMauXuatHang",
+  // Báo cáo nhập kho + Misa
+  "getFilterOptions", "getBaoCaoTongHop", "getBaoCaoMisa", "getBaoCaoDonGia", "runCreateMisaData", "downloadMisaExcel",
+  "exportBaoCaoTongHopExcel", "exportBaoCaoTongHopPDF", "exportBaoCaoMisaExcel", "exportBaoCaoMisaPDF",
+  "exportBaoCaoDonGiaExcel", "exportBaoCaoDonGiaPDF", "exportPhieuCanPDF",
+  // Báo giá
+  "BG_getMaBaoGiaList", "BG_addMaBaoGia", "BG_deleteMaBaoGia", "BG_getMaKLList", "BG_addMaKL", "BG_deleteMaKL",
+  "BG_getQuoteList", "BG_getQuoteListWithStatus", "BG_getQuoteDetail", "BG_createQuote", "BG_deleteQuote",
+  "BG_getBaogiaRowByHash", "BG_updateBaogiaRow", "BG_deleteBaogiaRow", "BG_updateHieuLuc", "BG_showAllData", "BG_exportFileSmart",
+  // Kho dăm (ghi dữ liệu đi qua processFormData để có khóa + nhật ký)
+  "processFormData", "getDataForGiaoDichForm", "layBaoCaoTonKho", "layDanhSachDanhMucKho",
+  "layDanhSachDoKhoTheoBoLoc", "layDanhSachKyVetBai", "xuLyNhapSanPhamSanXuat",
+  // Xuất hàng + báo cáo xuất kho
+  "XH_step1_PreviewDraft", "XH_step1_ConfirmImport", "XH_getKhoXuatList", "XH_tinhDoKhoNhaMay",
+  "XH_saveDonHang", "XH_getDonHangList", "XH_getDonHangByRow", "XH_updateDonHang", "XH_deleteDonHang",
+  "XH_getBaoCaoXuatQuaCan", "XH_getBaoCaoXuatMisa",
+  "XH_exportBaoCaoXuatQuaCanExcel", "XH_exportBaoCaoXuatQuaCanPDF", "XH_exportBaoCaoXuatMisaExcel"
+].reduce(function (m, ten) { m[ten] = true; return m; }, {});
 
 function API(maPhien, tenHam, thamSo) {
   PHIEN_HIEN_TAI_ = xacThucPhien_(maPhien);
   const ten = String(tenHam || "");
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(ten) || /_$/.test(ten) || HAM_KHONG_GOI_QUA_API_[ten]) {
-    throw new Error("Không được phép gọi hàm: " + ten);
-  }
-  const fn = globalThis[ten];
-  // Chỉ cho gọi đúng các hàm nghiệp vụ của hệ thống (có dòng yeuCauPhien_() ở
-  // đầu) - chặn gọi hàm có sẵn của JavaScript (VD eval) hay hàm bị quên chặn.
+  const fn = HAM_API_[ten] === true ? globalThis[ten] : null;
+  // Chỉ cho gọi đúng các hàm trong HAM_API_ và vẫn phải có dòng yeuCauPhien_()
+  // ở đầu (2 lớp: quên 1 trong 2 thì hàm bị chặn chứ không bị lộ).
   if (typeof fn !== "function" || String(fn).indexOf("yeuCauPhien_()") === -1) {
     throw new Error("Không được phép gọi hàm: " + ten);
   }
