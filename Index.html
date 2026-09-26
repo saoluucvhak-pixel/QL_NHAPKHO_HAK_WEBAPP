@@ -1784,6 +1784,25 @@
           });
         }
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
+      kiemTraQuyenTruyCapCuaToi();
+    }
+
+    // Với chế độ "chạy dưới tài khoản người dùng" (USER_ACCESSING), người mới được
+    // thêm vào danh sách quyền vẫn KHÔNG dùng được nếu chưa được chia sẻ từng
+    // Google Sheet/Thư mục hệ thống dùng - báo rõ thiếu ở đâu thay vì để mọi thao
+    // tác sau đó lỗi "không có quyền truy cập tài liệu" khó hiểu.
+    function kiemTraQuyenTruyCapCuaToi(){
+      runServer('HT_kiemTraQuyenTruyCapCuaToi').then(res=>{
+        if (!res || res.status !== 'success' || !res.thieu || res.thieu.length === 0) return;
+        const banner = document.createElement('div');
+        banner.className = 'card';
+        banner.style.cssText = 'background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);box-shadow:none;';
+        banner.innerHTML = '<b>⚠️ Tài khoản ' + escapeHtml(res.email) + ' chưa được chia sẻ quyền trên ' + res.thieu.length + ' Sheet/Thư mục của hệ thống</b>'
+          + '<ul style="margin:8px 0;padding-left:20px;">' + res.thieu.map(t => '<li>' + escapeHtml(t.ten) + '</li>').join('') + '</ul>'
+          + '<div style="font-size:12.5px;">Các chức năng liên quan sẽ báo lỗi "không có quyền truy cập". Nhờ Quản trị viên vào <b>Hệ thống → Quản lý người dùng</b>, bấm nút <b>🔗 Chia sẻ tự động cho danh sách người dùng</b> (phải chạy bằng tài khoản CHỦ SỞ HỮU các file), rồi tải lại trang.</div>';
+        const content = document.querySelector('main.content');
+        if (content) content.insertBefore(banner, content.firstChild);
+      }).catch(()=>{ /* chỉ là chẩn đoán, không chặn tải trang */ });
     }
 
     // ---------------------------------------------------------------

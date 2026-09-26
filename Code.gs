@@ -23,15 +23,37 @@ function doGet() {
   // cập" thay vì tải toàn bộ ứng dụng - vì trang bị chặn không có cầu nối
   // google.script.run, người không có quyền KHÔNG THỂ gọi được bất kỳ hàm
   // server nào nữa (không chỉ là ẩn giao diện).
+
+  // Kiểm tra TRƯỚC danh sách quyền: nếu người dùng đã bỏ tick bớt quyền ở màn
+  // hình cấp quyền của Google (VD bỏ quyền xem email), script không đọc được
+  // email và sẽ báo nhầm "không có quyền truy cập" dù đã có trong danh sách.
+  const linkCapQuyen = layLinkCapQuyenConThieu_();
+  if (linkCapQuyen !== null) {
+    const nutCapQuyen = linkCapQuyen
+      ? '<p><a href="' + linkCapQuyen.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" target="_top" ' +
+        'style="display:inline-block;padding:10px 18px;background:#1B4332;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">' +
+        '🔑 Cấp lại đầy đủ quyền</a></p>'
+      : '';
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:80px auto;padding:32px;' +
+      'border:1px solid #ffe69c;border-radius:12px;background:#fff3cd;color:#664d03;text-align:center;">' +
+      '<h2 style="margin-top:0;">🔑 Chưa cấp đủ quyền cho ứng dụng</h2>' +
+      '<p>Tài khoản của bạn chưa cấp đủ quyền Google (Sheets / Drive / Email) cho hệ thống — thường do đã <b>bỏ tick</b> một số mục ở màn hình cấp quyền.</p>' +
+      nutCapQuyen +
+      '<p style="font-size:13px;">Ở màn hình của Google, hãy <b>tick chọn TẤT CẢ</b> các quyền rồi bấm Tiếp tục, sau đó tải lại trang này.</p>' +
+      '</div>'
+    ).setTitle('Cần cấp quyền');
+  }
+
   const nd = layThongTinNguoiDungHienTai_();
   if (!nd.coQuyen) {
-    const emailHienThi = nd.email ? nd.email.replace(/[<>&]/g, '') : "(không xác định - có thể chưa đăng nhập Google)";
+    const emailHienThi = nd.email ? nd.email.replace(/[<>&]/g, '') : "(không đọc được email - kiểm tra đã đăng nhập Google và đã cấp quyền xem địa chỉ email)";
     return HtmlService.createHtmlOutput(
       '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:80px auto;padding:32px;' +
       'border:1px solid #f5c2c7;border-radius:12px;background:#f8d7da;color:#58151c;text-align:center;">' +
       '<h2 style="margin-top:0;">🚫 Không có quyền truy cập</h2>' +
       '<p>Tài khoản <b>' + emailHienThi + '</b> chưa được cấp quyền sử dụng hệ thống này.</p>' +
-      '<p>Vui lòng liên hệ Quản trị viên để được thêm vào danh sách truy cập, sau đó tải lại trang.</p>' +
+      '<p>Vui lòng gửi đúng email trên cho Quản trị viên để thêm vào danh sách truy cập, sau đó tải lại trang.</p>' +
       '</div>'
     ).setTitle('Không có quyền truy cập');
   }

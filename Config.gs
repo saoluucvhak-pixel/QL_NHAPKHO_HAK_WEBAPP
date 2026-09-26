@@ -627,11 +627,24 @@ function DS_QUYEN_() {
 //     trên) - script giờ chạy dưới quyền CHÍNH họ, không còn "mượn" quyền của
 //     tài khoản deploy nữa. Nên tạo 1 Google Group gồm toàn bộ nhân viên rồi
 //     chia sẻ 1 lần cho cả Group, thay vì chia sẻ riêng lẻ từng người.
+// Gmail bỏ qua dấu "." và phần "+..." ở tên đăng nhập (nguyen.van.a@gmail.com,
+// nguyenvana@gmail.com, NguyenVanA+hak@gmail.com là CÙNG 1 tài khoản), nhưng
+// Session.getActiveUser().getEmail() trả về đúng dạng lúc tạo tài khoản - nếu
+// Admin gõ email vào danh sách quyền khác dạng đó, so sánh chuỗi thô sẽ trượt
+// và người dùng bị báo "chưa được cấp quyền" dù đã được thêm.
+function chuanHoaEmailSoSanh_(email) {
+  const e = String(email || "").trim().toLowerCase();
+  const m = e.match(/^([^@]+)@(gmail\.com|googlemail\.com)$/);
+  if (!m) return e;
+  return m[1].split("+")[0].replace(/\./g, "") + "@gmail.com";
+}
+
 function layThongTinNguoiDungHienTai_() {
   let email = "";
   try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { email = ""; }
   const ds = DS_QUYEN_();
-  const found = ds.find(function (u) { return String(u.email || "").trim().toLowerCase() === email; });
+  const emailSoSanh = chuanHoaEmailSoSanh_(email);
+  const found = email ? ds.find(function (u) { return chuanHoaEmailSoSanh_(u.email) === emailSoSanh; }) : null;
   return {
     email: email,
     vaiTro: found ? found.vaiTro : null,
@@ -670,6 +683,49 @@ function HT_layThongTinNguoiDungHienTai() {
   try { return { status: "success", data: layThongTinNguoiDungHienTai_() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
+// Với executeAs:"USER_ACCESSING", mỗi người tự cấp quyền OAuth cho script ở lần
+// mở đầu tiên. Màn hình cấp quyền hiện nay của Google cho phép BỎ TICK từng quyền
+// riêng lẻ - nếu bỏ tick quyền Drive/Sheets/Email, script vẫn mở được nhưng mọi
+// thao tác sau đó báo "Bạn không có quyền gọi SpreadsheetApp.openById. Quyền cần
+// thiết: https://www.googleapis.com/auth/spreadsheets" (hoặc không đọc được email
+// nên bị báo "không có quyền truy cập"). Trả về null nếu đã đủ quyền, ngược lại
+// trả về link để người dùng cấp lại đầy đủ.
+function layLinkCapQuyenConThieu_() {
+  try {
+    const info = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    if (info.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED) {
+      return info.getAuthorizationUrl() || "";
+    }
+  } catch (e) { /* không kiểm tra được thì để luồng bình thường tự xử lý */ }
+  return null;
+}
+
+// Mọi người dùng hợp lệ đều gọi được: kiểm tra CHÍNH tài khoản đang đăng nhập đã
+// mở được từng Sheet/Thư mục hệ thống dùng hay chưa. Với USER_ACCESSING, thiếu
+// chia sẻ Drive là nguyên nhân phổ biến nhất khiến người mới thêm vào danh sách
+// quyền vẫn không dùng được (lỗi "Bạn không có quyền truy cập tài liệu được yêu
+// cầu"). Kết quả "đủ quyền" được nhớ 10 phút để không làm chậm mỗi lần mở trang.
+function HT_kiemTraQuyenTruyCapCuaToi() {
+  try {
+    const nd = yeuCauDangNhap_();
+    const cache = CacheService.getUserCache();
+    const KHOA_CACHE = "quyen_tai_nguyen_ok_v1";
+    if (cache.get(KHOA_CACHE) === "1") return { status: "success", email: nd.email, thieu: [] };
+
+    const thieu = [];
+    _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
+      try {
+        if (tn.loai === "folder") DriveApp.getFolderById(tn.id).getName();
+        else DriveApp.getFileById(tn.id).getName();
+      } catch (e) {
+        thieu.push({ ten: tn.ten, loai: tn.loai, loi: e.toString() });
+      }
+    });
+    if (thieu.length === 0) cache.put(KHOA_CACHE, "1", 600);
+    return { status: "success", email: nd.email, thieu: thieu };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 function HT_layDanhSachQuyen() {
   try {
     yeuCauQuyenAdmin_();
@@ -706,7 +762,10 @@ function HT_luuDanhSachQuyen(danhSach) {
     });
     // Loại email trùng (giữ lần xuất hiện đầu tiên)
     const seen = {}; const finalList = [];
-    clean.forEach(function (u) { if (!seen[u.email]) { seen[u.email] = true; finalList.push(u); } });
+    clean.forEach(function (u) {
+      const key = chuanHoaEmailSoSanh_(u.email);
+      if (!seen[key]) { seen[key] = true; finalList.push(u); }
+    });
     if (!finalList.some(function (u) { return u.vaiTro === "ADMIN"; })) {
       throw new Error("Phải giữ lại ít nhất 1 tài khoản ADMIN, không thể xóa hết (nếu không sẽ không còn ai quản trị được hệ thống).");
     }
