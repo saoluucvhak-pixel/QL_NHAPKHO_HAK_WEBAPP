@@ -1891,35 +1891,34 @@
           const btn = document.getElementById('btnDangXuat');
           if (btn) btn.addEventListener('click', e => { e.preventDefault(); dangXuat(); });
         }
-        if (!res.data.laAdmin) {
-          ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru'].forEach(tabId=>{
-            const subItem = document.querySelector('.sub-item[data-tab="' + tabId + '"]');
-            if (subItem) subItem.style.display = 'none';
-            const tabBtn = document.querySelector('.tabbtn[data-pane="' + tabId + '"]');
-            if (tabBtn) tabBtn.style.display = 'none';
-          });
-        }
-        if (res.data.laChiXem) apDungCheDoChiXem();
+        apDungVaiTro(res.data);
         if (res.data.laAdmin) nhacLuuLinkCong();
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
     }
 
-    // Vai trò Chỉ xem: ẩn các menu/tab/nút nhập-sửa-xóa. Đây chỉ là lớp giao
-    // diện cho gọn - API() ở máy chủ mới là nơi chặn cứng (kiemTraQuyenChiXem_).
-    function apDungCheDoChiXem(){
-      document.body.classList.add('che-do-chi-xem');
-      ['view-import', 'view-router-nhaplieu'].forEach(viewId=>{
-        const mi = document.querySelector('.menu-item[data-view="' + viewId + '"]');
-        if (mi) mi.style.display = 'none';
-        const sm = document.getElementById('submenu-' + viewId.replace('view-', ''));
-        if (sm) sm.style.display = 'none';
+    // Ẩn/hiện menu theo vai trò. Vai trò Chỉ xem: ẩn các menu/tab/nút nhập-
+    // sửa-xóa. Đây chỉ là lớp giao diện cho gọn - API() ở máy chủ mới là nơi
+    // chặn cứng (kiemTraQuyenChiXem_). Luôn đặt cả 2 chiều ẩn/hiện vì có thể đổi
+    // người dùng ngay trong trang (đăng xuất rồi đăng nhập tài khoản khác).
+    function apDungVaiTro(u){
+      const hien = (el, co) => { if (el) el.style.display = co ? '' : 'none'; };
+      ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru'].forEach(tabId=>{
+        hien(document.querySelector('.sub-item[data-tab="' + tabId + '"]'), u.laAdmin);
+        hien(document.querySelector('.tabbtn[data-pane="' + tabId + '"]'), u.laAdmin);
       });
-      const subNhap = document.querySelector('.sub-item[data-tab="bg-tab-nhap"]');
-      if (subNhap) subNhap.style.display = 'none';
+      const chiXem = !!u.laChiXem;
+      document.body.classList.toggle('che-do-chi-xem', chiXem);
+      ['view-import', 'view-router-nhaplieu'].forEach(viewId=>{
+        hien(document.querySelector('.menu-item[data-view="' + viewId + '"]'), !chiXem);
+        hien(document.getElementById('submenu-' + viewId.replace('view-', '')), !chiXem);
+      });
+      hien(document.querySelector('.sub-item[data-tab="bg-tab-nhap"]'), !chiXem);
       const tabNhap = document.querySelector('.tabbtn[data-pane="bg-tab-nhap"]');
-      if (tabNhap) tabNhap.style.display = 'none';
-      const tabHieuLuc = document.querySelector('.tabbtn[data-pane="bg-tab-hieuluc"]');
-      if (tabHieuLuc) tabHieuLuc.click();
+      hien(tabNhap, !chiXem);
+      if (chiXem && tabNhap && tabNhap.classList.contains('active')) {
+        const tabHieuLuc = document.querySelector('.tabbtn[data-pane="bg-tab-hieuluc"]');
+        if (tabHieuLuc) tabHieuLuc.click();
+      }
     }
 
     // Admin: nhắc lưu link Cổng nếu chưa có (nhân viên cần link này để đăng nhập).
@@ -1945,9 +1944,7 @@
       google.script.run
         .withSuccessHandler(res => {
           if (res && res.status === 'success') {
-            PHIEN = ma;
-            document.getElementById('loginScreen').classList.remove('show');
-            _baoPhienSanSang(ma);
+            vaoHeThong(ma, res.data);
           } else {
             xoaPhienDaLuu();
             hienManHinhDangNhap(THONG_BAO_DANG_NHAP || (res && res.message) || '');
@@ -1956,6 +1953,59 @@
         .withFailureHandler(err => hienManHinhDangNhap('Không kết nối được máy chủ: ' + ((err && err.message) || err)))
         .DN_kiemTraPhien(ma);
     }
+
+    // Vào hệ thống với 1 phiên đã được máy chủ xác nhận. Lần đầu: nhả các lời
+    // gọi đang xếp hàng chờ. Các lần sau (đăng nhập lại sau khi hết phiên/đăng
+    // xuất, không tải lại trang): làm mới thông tin người dùng + dữ liệu chính.
+    let _daVaoHeThong = false;
+    function vaoHeThong(ma, nguoiDung){
+      PHIEN = ma;
+      dungChoPhien();
+      document.getElementById('loginScreen').classList.remove('show');
+      if (!_daVaoHeThong) { _daVaoHeThong = true; _baoPhienSanSang(ma); return; }
+      initUserInfo();
+      htLoadDashboard();
+      loadFilterOptions();
+      toast('Đã đăng nhập: ' + ((nguoiDung && nguoiDung.email) || ''), true);
+    }
+
+    // ĐĂNG NHẬP BẰNG CỬA SỔ BẬT LÊN: webapp có thể đang nằm trong khung (iframe)
+    // của Portal MAIN_HAK - nếu chuyển cả trang sang Cổng thì người dùng bị đưa
+    // ra khỏi Portal. Nên Cổng được mở ở cửa sổ riêng; đăng nhập xong, cửa sổ đó
+    // lưu phiên vào localStorage (chung với khung này vì cùng webapp, cùng
+    // google.com), khung này nhận phiên qua sự kiện "storage" (kèm dò định kỳ
+    // phòng trình duyệt không bắn sự kiện) rồi tự đóng cửa sổ đăng nhập.
+    // Không mở được cửa sổ (bị chặn) thì link tự chuyển cả trang như trước.
+    let _cuaSoDangNhap = null, _dongHoChoPhien = null, _phienTruocKhiCho = '';
+    function dungChoPhien(){
+      if (_dongHoChoPhien) { clearInterval(_dongHoChoPhien); _dongHoChoPhien = null; }
+      if (_cuaSoDangNhap) { try { _cuaSoDangNhap.close(); } catch(e) {} _cuaSoDangNhap = null; }
+    }
+    function dangHienManHinhDangNhap(){ return document.getElementById('loginScreen').classList.contains('show'); }
+    function nhanPhienTuCuaSoKhac(ma){
+      if (!ma || !dangHienManHinhDangNhap() || ma === _phienTruocKhiCho) return;
+      _phienTruocKhiCho = ma; // tránh kiểm tra lặp cùng 1 mã
+      google.script.run
+        .withSuccessHandler(res => { if (res && res.status === 'success' && dangHienManHinhDangNhap()) vaoHeThong(ma, res.data); })
+        .withFailureHandler(()=>{})
+        .DN_kiemTraPhien(ma);
+    }
+    window.addEventListener('storage', e => { if (e.key === KHOA_LUU_PHIEN && e.newValue) nhanPhienTuCuaSoKhac(e.newValue); });
+    document.getElementById('btnDangNhapGoogle').addEventListener('click', e => {
+      const nut = e.currentTarget;
+      if (!nut.href) { e.preventDefault(); return; }
+      let w = null;
+      try { w = window.open(nut.href, 'hak_dang_nhap', 'width=560,height=720'); } catch(err) { w = null; }
+      if (!w) return; // bị chặn cửa sổ bật lên -> để link chuyển cả trang (target=_top)
+      e.preventDefault();
+      _cuaSoDangNhap = w;
+      _phienTruocKhiCho = docPhienDaLuu();
+      if (_dongHoChoPhien) clearInterval(_dongHoChoPhien);
+      _dongHoChoPhien = setInterval(()=> nhanPhienTuCuaSoKhac(docPhienDaLuu()), 1500);
+      const tb = document.getElementById('loginThongBao');
+      tb.textContent = 'Đang chờ đăng nhập ở cửa sổ vừa mở… (không thấy cửa sổ? kiểm tra trình duyệt có chặn cửa sổ bật lên không)';
+      tb.style.display = 'block';
+    });
 
     function hienManHinhDangNhap(thongBao){
       hideOverlay();
@@ -1986,6 +2036,7 @@
 
     function dangXuat(){
       const ma = PHIEN;
+      _phienTruocKhiCho = ma;
       xoaPhienDaLuu();
       google.script.run.withSuccessHandler(()=>{}).withFailureHandler(()=>{}).DN_dangXuat(ma);
       hienManHinhDangNhap('Đã đăng xuất.');
