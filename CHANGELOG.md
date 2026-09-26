@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 2.1.0 — 26/09/2026
+
+### Tính năng mới (chỉ Quản trị)
+- **Sao lưu tự động** (Hệ thống › Lưu trữ & Sao lưu): sao chép nguyên bản mọi Google Sheet của hệ thống vào thư mục "HAK - Sao lưu dữ liệu hệ thống" hằng đêm 1–2 giờ sáng hoặc bấm "Sao lưu ngay"; giữ N bản gần nhất (mặc định 30), bản cũ vào Thùng rác Drive; hiện kết quả lần gần nhất & lỗi từng file; hướng dẫn khôi phục qua Liên kết dữ liệu.
+- **Nhật ký hoạt động** (Hệ thống › Nhật ký hoạt động): lọc theo khoảng ngày, người thực hiện, hành động, trạng thái, từ khóa; phân trang 50 dòng; xuất Excel. Đọc sheet Audit từ dưới lên theo khối nên nhanh cả khi nhật ký rất lớn.
+
+### Cải tiến
+- Sheet "Audit" tự tạo nếu chưa có (trước đây thiếu sheet thì không ghi nhật ký gì).
+- Thêm quyền `script.scriptapp` (tạo lịch chạy tự động) — **Admin cần cấp quyền lại 1 lần** khi cập nhật (xem Hướng dẫn triển khai).
+
+### Kiểm thử
+- 90 ca máy chủ + 46 ca giao diện, PASS 100%.
+
 ## 2.0.0 — 26/09/2026
 
 ### Bảo mật & phân quyền

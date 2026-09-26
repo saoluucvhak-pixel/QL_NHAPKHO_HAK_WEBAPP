@@ -883,6 +883,7 @@ const HAM_API_ = [
   "HT_layDanhSachQuyen", "HT_luuDanhSachQuyen", "HT_chiaSeTaiNguyenChoDanhSachQuyen", "HT_layTinhTrangChiaSeTaiNguyen",
   "HT_thuHoiQuyenTaiNguyen", "HT_thuHoiToanBoQuyenDriveChoEmail",
   "HT_layCauHinhCong", "HT_layMaNguonCong", "HT_luuLinkCong", "HT_doiKhoaCong",
+  "HT_layTinhTrangSaoLuu", "HT_luuCauHinhSaoLuu", "HT_saoLuuNgay", "HT_layNhatKy", "HT_xuatNhatKyExcel",
   // Import / nhập liệu phiếu cân nhập
   "step1_PreviewDraft", "step1_ConfirmImport", "addManualPhieuCan", "taoFileMauPhieuCan", "taoFileMauXuatHang",
   // Báo cáo nhập kho + Misa

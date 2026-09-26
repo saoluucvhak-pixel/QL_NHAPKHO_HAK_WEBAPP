@@ -1925,13 +1925,19 @@ function toDateObj(val) {
 function toDateOnly_(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function toTimeOnly_(d) { return new Date(1899, 11, 30, d.getHours(), d.getMinutes(), d.getSeconds()); }
 
-// Ghi log vào sheet "Audit" đã có sẵn trong hệ thống (Timestamp, Action, Status, Message)
-// để nhất quán với quy ước audit hiện có của hệ thống PhieuCan_DN.
+// Ghi log vào sheet "Audit" (Thời gian, Hành động, Trạng thái, Nội dung, Người
+// thực hiện) trong Spreadsheet Phiếu cân. Xem lại ở Hệ thống › Nhật ký hoạt động.
 function logAudit_(action, status, message) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.AUDIT_SHEET);
-    if (!sheet) return; // Nếu sheet Audit không tồn tại thì bỏ qua, không làm hỏng luồng chính
+    let sheet = ss.getSheetByName(CONFIG.AUDIT_SHEET);
+    if (!sheet) {
+      // TRƯỚC ĐÂY thiếu sheet Audit thì âm thầm KHÔNG ghi gì (mất toàn bộ vết
+      // kiểm soát, VD khi cài cho doanh nghiệp mới) - nay tự tạo.
+      sheet = ss.insertSheet(CONFIG.AUDIT_SHEET);
+      sheet.appendRow(NK_TIEU_DE_);
+      sheet.setFrozenRows(1);
+    }
     // Cột E = người thực hiện: webapp chạy bằng tài khoản Admin (USER_DEPLOYING)
     // nên phải ghi rõ email người đăng nhập, nếu không mọi dòng log đều như Admin làm.
     if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue("Người thực hiện");
@@ -4965,6 +4971,263 @@ function XH_exportBaoCaoXuatMisaExcel(filters) {
     const tempSS = createTempSheetForExport_("BaoCao_XuatMisa_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [6, 7, 8, 9]);
     tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat(MISA_FORMAT().DATE_FMT);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo xuất kết xuất Misa, ' + list.length + ' dòng.');
+    return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/*********************************************************
+ * PHẦN 9: SAO LƯU DỮ LIỆU TỰ ĐỘNG & NHẬT KÝ HOẠT ĐỘNG (CHỈ ADMIN)
+ *********************************************************/
+
+/* ---------- 9A. SAO LƯU ----------
+ * Mỗi lần sao lưu tạo 1 thư mục "SaoLuu_yyyy-MM-dd_HHmm" trong thư mục gốc
+ * "HAK - Sao lưu dữ liệu hệ thống" (Drive của Admin) và sao chép NGUYÊN BẢN
+ * mọi Spreadsheet trong Liên kết dữ liệu vào đó. Chỉ giữ N bản gần nhất, bản
+ * cũ hơn chuyển vào Thùng rác Drive (khôi phục được trong 30 ngày).
+ * KHÔI PHỤC: mở bản sao cần dùng, lấy ID của nó rồi dán vào Hệ thống › Cấu
+ * hình hệ thống › Liên kết dữ liệu (thay ID Spreadsheet đang lỗi) - hệ thống
+ * dùng ngay bản sao đó; hoặc sao chép từng sheet về file gốc. */
+const SL_PROP_THU_MUC_ = "SAO_LUU_THU_MUC_ID";
+const SL_PROP_GIU_LAI_ = "SAO_LUU_GIU_LAI";
+const SL_PROP_KET_QUA_ = "SAO_LUU_KET_QUA_CUOI";
+const SL_HAM_TRIGGER_ = "TRIGGER_saoLuuHangDem";
+const SL_TIEN_TO_THU_MUC_ = "SaoLuu_";
+const SL_GIO_CHAY_ = 1;          // chạy trong khoảng 1-2 giờ sáng (múi giờ của dự án)
+const SL_GIU_LAI_MAC_DINH_ = 30; // bản
+
+function SL_layThuMucGoc_(taoNeuChuaCo) {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(SL_PROP_THU_MUC_);
+  if (id) {
+    try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) { /* thư mục đã bị xóa -> tạo lại */ }
+  }
+  if (!taoNeuChuaCo) return null;
+  const moi = DriveApp.createFolder("HAK - Sao lưu dữ liệu hệ thống");
+  props.setProperty(SL_PROP_THU_MUC_, moi.getId());
+  return moi;
+}
+
+function SL_soBanGiuLai_() {
+  const n = parseInt(PropertiesService.getScriptProperties().getProperty(SL_PROP_GIU_LAI_), 10);
+  return (n >= 1 && n <= 365) ? n : SL_GIU_LAI_MAC_DINH_;
+}
+
+function SL_timTrigger_() {
+  return ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === SL_HAM_TRIGGER_; });
+}
+
+// Danh sách các thư mục bản sao lưu, MỚI NHẤT trước (tên có dạng ngày giờ nên
+// sắp theo tên là đúng thứ tự thời gian).
+function SL_dsBanSaoLuu_(goc) {
+  const ds = [];
+  const it = goc.getFolders();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.getName().indexOf(SL_TIEN_TO_THU_MUC_) === 0) ds.push(f);
+  }
+  return ds.sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });
+}
+
+function SL_thucHienSaoLuu_(nguon) {
+  // Không cho 2 lượt sao lưu chạy chồng nhau (VD bấm "Sao lưu ngay" đúng lúc
+  // lịch tự động đang chạy). KHÔNG dùng LockService vì sẽ chặn người dùng ghi
+  // dữ liệu suốt thời gian sao chép.
+  const cache = CacheService.getScriptCache();
+  if (cache.get("sao_luu_dang_chay")) throw new Error("Đang có 1 lượt sao lưu chạy, vui lòng đợi vài phút.");
+  cache.put("sao_luu_dang_chay", "1", 1800);
+  try {
+    const batDau = Date.now();
+    const nhan = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HHmm");
+    const goc = SL_layThuMucGoc_(true);
+    const thuMuc = goc.createFolder(SL_TIEN_TO_THU_MUC_ + nhan);
+    const loi = [];
+    let soFile = 0;
+    _layDanhSachTaiNguyenDaGopId_().filter(function (tn) { return tn.loai === "sheet"; }).forEach(function (tn) {
+      try {
+        const f = DriveApp.getFileById(tn.id);
+        f.makeCopy(f.getName() + " (" + nhan + ")", thuMuc);
+        soFile++;
+      } catch (e) {
+        loi.push(tn.ten + ": " + (e.message || e));
+      }
+    });
+    const dsBan = SL_dsBanSaoLuu_(goc);
+    let soBanDaXoa = 0;
+    dsBan.slice(SL_soBanGiuLai_()).forEach(function (f) { f.setTrashed(true); soBanDaXoa++; });
+
+    const tomTat = {
+      thoiGian: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
+      nguon: nguon, thuMuc: thuMuc.getName(), thuMucUrl: thuMuc.getUrl(),
+      soFile: soFile, loi: loi, soBanDaXoa: soBanDaXoa, giay: Math.round((Date.now() - batDau) / 1000)
+    };
+    PropertiesService.getScriptProperties().setProperty(SL_PROP_KET_QUA_, JSON.stringify(tomTat));
+    logAudit_("SAO_LUU", loi.length ? (soFile ? "MOT_PHAN" : "ERROR") : "OK",
+      nguon + ": " + soFile + " file → " + thuMuc.getName() + (loi.length ? " | Lỗi: " + loi.join("; ") : "") + (soBanDaXoa ? " | Đã dọn " + soBanDaXoa + " bản cũ" : ""));
+    return tomTat;
+  } finally {
+    cache.remove("sao_luu_dang_chay");
+  }
+}
+
+// Hàm do TRIGGER hằng đêm gọi. Là hàm công khai (trigger không gọi được hàm có
+// "_" cuối) nhưng KHÔNG nằm trong HAM_API_ và chỉ chạy khi mã trigger gửi kèm
+// khớp đúng trigger đã cài - gọi thẳng qua google.script.run không có/không
+// đoán được mã này nên bị bỏ qua.
+function TRIGGER_saoLuuHangDem(e) {
+  const uid = (e && e.triggerUid) ? String(e.triggerUid) : "";
+  if (!uid || !SL_timTrigger_().some(function (t) { return t.getUniqueId() === uid; })) return;
+  SL_thucHienSaoLuu_("Tự động");
+}
+
+function HT_layTinhTrangSaoLuu() {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const goc = SL_layThuMucGoc_(false);
+    const raw = PropertiesService.getScriptProperties().getProperty(SL_PROP_KET_QUA_);
+    let ketQuaCuoi = null;
+    try { ketQuaCuoi = raw ? JSON.parse(raw) : null; } catch (e) { ketQuaCuoi = null; }
+    return {
+      status: "success",
+      data: {
+        batTuDong: SL_timTrigger_().length > 0,
+        gioChay: SL_GIO_CHAY_,
+        giuLai: SL_soBanGiuLai_(),
+        thuMucUrl: goc ? goc.getUrl() : "",
+        ketQuaCuoi: ketQuaCuoi,
+        dsBan: goc ? SL_dsBanSaoLuu_(goc).slice(0, 10).map(function (f) { return { ten: f.getName(), url: f.getUrl() }; }) : [],
+        soSpreadsheet: _layDanhSachTaiNguyenDaGopId_().filter(function (tn) { return tn.loai === "sheet"; }).length
+      }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_luuCauHinhSaoLuu(cauHinh) {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    cauHinh = cauHinh || {};
+    const giuLai = parseInt(cauHinh.giuLai, 10);
+    if (!(giuLai >= 1 && giuLai <= 365)) throw new Error("Số bản giữ lại phải từ 1 đến 365.");
+    PropertiesService.getScriptProperties().setProperty(SL_PROP_GIU_LAI_, String(giuLai));
+    // Luôn xóa hết trigger cũ rồi tạo lại (tránh trùng 2 trigger chạy 2 lần/đêm).
+    SL_timTrigger_().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+    if (cauHinh.batTuDong === true) {
+      ScriptApp.newTrigger(SL_HAM_TRIGGER_).timeBased().everyDays(1).atHour(SL_GIO_CHAY_).create();
+    }
+    logAudit_("CAUHINH_SAO_LUU", "OK", (cauHinh.batTuDong === true ? "Bật" : "Tắt") + " sao lưu tự động, giữ " + giuLai + " bản");
+    return { status: "success", message: cauHinh.batTuDong === true
+      ? "✅ Đã bật sao lưu tự động hằng đêm (" + SL_GIO_CHAY_ + "–" + (SL_GIO_CHAY_ + 1) + " giờ sáng), giữ " + giuLai + " bản gần nhất."
+      : "✅ Đã tắt sao lưu tự động (vẫn giữ các bản đã có)." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_saoLuuNgay() {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const kq = SL_thucHienSaoLuu_("Thủ công (" + layThongTinNguoiDungHienTai_().email + ")");
+    return {
+      status: kq.soFile > 0 ? "success" : "error",
+      data: kq,
+      message: (kq.soFile > 0 ? "✅ Đã sao lưu " + kq.soFile + " file vào " + kq.thuMuc : "❌ Không sao lưu được file nào")
+        + (kq.loi.length ? " — lỗi: " + kq.loi.join("; ") : "")
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/* ---------- 9B. NHẬT KÝ HOẠT ĐỘNG ---------- */
+const NK_TIEU_DE_ = ["Thời gian", "Hành động", "Trạng thái", "Nội dung", "Người thực hiện"];
+const NK_KICH_THUOC_TRANG_ = 50;
+const NK_KHOI_DOC_ = 2000;         // đọc sheet Audit theo khối 2.000 dòng từ dưới lên
+const NK_TOI_DA_DONG_ = 20000;     // tối đa số dòng khớp (xem/xuất) trong 1 lần lọc
+
+function NK_ngay_(s, cuoiNgay) {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return cuoiNgay ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999) : new Date(+m[1], +m[2] - 1, +m[3]);
+}
+
+// Nhật ký được ghi nối đuôi theo thời gian nên đọc TỪ DƯỚI LÊN theo khối và
+// dừng ngay khi gặp dòng cũ hơn "Từ ngày" - xem 7 ngày gần nhất chỉ đọc vài
+// khối cuối dù sheet Audit đã có hàng trăm nghìn dòng.
+function NK_loc_(boLoc) {
+  boLoc = boLoc || {};
+  const bayGio = new Date();
+  const den = NK_ngay_(boLoc.denNgay, true) || bayGio;
+  const tu = NK_ngay_(boLoc.tuNgay, false) || new Date(den.getFullYear(), den.getMonth(), den.getDate() - 6);
+  if (tu > den) throw new Error("'Từ ngày' phải trước 'Đến ngày'.");
+  const emailLoc = chuanHoaEmailSoSanh_(boLoc.email || "");
+  const hanhDongLoc = String(boLoc.hanhDong || "");
+  const trangThaiLoc = String(boLoc.trangThai || "");
+  const tuKhoa = String(boLoc.tuKhoa || "").trim().toLowerCase();
+
+  const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.AUDIT_SHEET);
+  const ketQua = [], dsHanhDong = {}, dsEmail = {}, dsTrangThai = {};
+  let biCat = false;
+  if (sheet) {
+    let cuoi = sheet.getLastRow();
+    let dung = false;
+    while (cuoi >= 2 && !dung) {
+      const dau = Math.max(2, cuoi - NK_KHOI_DOC_ + 1);
+      const khoi = sheet.getRange(dau, 1, cuoi - dau + 1, 5).getValues();
+      for (let i = khoi.length - 1; i >= 0; i--) {
+        const r = khoi[i];
+        const t = r[0] instanceof Date ? r[0] : new Date(r[0]);
+        if (isNaN(t.getTime()) || t > den) continue;
+        if (t < tu) { dung = true; break; }
+        const hanhDong = String(r[1] || ""), trangThai = String(r[2] || ""), email = String(r[4] || "");
+        if (hanhDong) dsHanhDong[hanhDong] = true;
+        if (trangThai) dsTrangThai[trangThai] = true;
+        if (email) dsEmail[email] = true;
+        if (emailLoc && chuanHoaEmailSoSanh_(email) !== emailLoc) continue;
+        if (hanhDongLoc && hanhDong !== hanhDongLoc) continue;
+        if (trangThaiLoc && trangThai !== trangThaiLoc) continue;
+        if (tuKhoa && String(r[3] || "").toLowerCase().indexOf(tuKhoa) === -1) continue;
+        if (ketQua.length >= NK_TOI_DA_DONG_) { biCat = true; dung = true; break; }
+        ketQua.push({ t: t, hanhDong: hanhDong, trangThai: trangThai, noiDung: String(r[3] == null ? "" : r[3]), email: email });
+      }
+      cuoi = dau - 1;
+    }
+  }
+  const sapXep = function (o) { return Object.keys(o).sort(); };
+  return { tu: tu, den: den, dong: ketQua, biCat: biCat, dsHanhDong: sapXep(dsHanhDong), dsEmail: sapXep(dsEmail), dsTrangThai: sapXep(dsTrangThai) };
+}
+
+function HT_layNhatKy(boLoc) {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const kq = NK_loc_(boLoc);
+    const tz = Session.getScriptTimeZone();
+    const tongSo = kq.dong.length;
+    const tongSoTrang = Math.max(1, Math.ceil(tongSo / NK_KICH_THUOC_TRANG_));
+    const trang = Math.min(Math.max(1, parseInt((boLoc || {}).trang, 10) || 1), tongSoTrang);
+    const data = kq.dong.slice((trang - 1) * NK_KICH_THUOC_TRANG_, trang * NK_KICH_THUOC_TRANG_).map(function (d) {
+      return {
+        thoiGian: Utilities.formatDate(d.t, tz, "dd/MM/yyyy HH:mm:ss"),
+        hanhDong: d.hanhDong, trangThai: d.trangThai, email: d.email,
+        noiDung: d.noiDung.length > 1000 ? d.noiDung.slice(0, 1000) + "…" : d.noiDung
+      };
+    });
+    return {
+      status: "success", data: data, tongSo: tongSo, trang: trang, tongSoTrang: tongSoTrang, biCat: kq.biCat,
+      tuNgay: Utilities.formatDate(kq.tu, tz, "yyyy-MM-dd"), denNgay: Utilities.formatDate(kq.den, tz, "yyyy-MM-dd"),
+      dsHanhDong: kq.dsHanhDong, dsEmail: kq.dsEmail, dsTrangThai: kq.dsTrangThai
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_xuatNhatKyExcel(boLoc) {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const kq = NK_loc_(boLoc);
+    if (kq.dong.length === 0) return { status: "error", message: "Không có dòng nhật ký nào phù hợp bộ lọc." };
+    const rows = kq.dong.map(function (d) { return [d.t, d.hanhDong, d.trangThai, d.noiDung, d.email]; });
+    const tempSS = createTempSheetForExport_("NhatKy_HoatDong_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), NK_TIEU_DE_, rows, []);
+    tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat("dd/MM/yyyy HH:mm:ss");
+    logAudit_("EXPORT_EXCEL", "OK", "Xuất nhật ký hoạt động, " + rows.length + " dòng.");
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }

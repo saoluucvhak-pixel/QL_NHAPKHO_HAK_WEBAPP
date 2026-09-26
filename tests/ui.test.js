@@ -27,6 +27,13 @@ function mkRun(){ let ok=()=>{}, fail=()=>{};
         if (fn==='HT_layCauHinhCong') return ok({status:'success',data:{linkCong:'https://script.google.com/macros/s/CONG/exec',linkWebappChinh:'https://script.google.com/macros/s/MAIN/exec',linkWebappHopLe:true}});
         if (fn==='HT_layMaNguonCong') return ok({status:'success',data:'const KHOA_BI_MAT = "k";'});
         if (fn==='HT_layDanhSachQuyen') return ok({status:'success',data:[{email:'saoluucvhak@gmail.com',vaiTro:'ADMIN'},{email:'xem@gmail.com',vaiTro:'CHIXEM'}]});
+        if (fn==='HT_layTinhTrangSaoLuu') return ok({status:'success',data:{batTuDong:true,gioChay:1,giuLai:30,thuMucUrl:'https://drive.google.com/drive/folders/X',soSpreadsheet:7,
+          ketQuaCuoi:{thoiGian:'26/09/2026 01:05',nguon:'Tự động',soFile:6,giay:40,loi:['ĐNTT: <b>Không có quyền</b>']},dsBan:[{ten:'SaoLuu_2026-09-26_0100',url:'https://drive.google.com/drive/folders/Y'}]}});
+        if (fn==='HT_luuCauHinhSaoLuu') { window.__luuSaoLuu = args[0]; return ok({status:'success',message:'✅ Đã lưu'}); }
+        if (fn==='HT_layNhatKy') { const b=args[0]; window.__nkBoLoc = b; const tong=120, trang=Math.min(b.trang||1,3);
+          return ok({status:'success',tongSo:tong,trang:trang,tongSoTrang:3,biCat:false,tuNgay:b.tuNgay||'2026-09-20',denNgay:b.denNgay||'2026-09-26',
+            dsEmail:['nv1@gmail.com','saoluucvhak@gmail.com'],dsHanhDong:['DANG_NHAP','SAO_LUU'],dsTrangThai:['ERROR','OK'],
+            data:[{thoiGian:'26/09/2026 08:00:00',email:'nv1@gmail.com',hanhDong:'DANG_NHAP',trangThai:'OK',noiDung:'<img src=x onerror=alert(1)> trang '+trang}]}); }
         if (fn==='layDanhSachDanhMucKho') return ok([{maKho:'K1',tenNhaMay:'NM <b>X</b>',tenKho:'Kho A',ngayKhoiTao:'2026-01-01'}]);
         if (fn==='exportBaoCaoTongHopExcel') return ok({status:'success', url:'https://docs.google.com/x/export?format=xlsx', fileBase64:btoa('PK-fake'), fileName:'BaoCao.xlsx', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
         return ok({status:'success',data:[],summary:{}});
@@ -138,6 +145,23 @@ function page(phienMoi, thongBao, user){
   await p.waitForTimeout(400);
   check('re-login in place works', !(await p.isVisible('#loginScreen')));
   check('role UI switched to viewer', await p.evaluate(()=>document.body.classList.contains('che-do-chi-xem')) && !(await p.isVisible('.menu-item[data-view="view-import"]')) && await p.evaluate(()=>document.querySelector('.sub-item[data-tab="ht-tab-quyen"]').style.display === 'none'));
+
+  // M. Admin: Sao lưu tự động + Nhật ký hoạt động
+  p = await open('a'.repeat(64), '', null, { email:'saoluucvhak@gmail.com', vaiTro:'ADMIN', coQuyen:true, laAdmin:true, laChiXem:false });
+  await p.click('.menu-item[data-view="view-hethong"]'); await p.click('.sub-item[data-tab="ht-tab-luutru"]'); await p.waitForTimeout(300);
+  check('backup card: status loaded', await p.isChecked('#sl_batTuDong') && (await p.textContent('#sl_trangThai')).includes('ĐANG BẬT') && (await p.textContent('#sl_dsBan')).includes('SaoLuu_2026-09-26_0100'));
+  check('backup card: error text escaped', (await p.innerHTML('#sl_trangThai')).includes('&lt;b&gt;Không có quyền'));
+  await p.uncheck('#sl_batTuDong'); await p.fill('#sl_giuLai', '14'); await p.click('#btnLuuCauHinhSaoLuu'); await p.waitForTimeout(200);
+  check('backup card: save sends settings', await p.evaluate(()=>window.__luuSaoLuu && window.__luuSaoLuu.batTuDong === false && String(window.__luuSaoLuu.giuLai) === '14'));
+  await p.click('.sub-item[data-tab="ht-tab-nhatky"]'); await p.waitForTimeout(300);
+  check('log tab: loads last 7 days by default', await p.evaluate(()=>{ const b = window.__nkBoLoc; return !!b && !!b.tuNgay && (new Date(b.denNgay) - new Date(b.tuNgay)) / 86400000 === 6; }));
+  check('log tab: rows rendered + escaped', (await p.textContent('#nk_body')).includes('DANG_NHAP') && (await p.innerHTML('#nk_body')).includes('&lt;img') && !(await p.evaluate(()=>!!document.querySelector('#nk_body img'))));
+  check('log tab: filter dropdowns filled', (await p.evaluate(()=>[...document.querySelectorAll('#nk_email option')].map(o=>o.value).join())) === ',nv1@gmail.com,saoluucvhak@gmail.com');
+  await p.selectOption('#nk_hanhDong', 'SAO_LUU'); await p.click('#btnNhatKySau'); await p.waitForTimeout(300);
+  check('log tab: paging keeps filters', await p.evaluate(()=>window.__nkBoLoc.trang === 2 && window.__nkBoLoc.hanhDong === 'SAO_LUU') && (await p.textContent('#nk_trang')) === 'Trang 2/3');
+  // N. Nhân viên không thấy tab Nhật ký / Lưu trữ
+  p = await open('a'.repeat(64), '', null);
+  check('staff: no log/backup tabs', await p.evaluate(()=>['ht-tab-nhatky','ht-tab-luutru'].every(t=>document.querySelector('.sub-item[data-tab="'+t+'"]').style.display === 'none')));
   console.log('page errors:', errs.length ? errs : 'none');
   console.log(`\n${pass} passed, ${fail} failed`);
   await b.close();

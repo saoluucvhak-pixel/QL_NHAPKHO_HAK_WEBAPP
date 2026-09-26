@@ -439,7 +439,8 @@
           <div class="sub-item" data-tab="ht-tab-huongdan" data-group="hethong">Hướng dẫn sử dụng</div>
           <div class="sub-item" data-tab="ht-tab-cauhinh" data-group="hethong">Cấu hình hệ thống</div>
           <div class="sub-item" data-tab="ht-tab-quyen" data-group="hethong">Quản lý người dùng</div>
-          <div class="sub-item" data-tab="ht-tab-luutru" data-group="hethong">Lưu trữ dữ liệu</div>
+          <div class="sub-item" data-tab="ht-tab-luutru" data-group="hethong">Lưu trữ &amp; Sao lưu</div>
+          <div class="sub-item" data-tab="ht-tab-nhatky" data-group="hethong">Nhật ký hoạt động</div>
         </li>
       </ul>
 
@@ -1181,7 +1182,8 @@
           <div class="tabbtn" data-pane="ht-tab-huongdan">📖 Hướng dẫn sử dụng</div>
           <div class="tabbtn" data-pane="ht-tab-cauhinh">⚙️ Cấu hình hệ thống</div>
           <div class="tabbtn" data-pane="ht-tab-quyen">👤 Quản lý người dùng</div>
-          <div class="tabbtn" data-pane="ht-tab-luutru">🗄️ Lưu trữ dữ liệu</div>
+          <div class="tabbtn" data-pane="ht-tab-luutru">🗄️ Lưu trữ &amp; Sao lưu</div>
+          <div class="tabbtn" data-pane="ht-tab-nhatky">📜 Nhật ký hoạt động</div>
         </div>
 
         <!-- TAB: QUY TRÌNH TỔNG QUAN -->
@@ -1576,6 +1578,30 @@
         <!-- TAB: LƯU TRỮ DỮ LIỆU (archiving - chỉ Admin) -->
         <div class="tabpane" id="ht-tab-luutru">
           <div class="card">
+            <h2>💾 Sao lưu dữ liệu tự động</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Sao chép NGUYÊN BẢN toàn bộ Google Sheet của hệ thống (các file trong Liên kết dữ liệu) vào thư mục <b>"HAK - Sao lưu dữ liệu hệ thống"</b> trên Drive của tài khoản Quản trị. Mỗi lần sao lưu là 1 thư mục con theo ngày giờ; chỉ giữ số bản gần nhất đã chọn, bản cũ hơn chuyển vào Thùng rác Drive (khôi phục được trong 30 ngày).
+            </p>
+            <div class="field-grid">
+              <div class="field" style="justify-content:flex-end;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:38px;"><input type="checkbox" id="sl_batTuDong" style="width:18px;height:18px;margin:0;flex:none;"> Tự động sao lưu hằng đêm (1–2 giờ sáng)</label></div>
+              <div class="field"><label>Giữ lại số bản gần nhất</label><input type="number" id="sl_giuLai" min="1" max="365" value="30"></div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnLuuCauHinhSaoLuu">💾 Lưu cài đặt</button>
+              <button class="btn btn-accent" id="btnSaoLuuNgay">▶️ Sao lưu ngay</button>
+              <button class="btn btn-ghost" id="btnTaiLaiSaoLuu">🔄 Tải lại</button>
+            </div>
+            <div id="sl_trangThai" style="font-size:12.5px;margin-top:8px;"></div>
+            <div class="table-wrap" style="margin-top:10px;">
+              <table>
+                <thead><tr><th>Bản sao lưu gần đây</th><th></th></tr></thead>
+                <tbody id="sl_dsBan"><tr><td colspan="2" class="empty-state">Đang tải…</td></tr></tbody>
+              </table>
+            </div>
+            <div class="guide-warn"><b>Khôi phục:</b> mở bản sao lưu cần dùng trên Drive, sao chép ID của Google Sheet đó rồi dán vào <b>Cấu hình hệ thống › Liên kết dữ liệu</b> thay cho ID đang lỗi — hệ thống dùng ngay bản sao. Hoặc sao chép từng sheet từ bản sao về file gốc. Bản sao chiếm dung lượng Drive của tài khoản Quản trị.</div>
+          </div>
+
+          <div class="card">
             <h2>Lưu trữ phiếu cân theo năm (Chốt sổ)</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Sheet <code>PhieuCan_DN</code> càng nhiều năm dữ liệu càng phình to, khiến nhập phiếu/xem báo cáo/tính giá chậm dần. "Chốt sổ" 1 năm sẽ chuyển các phiếu <b>ĐÃ khóa "OK"</b> của năm đó sang sheet lưu trữ riêng (<code>PhieuCan_DN_&lt;năm&gt;</code>, cùng trong Google Sheet này) — báo cáo vẫn xem lại được bình thường khi cần, chỉ chậm hơn 1 chút cho riêng năm đã chốt. Phiếu <b>chưa "OK"</b> luôn được giữ lại dù thuộc năm nào, để còn sửa được.
@@ -1590,6 +1616,39 @@
               <button class="btn btn-ghost" id="btnTaiLaiThongKeNam">🔄 Tải lại thống kê</button>
             </div>
             <div class="guide-warn">Thao tác "Chốt sổ" di chuyển dữ liệu thật (không phải sao chép) — dữ liệu vẫn còn nguyên vẹn trong sheet lưu trữ, nhưng nên chắc chắn không còn cần sửa gì thêm cho năm đó trước khi bấm.</div>
+          </div>
+        </div>
+        <!-- TAB: NHẬT KÝ HOẠT ĐỘNG (chỉ Admin) -->
+        <div class="tabpane" id="ht-tab-nhatky">
+          <div class="card">
+            <h2>📜 Nhật ký hoạt động</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Mọi thao tác ghi dữ liệu, đăng nhập (thành công / bị từ chối), thay đổi cấu hình, xuất file, sao lưu… kèm email người thực hiện. Mặc định hiện 7 ngày gần nhất.
+            </p>
+            <div class="field-grid">
+              <div class="field"><label>Từ ngày</label><input type="date" id="nk_tuNgay"></div>
+              <div class="field"><label>Đến ngày</label><input type="date" id="nk_denNgay"></div>
+              <div class="field"><label>Người thực hiện</label><select id="nk_email"><option value="">— Tất cả —</option></select></div>
+              <div class="field"><label>Hành động</label><select id="nk_hanhDong"><option value="">— Tất cả —</option></select></div>
+              <div class="field"><label>Trạng thái</label><select id="nk_trangThai"><option value="">— Tất cả —</option></select></div>
+              <div class="field"><label>Từ khóa trong nội dung</label><input type="text" id="nk_tuKhoa" placeholder="VD: số phiếu, tên khách…"></div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnLocNhatKy">🔍 Lọc</button>
+              <button class="btn btn-accent" id="btnXuatNhatKy">⬇️ Xuất Excel</button>
+            </div>
+            <div id="nk_tomTat" style="font-size:12.5px;color:var(--ink-soft);margin:6px 0;"></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th style="white-space:nowrap;">Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Nội dung</th></tr></thead>
+                <tbody id="nk_body"><tr><td colspan="5" class="empty-state">Bấm "Lọc" để xem nhật ký.</td></tr></tbody>
+              </table>
+            </div>
+            <div class="btnrow" style="justify-content:center;">
+              <button class="btn btn-ghost btn-sm" id="btnNhatKyTruoc">◀ Trang trước</button>
+              <span id="nk_trang" style="font-size:12.5px;align-self:center;"></span>
+              <button class="btn btn-ghost btn-sm" id="btnNhatKySau">Trang sau ▶</button>
+            </div>
           </div>
         </div>
       </section>
@@ -1833,7 +1892,8 @@
         if (paneId === 'xk-tab-misa' && !state.loadedXuatMisa) { state.loadedXuatMisa = true; locXuatMisa(); }
         if (paneId === 'ht-tab-cauhinh' && !state.loadedCauHinh) { state.loadedCauHinh = true; htLoadCauHinh(); }
         if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadCong(); htLoadDanhSachQuyen(); }
-        if (paneId === 'ht-tab-luutru' && !state.loadedLuuTru) { state.loadedLuuTru = true; htLoadThongKeNam(); }
+        if (paneId === 'ht-tab-luutru' && !state.loadedLuuTru) { state.loadedLuuTru = true; htLoadSaoLuu(); htLoadThongKeNam(); }
+        if (paneId === 'ht-tab-nhatky' && !state.loadedNhatKy) { state.loadedNhatKy = true; htKhoiTaoNhatKy(); }
       });
     });
     document.querySelectorAll('.sub-item[data-tab]').forEach(sub=>{
@@ -1850,7 +1910,7 @@
       bgHieuLucData: [], bgViewType: 'FINAL', bgUncheckedIds: new Set(), loadedKhoDam: false,
       loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null, dhEditingStt: null,
       loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
-      loadedLuuTru: false, currentUser: null
+      loadedLuuTru: false, loadedNhatKy: false, nkTrang: 1, currentUser: null
     };
 
     // ---------------------------------------------------------------
@@ -1902,7 +1962,7 @@
     // người dùng ngay trong trang (đăng xuất rồi đăng nhập tài khoản khác).
     function apDungVaiTro(u){
       const hien = (el, co) => { if (el) el.style.display = co ? '' : 'none'; };
-      ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru'].forEach(tabId=>{
+      ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru', 'ht-tab-nhatky'].forEach(tabId=>{
         hien(document.querySelector('.sub-item[data-tab="' + tabId + '"]'), u.laAdmin);
         hien(document.querySelector('.tabbtn[data-pane="' + tabId + '"]'), u.laAdmin);
       });
@@ -4864,6 +4924,125 @@
     // =================================================================
     // HỆ THỐNG - LƯU TRỮ DỮ LIỆU (chốt sổ theo năm - chỉ Admin)
     // =================================================================
+    // =================================================================
+    // HỆ THỐNG - SAO LƯU TỰ ĐỘNG (chỉ Admin)
+    // =================================================================
+    async function htLoadSaoLuu(){
+      try {
+        const res = await runServer('HT_layTinhTrangSaoLuu');
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        const d = res.data;
+        document.getElementById('sl_batTuDong').checked = !!d.batTuDong;
+        document.getElementById('sl_giuLai').value = d.giuLai;
+        const kq = d.ketQuaCuoi;
+        document.getElementById('sl_trangThai').innerHTML =
+          (d.batTuDong ? '<span class="badge badge-ok">ĐANG BẬT</span> tự động hằng đêm ' + d.gioChay + '–' + (d.gioChay + 1) + ' giờ sáng'
+                       : '<span class="badge badge-warn">ĐANG TẮT</span> sao lưu tự động')
+          + ' · ' + d.soSpreadsheet + ' Google Sheet sẽ được sao lưu'
+          + (d.thuMucUrl ? ' · <a href="' + escapeHtml(d.thuMucUrl) + '" target="_blank" rel="noopener">Mở thư mục sao lưu</a>' : '')
+          + '<br>Lần gần nhất: ' + (kq ? escapeHtml(kq.thoiGian) + ' (' + escapeHtml(kq.nguon) + ') — ' + kq.soFile + ' file, ' + kq.giay + ' giây'
+              + (kq.loi && kq.loi.length ? ' — <b style="color:var(--danger);">lỗi: ' + escapeHtml(kq.loi.join('; ')) + '</b>' : '') : 'chưa có');
+        const body = document.getElementById('sl_dsBan');
+        body.innerHTML = d.dsBan.length
+          ? d.dsBan.map(b => '<tr><td class="mono">' + escapeHtml(b.ten) + '</td><td><a href="' + escapeHtml(b.url) + '" target="_blank" rel="noopener">Mở ↗</a></td></tr>').join('')
+          : '<tr><td colspan="2" class="empty-state">Chưa có bản sao lưu nào.</td></tr>';
+      } catch(err){ toast('Lỗi tải tình trạng sao lưu: ' + err, false); }
+    }
+    document.getElementById('btnTaiLaiSaoLuu').addEventListener('click', htLoadSaoLuu);
+    document.getElementById('btnLuuCauHinhSaoLuu').addEventListener('click', async ()=>{
+      showOverlay('Đang lưu cài đặt sao lưu…');
+      try {
+        const res = await runServer('HT_luuCauHinhSaoLuu', {
+          batTuDong: document.getElementById('sl_batTuDong').checked,
+          giuLai: document.getElementById('sl_giuLai').value
+        });
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') await htLoadSaoLuu();
+      } catch(err){ toast('Lỗi lưu cài đặt sao lưu: ' + err, false); } finally { hideOverlay(); }
+    });
+    document.getElementById('btnSaoLuuNgay').addEventListener('click', async ()=>{
+      if (!confirm('Sao lưu ngay toàn bộ Google Sheet của hệ thống? (có thể mất 1–3 phút)')) return;
+      showOverlay('Đang sao lưu dữ liệu… (1–3 phút, vui lòng không đóng trang)');
+      try {
+        const res = await runServer('HT_saoLuuNgay');
+        toast(res.message, res.status === 'success');
+        await htLoadSaoLuu();
+      } catch(err){ toast('Lỗi sao lưu: ' + err, false); } finally { hideOverlay(); }
+    });
+
+    // =================================================================
+    // HỆ THỐNG - NHẬT KÝ HOẠT ĐỘNG (chỉ Admin)
+    // =================================================================
+    function nkBoLoc(trang){
+      return {
+        tuNgay: document.getElementById('nk_tuNgay').value,
+        denNgay: document.getElementById('nk_denNgay').value,
+        email: document.getElementById('nk_email').value,
+        hanhDong: document.getElementById('nk_hanhDong').value,
+        trangThai: document.getElementById('nk_trangThai').value,
+        tuKhoa: document.getElementById('nk_tuKhoa').value.trim(),
+        trang: trang || 1
+      };
+    }
+    function nkDoDanhSach(id, ds){
+      const sel = document.getElementById(id);
+      const dangChon = sel.value;
+      const giaTri = new Set(ds || []);
+      if (dangChon) giaTri.add(dangChon); // giữ lựa chọn hiện tại dù khoảng ngày mới không còn giá trị đó
+      sel.innerHTML = '<option value="">— Tất cả —</option>'
+        + [...giaTri].sort().map(v => '<option value="' + escapeHtml(v) + '"' + (v === dangChon ? ' selected' : '') + '>' + escapeHtml(v) + '</option>').join('');
+    }
+    function nkLopTrangThai(tt){
+      const t = String(tt || '').toUpperCase();
+      return t === 'OK' ? 'badge-ok' : (t === 'ERROR' || t === 'TU_CHOI') ? 'badge-warn' : '';
+    }
+    async function htLoadNhatKy(trang){
+      showOverlay('Đang tải nhật ký…');
+      try {
+        const res = await runServer('HT_layNhatKy', nkBoLoc(trang));
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        state.nkTrang = res.trang;
+        document.getElementById('nk_tuNgay').value = res.tuNgay;
+        document.getElementById('nk_denNgay').value = res.denNgay;
+        nkDoDanhSach('nk_email', res.dsEmail);
+        nkDoDanhSach('nk_hanhDong', res.dsHanhDong);
+        nkDoDanhSach('nk_trangThai', res.dsTrangThai);
+        document.getElementById('nk_tomTat').textContent = res.tongSo + ' dòng phù hợp'
+          + (res.biCat ? ' (đã đạt giới hạn 20.000 dòng - hãy thu hẹp khoảng ngày/bộ lọc)' : '');
+        document.getElementById('nk_trang').textContent = 'Trang ' + res.trang + '/' + res.tongSoTrang;
+        document.getElementById('btnNhatKyTruoc').disabled = res.trang <= 1;
+        document.getElementById('btnNhatKySau').disabled = res.trang >= res.tongSoTrang;
+        const body = document.getElementById('nk_body');
+        body.innerHTML = res.data.length ? res.data.map(r => '<tr>'
+            + '<td class="mono" style="white-space:nowrap;">' + escapeHtml(r.thoiGian) + '</td>'
+            + '<td>' + escapeHtml(r.email || '—') + '</td>'
+            + '<td>' + escapeHtml(r.hanhDong) + '</td>'
+            + '<td><span class="badge ' + nkLopTrangThai(r.trangThai) + '">' + escapeHtml(r.trangThai) + '</span></td>'
+            + '<td style="font-size:12px;max-width:520px;word-break:break-word;">' + escapeHtml(r.noiDung) + '</td>'
+            + '</tr>').join('')
+          : '<tr><td colspan="5" class="empty-state">Không có nhật ký phù hợp.</td></tr>';
+      } catch(err){ toast('Lỗi tải nhật ký: ' + err, false); } finally { hideOverlay(); }
+    }
+    function htKhoiTaoNhatKy(){
+      const den = new Date(); const tu = new Date(); tu.setDate(tu.getDate() - 6);
+      const dinhDang = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      document.getElementById('nk_tuNgay').value = dinhDang(tu);
+      document.getElementById('nk_denNgay').value = dinhDang(den);
+      htLoadNhatKy(1);
+    }
+    document.getElementById('btnLocNhatKy').addEventListener('click', ()=> htLoadNhatKy(1));
+    document.getElementById('nk_tuKhoa').addEventListener('keydown', e => { if (e.key === 'Enter') htLoadNhatKy(1); });
+    document.getElementById('btnNhatKyTruoc').addEventListener('click', ()=> htLoadNhatKy(state.nkTrang - 1));
+    document.getElementById('btnNhatKySau').addEventListener('click', ()=> htLoadNhatKy(state.nkTrang + 1));
+    document.getElementById('btnXuatNhatKy').addEventListener('click', async ()=>{
+      showOverlay('Đang xuất nhật ký…');
+      try {
+        const res = await runServer('HT_xuatNhatKyExcel', nkBoLoc(1));
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        moFileXuat(res);
+      } catch(err){ toast('Lỗi xuất nhật ký: ' + err, false); } finally { hideOverlay(); }
+    });
+
     async function htLoadThongKeNam(){
       const body = document.getElementById('ht_luutruBody');
       body.innerHTML = '<tr><td colspan="5" class="empty-state">Đang tải…</td></tr>';

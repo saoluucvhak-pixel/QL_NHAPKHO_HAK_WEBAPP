@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ KỸ THUẬT — HỆ THỐNG QUẢN LÝ CÂN / NHẬP–XUẤT KHO HAKGROUP
 
-Phiên bản đánh giá: 2.0.0 (nhánh `claude/fix-webapp-cleanup-p8wzjn`) · Ngày: 26/09/2026
+Phiên bản đánh giá: 2.1.0 (nhánh `claude/fix-webapp-cleanup-p8wzjn`) · Ngày: 26/09/2026
 
 > Phạm vi: toàn bộ mã nguồn trong repo — `Code.gs` (≈4.950 dòng), `Config.gs` (≈1.150 dòng),
 > `Index.html` (≈4.900 dòng: HTML + CSS + JS), `appsscript.json`, cùng Portal `MAIN_HAK` (chỉ đọc để
@@ -186,11 +186,11 @@ Giới hạn cứng của Google: 10 triệu ô / spreadsheet (≈ 370.000 dòng
 | Authorization | Mỗi lời gọi: phiên hợp lệ → email **còn** trong danh sách (thu hồi tức thì) → hàm trong `HAM_API_` → có `yeuCauPhien_()` → vai trò (Admin: `yeuCauQuyenAdmin_`; Chỉ xem: `HAM_CHO_PHEP_CHI_XEM_`) | ★★★★½ |
 | Spreadsheet permission | Nhân viên không cần quyền Sheet/Drive; khuyến nghị thu hồi quyền cũ (có công cụ trong trang Người dùng) | ★★★★ |
 | Bí mật | Khóa Cổng trong Script Properties; chỉ hiện trong nhật ký chủ dự án hoặc trang Admin; có nút đổi khóa | ★★★½ |
-| Audit log | Mọi thao tác ghi + đăng nhập (thành công/từ chối) + xem/đổi cấu hình Cổng, có email người thực hiện | ★★★★ |
+| Audit log | Mọi thao tác ghi + đăng nhập (thành công/từ chối) + xem/đổi cấu hình Cổng + sao lưu, có email người thực hiện; trang Nhật ký hoạt động lọc/xuất Excel (2.1.0) | ★★★★½ |
 | Input validation | Email, vai trò, link Cổng, ngày, số lượng > 0 | ★★★ |
 | Escape HTML | `escapeHtml`, `jsAttr`; JSON nhúng trang chặn `</script>` | ★★★★ |
 | Formula/CSV Injection | Khi nhập (`sanitize`) + khi xuất (`chongCongThuc_`) + nhật ký | ★★★★ |
-| Backup/Restore | Chưa có công cụ; phụ thuộc Lịch sử phiên bản của Google Sheets | ★★ (Lộ trình) |
+| Backup/Restore | Sao lưu tự động hằng đêm + thủ công, giữ N bản, khôi phục qua Liên kết dữ liệu (bản 2.1.0) | ★★★★ |
 | Encryption | Dữ liệu nằm trên Google (mã hóa khi lưu/truyền bởi Google); không mã hóa cấp ứng dụng | Phù hợp nền tảng |
 | Clickjacking | `ALLOWALL` (bắt buộc để nhúng Portal); rủi ro thấp vì trang lạ không có phiên (bộ nhớ trình duyệt tách theo trang chủ) | ★★★ |
 
@@ -236,9 +236,9 @@ Rủi ro còn lại: (1) Người có quyền **sửa dự án Apps Script** xem
 | Ưu tiên | Tính năng | Giá trị |
 |---|---|---|
 | Cao | **Thiết lập doanh nghiệp** (tên công ty, logo, tạo bộ Spreadsheet mẫu 1 chạm, email Admin) | Điều kiện bắt buộc để bán cho nhiều doanh nghiệp |
-| Cao | **Sao lưu / Khôi phục** theo lịch (trigger hằng đêm sao chép 5 Spreadsheet vào thư mục backup, giữ 30 bản) | An toàn dữ liệu |
+| ✅ Đã làm (2.1.0) | **Sao lưu / Khôi phục** theo lịch (trigger hằng đêm, giữ N bản) | An toàn dữ liệu |
 | Cao | **Thùng rác** (xóa mềm cho báo giá/đơn hàng như Kho dăm đang dùng "Đã hủy") + khôi phục | Chống thao tác nhầm |
-| Cao | Trang **Nhật ký hoạt động** (lọc theo người/thao tác/ngày) cho Admin | Kiểm soát nội bộ |
+| ✅ Đã làm (2.1.0) | Trang **Nhật ký hoạt động** (lọc theo người/thao tác/ngày, xuất Excel) cho Admin | Kiểm soát nội bộ |
 | TB | Phê duyệt (Workflow): phiếu điều chỉnh kho, báo giá mới → Admin duyệt | Kiểm soát |
 | TB | Thông báo Email / Telegram / Zalo OA khi import xong, báo giá hết hiệu lực | Chủ động |
 | TB | Dark mode, phím tắt (Ctrl+K tìm chức năng), PWA cài lên điện thoại | UX |
@@ -254,8 +254,8 @@ Chạy: `npm test` (máy chủ) và `npm run test:ui` (giao diện) — xem `doc
 
 | Bộ | Số ca | Kết quả | Nội dung |
 |---|---|---|---|
-| Máy chủ (`tests/server.test.js`) | 68 | **68/68 PASS** | Cài đặt Cổng; vé hợp lệ/giả/sai khóa/hết hạn/quá xa/dùng lại/rác; phiên, hết hạn 12h, đăng xuất, thu hồi tức thì; API chặn eval/hàm riêng/hàm nội bộ/doGet; mọi hàm giao diện gọi đều có trong `HAM_API_`; Admin/Nhân viên/Chỉ xem; đổi khóa Cổng; tải file xuất; chống công thức; xác định dòng đơn hàng (lệch dòng, đã xóa, trùng STT); xóa kỳ vét bãi (tiêu đề, kỳ cũ, dòng khác, kỳ mới nhất); gom khối xóa dòng; nhật ký nguyên tử |
-| Giao diện (`tests/ui.test.js`, Chromium) | 38 | **38/38 PASS** | Màn đăng nhập, thông báo, phiên mới/đã lưu/hết hạn, đăng xuất, xếp hàng lời gọi, escape XSS, tải file; Chỉ xem (ẩn menu/tab/nút); Admin (Cổng, vai trò); **nhúng Portal**: đăng nhập cửa sổ bật lên, khung không bị chuyển trang, nhận phiên, đóng cửa sổ; đổi người dùng ngay trong trang |
+| Máy chủ (`tests/server.test.js`) | 90 | **90/90 PASS** | Cài đặt Cổng; vé hợp lệ/giả/sai khóa/hết hạn/quá xa/dùng lại/rác; phiên, hết hạn 12h, đăng xuất, thu hồi tức thì; API chặn eval/hàm riêng/hàm nội bộ/doGet; mọi hàm giao diện gọi đều có trong `HAM_API_`; Admin/Nhân viên/Chỉ xem; đổi khóa Cổng; tải file xuất; chống công thức; xác định dòng đơn hàng (lệch dòng, đã xóa, trùng STT); xóa kỳ vét bãi (tiêu đề, kỳ cũ, dòng khác, kỳ mới nhất); gom khối xóa dòng; nhật ký nguyên tử; **sao lưu** (chặn nhân viên/chỉ xem, trigger giả mạo, bật 2 lần vẫn 1 trigger, giữ N bản, báo lỗi từng file, không chạy chồng); **nhật ký** (7 ngày mặc định, chỉ đọc khối cần thiết trên 5.000 dòng, lọc kết hợp, từ khóa, phân trang, xuất Excel, phân quyền) |
+| Giao diện (`tests/ui.test.js`, Chromium) | 46 | **46/46 PASS** | Màn đăng nhập, thông báo, phiên mới/đã lưu/hết hạn, đăng xuất, xếp hàng lời gọi, escape XSS, tải file; Chỉ xem (ẩn menu/tab/nút); Admin (Cổng, vai trò); **nhúng Portal**: đăng nhập cửa sổ bật lên, khung không bị chuyển trang, nhận phiên, đóng cửa sổ; đổi người dùng ngay trong trang; trang Sao lưu & Nhật ký (escape, lọc, phân trang, ẩn với nhân viên) |
 | Kiểm tra tĩnh | — | PASS | Cú pháp 3 file; mọi hàm công khai mở đầu bằng `yeuCauPhien_()`; mọi lời gọi `runServer` có hàm tương ứng; không còn hàm chết |
 
 **Chưa kiểm thử được** (cần môi trường Google thật): tốc độ thực tế trên Sheets, quota, Safari/iOS, trình chặn cửa sổ bật lên, Portal thật. Danh sách kiểm thử thủ công: `docs/KIEM_THU.md`.
@@ -270,7 +270,7 @@ Xem `CHANGELOG.md`.
 
 | Giai đoạn | Thời gian | Hạng mục |
 |---|---|---|
-| **GĐ1 — Chuyên nghiệp hóa** | 2–3 tuần | `clasp` + GitHub Actions tự đẩy code & chạy test; tách file theo module; chuyển Kho dăm sang toast/`{status}`; hàm ngày giờ dùng chung; trang Nhật ký hoạt động; sao lưu hằng đêm |
+| **GĐ1 — Chuyên nghiệp hóa** | 2–3 tuần | ✅ trang Nhật ký hoạt động; ✅ sao lưu hằng đêm; ⏳ `clasp` + GitHub Actions tự đẩy code & chạy test; tách file theo module; chuyển Kho dăm sang toast/`{status}`; hàm ngày giờ dùng chung |
 | **GĐ2 — Thương mại hóa** | 4–6 tuần | Trang Thiết lập doanh nghiệp + tạo bộ Sheet mẫu; bỏ viết cứng tên công ty/ID; bản quyền theo mã kích hoạt; hướng dẫn cài đặt cho khách; dark mode, a11y; thùng rác; phê duyệt |
 | **GĐ3 — Quy mô lớn** | tùy nhu cầu | Chỉ mục theo ngày + phân trang máy chủ cho mọi báo cáo; khi > 300.000 phiếu/năm hoặc > 50 người dùng đồng thời: chuyển CSDL sang Cloud SQL/Firestore/Supabase qua JDBC/UrlFetch, giữ nguyên giao diện |
 
@@ -298,9 +298,10 @@ Xem `CHANGELOG.md`.
 | | Điểm (/10) |
 |---|---|
 | Ban đầu (trước phiên làm việc) | **4,5** — chạy được nghiệp vụ nhưng không có xác thực, lỗi phân quyền, XSS, nhiều lỗi dữ liệu |
-| Hiện tại (sau nâng cấp) | **7,0** — bảo mật cấp thương mại, phân quyền 3 vai trò, kiểm thử tự động, nhật ký, tài liệu |
+| Bản 2.0.0 | **7,0** — bảo mật cấp thương mại, phân quyền 3 vai trò, kiểm thử tự động, nhật ký, tài liệu |
+| Hiện tại (2.1.0) | **7,5** — thêm sao lưu tự động có khôi phục, trang Nhật ký hoạt động |
 | Mục tiêu sau GĐ1 + GĐ2 | 8,5 |
 
 **Mức sẵn sàng thương mại (ước lượng):**
-- Triển khai **cho chính HAKGROUP / 1 doanh nghiệp** do đội HAK tự vận hành: **≈ 80%** (thiếu sao lưu tự động, trang nhật ký).
-- **Bán cho nhiều doanh nghiệp** (tự cài, tự cấu hình): **≈ 50%** — thiếu trang thiết lập doanh nghiệp & bộ Sheet mẫu, tên công ty/ID còn viết cứng, cập nhật phiên bản còn thủ công, chưa có cơ chế bản quyền.
+- Triển khai **cho chính HAKGROUP / 1 doanh nghiệp** do đội HAK tự vận hành: **≈ 88%** (còn: cập nhật tự động bằng clasp/CI, kiểm thử trên dữ liệu thật).
+- **Bán cho nhiều doanh nghiệp** (tự cài, tự cấu hình): **≈ 55%** — thiếu trang thiết lập doanh nghiệp & bộ Sheet mẫu, tên công ty/ID còn viết cứng, cập nhật phiên bản còn thủ công, chưa có cơ chế bản quyền.

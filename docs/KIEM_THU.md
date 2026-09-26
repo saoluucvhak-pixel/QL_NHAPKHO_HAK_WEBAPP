@@ -3,8 +3,8 @@
 ## 1. Kiểm thử tự động (đã có — PASS 100%)
 | Bộ | Lệnh | Số ca |
 |---|---|---|
-| Máy chủ / bảo mật / API / dữ liệu | `npm test` | 68 |
-| Giao diện / vai trò / nhúng Portal | `npm run test:ui` | 38 |
+| Máy chủ / bảo mật / API / dữ liệu / sao lưu / nhật ký | `npm test` | 90 |
+| Giao diện / vai trò / nhúng Portal / sao lưu / nhật ký | `npm run test:ui` | 46 |
 
 Chi tiết từng ca: xem tên ca trong `tests/*.test.js` (mỗi `check('…')` là 1 ca).
 
@@ -34,6 +34,14 @@ Chi tiết từng ca: xem tên ca trong `tests/*.test.js` (mỗi `check('…')` 
 - [ ] Kỳ vét bãi: chỉ nút xóa kỳ mới nhất hoạt động
 - [ ] Tên khách hàng `=1+1` → lưu & xuất Excel hiển thị đúng chữ `=1+1`
 - [ ] Phiếu thuộc kỳ vét bãi cũ → không sửa/xóa được
+
+### Sao lưu & Nhật ký (Quản trị)
+- [ ] Bấm "Sao lưu ngay" → thư mục "HAK - Sao lưu dữ liệu hệ thống" có thư mục con mới với đủ các Google Sheet
+- [ ] Bật tự động → sáng hôm sau thấy bản sao lưu mới lúc 1–2 giờ, trạng thái "Tự động"
+- [ ] Đặt giữ lại 2 bản, sao lưu 3 lần → chỉ còn 2 thư mục, bản cũ trong Thùng rác
+- [ ] Khôi phục thử: dán ID 1 bản sao vào Liên kết dữ liệu → báo cáo đọc từ bản sao → đổi lại ID gốc
+- [ ] Nhật ký: thấy dòng DANG_NHAP của mình; lọc theo người/hành động/từ khóa; sang trang; Xuất Excel
+- [ ] Nhân viên / Chỉ xem không thấy 2 mục này
 
 ### Trình duyệt / thiết bị
 - [ ] Chrome, Edge (Windows); Safari (macOS); Chrome & Safari (Android/iOS)

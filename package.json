@@ -1,6 +1,6 @@
 {
   "name": "hak-quan-ly-nhap-kho",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Hệ thống quản lý cân / nhập - xuất kho HAKGROUP (Google Apps Script). Thư mục tests/ chỉ chạy trên máy lập trình, KHÔNG đưa vào dự án Apps Script.",
   "scripts": {

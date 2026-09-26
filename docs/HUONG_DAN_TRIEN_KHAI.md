@@ -5,11 +5,12 @@
 1. Mở dự án Apps Script của webapp bằng tài khoản Admin (chủ dự án).
 2. Thay **toàn bộ** nội dung 4 file bằng bản mới: `Code.gs`, `Config.gs`, `Index.html`, `appsscript.json`.
    Không dán thư mục `tests/`, `docs/`, `package.json` vào Apps Script.
-3. Bấm **Lưu** → **Deploy › Manage deployments › (bản đang dùng) › Edit › Version: New version › Deploy**.
+3. Bấm **Lưu**. **Nếu bản mới có thêm quyền** (bản 2.1.0 thêm quyền "chạy theo lịch" cho sao lưu tự động): trên thanh công cụ chọn hàm `CAI_DAT_CONG_DANG_NHAP` → **Chạy** → **Xem lại quyền** → chọn tài khoản Admin → **Cho phép**. (Hàm này chỉ in lại mã Cổng ra nhật ký, không thay đổi gì.)
+4. **Deploy › Manage deployments › (bản đang dùng) › Edit › Version: New version › Deploy**.
    Giữ nguyên link `/exec` (không tạo deployment mới, nếu không Portal & Cổng phải đổi link).
-4. Mở webapp, đăng nhập, kiểm tra nhanh: Dashboard, 1 báo cáo, xuất 1 file Excel.
+5. Mở webapp, đăng nhập, kiểm tra nhanh: Dashboard, 1 báo cáo, xuất 1 file Excel.
 
-> Bản 2.0 không cần sửa dự án Cổng đăng nhập hay Portal MAIN_HAK.
+> Bản 2.x không cần sửa dự án Cổng đăng nhập hay Portal MAIN_HAK.
 
 ## B. Cài mới từ đầu
 
@@ -38,7 +39,9 @@ Trong Portal: **Quản trị** → mục "Kho gỗ keo" (`URL_KHO`) → dán lin
 ### B5. Sau khi cài
 - **Thu hồi quyền Sheet trực tiếp** của nhân viên (Hệ thống › Quản lý người dùng › Tình trạng chia sẻ): webapp không cần, còn giữ thì họ sửa được Sheet ngoài hệ thống.
 - Không chia sẻ **dự án Cổng** cho ai (chứa khóa bí mật). Nghi lộ: **Đổi khóa bí mật** → dán mã mới vào Cổng → triển khai phiên bản mới.
-- Định kỳ **Chốt sổ năm** (Hệ thống › Lưu trữ dữ liệu) để sheet chính luôn nhẹ.
+- Bật **Sao lưu tự động** (Hệ thống › Lưu trữ & Sao lưu → tích "Tự động sao lưu hằng đêm" → Lưu cài đặt) rồi bấm **Sao lưu ngay** 1 lần để kiểm tra.
+- Định kỳ **Chốt sổ năm** (Hệ thống › Lưu trữ & Sao lưu) để sheet chính luôn nhẹ.
+- Định kỳ xem **Nhật ký hoạt động** (lọc Trạng thái = TU_CHOI / ERROR) để phát hiện truy cập bất thường.
 
 ## C. Khôi phục sự cố
 
@@ -49,4 +52,6 @@ Trong Portal: **Quản trị** → mục "Kho gỗ keo" (`URL_KHO`) → dán lin
 | "Tài khoản … chưa được cấp quyền" | Email chưa có trong danh sách | Admin thêm đúng email hiển thị trong thông báo |
 | Đăng nhập trong Portal không phản hồi | Trình duyệt chặn cửa sổ bật lên | Cho phép pop-up cho script.google.com |
 | "Hệ thống đang bận" | Người khác đang ghi dữ liệu | Thử lại sau vài giây |
-| Dữ liệu sai do thao tác nhầm | — | Google Sheets › Tệp › Lịch sử phiên bản; xem sheet **Audit** để biết ai làm gì |
+| Dữ liệu sai do thao tác nhầm | — | Xem **Nhật ký hoạt động** để biết ai làm gì, lúc nào; khôi phục từ **bản sao lưu** (dán ID bản sao vào Liên kết dữ liệu) hoặc Google Sheets › Tệp › Lịch sử phiên bản |
+| Sao lưu báo lỗi 1 file "Không có quyền" | Tài khoản Admin không xem được file đó | Chia sẻ file cho tài khoản Admin (ít nhất quyền Xem) |
+| Lỗi "cần cấp quyền" sau khi cập nhật | Bản mới có thêm quyền | Làm bước A3 (chạy 1 hàm trong trình soạn thảo, Cho phép) |

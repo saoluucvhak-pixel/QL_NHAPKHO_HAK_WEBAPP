@@ -9,6 +9,9 @@ const Utilities = {
   base64Encode: b => toBuf(b).toString('base64'),
   base64EncodeWebSafe: b => toBuf(b).toString('base64').replace(/\+/g,'-').replace(/\//g,'_'),
   base64DecodeWebSafe: s => Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/'), 'base64'),
+  formatDate: (d, tz, f) => { const p = n => String(n).padStart(2, '0');
+    return f.replace('yyyy', d.getFullYear()).replace('MM', p(d.getMonth()+1)).replace('dd', p(d.getDate()))
+            .replace('HH', p(d.getHours())).replace('mm', p(d.getMinutes())).replace('ss', p(d.getSeconds())); },
   computeHmacSha256Signature: (v, k) => [...crypto.createHmac('sha256', toBuf(k)).update(toBuf(v)).digest()],
 };
 const HtmlService = {
@@ -26,6 +29,7 @@ const ctx = {
   ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/MAIN/exec' }), getOAuthToken: () => 'ADMIN_TOKEN' },
   DriveApp: { getFileById: () => ({ getName: () => 'BaoCao_TongHop' }) },
   SpreadsheetApp: { openById: () => ({ getSheetByName: () => null }) },
+  Session: { getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' },
   LockService: { getScriptLock: () => ({ tryLock: () => true, waitLock(){}, releaseLock(){} }) },
   HtmlService,
 };
@@ -217,6 +221,101 @@ const logRows = [];
 ctx.SpreadsheetApp.openById = () => ({ getSheetByName: () => ({ getRange: () => ({ getValue: () => 'Người thực hiện', setValue(){} }), appendRow: r => logRows.push(r) }) });
 ctx.logAudit_('TEST', 'OK', '=IMPORTXML("http://x")'); ctx.logAudit_('TEST', 'OK', 'a'.repeat(60000));
 check('audit log appendRow + formula-safe + truncated', logRows.length === 2 && logRows[0][3] === "'=IMPORTXML(\"http://x\")" && logRows[1][3].length < 45100 && logRows[0][4] === 'saoluucvhak@gmail.com');
+ctx.SpreadsheetApp.openById = ssGoc;
+
+// ===================== 15. SAO LƯU TỰ ĐỘNG =====================
+// Drive + trigger giả
+let driveSeq = 0; const folders = {};
+function mkFolder(name) {
+  const id = 'F' + (++driveSeq);
+  const f = { id, name, trashed: false, children: [], files: [],
+    getId: () => id, getName: () => f.name, getUrl: () => 'https://drive.google.com/drive/folders/' + id,
+    isTrashed: () => f.trashed, setTrashed: v => { f.trashed = v; },
+    createFolder: n => { const c = mkFolder(n); f.children.push(c); return c; },
+    getFolders: () => { const l = f.children.filter(c => !c.trashed); let i = 0; return { hasNext: () => i < l.length, next: () => l[i++] }; } };
+  folders[id] = f; return f;
+}
+const idLoi = run('CONFIG.DNTT_FILE_ID');
+ctx.DriveApp = {
+  createFolder: n => mkFolder(n),
+  getFolderById: id => { if (!folders[id]) throw new Error('not found'); return folders[id]; },
+  getFileById: id => ({ getName: () => 'File_' + id.slice(0, 4),
+    makeCopy: (name, folder) => { if (id === idLoi) throw new Error('Không có quyền'); folder.files.push(name); } }),
+};
+const triggers = [];
+ctx.ScriptApp.getProjectTriggers = () => triggers.slice();
+ctx.ScriptApp.deleteTrigger = t => triggers.splice(triggers.indexOf(t), 1);
+ctx.ScriptApp.newTrigger = fn => { const b = { timeBased: () => b, everyDays: n => { b.days = n; return b; }, atHour: h => { b.hour = h; return b; },
+  create: () => { const t = { fn, days: b.days, hour: b.hour, uid: 'UID' + Math.random(), getHandlerFunction: () => fn, getUniqueId: () => t.uid }; triggers.push(t); return t; } }; return b; };
+
+const nvP = (() => { reset(); ctx.API(phienMoi, 'HT_luuDanhSachQuyen', [[{email:'saoluucvhak@gmail.com',vaiTro:'ADMIN'},{email:'nv2@gmail.com',vaiTro:'NHANVIEN'},{email:'xem2@gmail.com',vaiTro:'CHIXEM'}]]);
+  return JSON.parse(dangNhap(veTuLink(taoCong(doi.data)('nv2@gmail.com'))).phienMoiJson); })();
+const xemP = JSON.parse(dangNhap(veTuLink(taoCong(doi.data)('xem2@gmail.com'))).phienMoiJson);
+const soSheet = run('_layDanhSachTaiNguyenDaGopId_()').filter(t => t.loai === 'sheet').length;
+
+reset(); check('backup: staff blocked', ctx.API(nvP, 'HT_saoLuuNgay', []).status === 'error' && Object.keys(folders).length === 0);
+reset(); check('backup: viewer blocked', throwsWith(()=>ctx.API(xemP, 'HT_layTinhTrangSaoLuu', []), 'chỉ có quyền XEM'));
+reset(); check('backup: trigger fn not callable via API', throwsWith(()=>ctx.API(phienMoi, 'TRIGGER_saoLuuHangDem', [{ triggerUid: 'x' }]), 'Không được phép'));
+reset(); check('backup: invalid retention rejected', ctx.API(phienMoi, 'HT_luuCauHinhSaoLuu', [{ batTuDong: true, giuLai: 0 }]).status === 'error' && triggers.length === 0);
+reset(); ctx.API(phienMoi, 'HT_luuCauHinhSaoLuu', [{ batTuDong: true, giuLai: 2 }]);
+reset(); ctx.API(phienMoi, 'HT_luuCauHinhSaoLuu', [{ batTuDong: true, giuLai: 2 }]);
+check('backup: enabling twice keeps exactly 1 nightly trigger at 1h', triggers.length === 1 && triggers[0].fn === 'TRIGGER_saoLuuHangDem' && triggers[0].days === 1 && triggers[0].hour === 1);
+ctx.TRIGGER_saoLuuHangDem({}); ctx.TRIGGER_saoLuuHangDem({ triggerUid: 'doan-bua' }); ctx.TRIGGER_saoLuuHangDem();
+check('backup: direct/forged trigger calls do nothing', Object.keys(folders).length === 0);
+// Có sẵn 3 bản cũ -> chạy trigger thật -> giữ 2 bản mới nhất
+const goc = mkFolder('HAK - Sao lưu dữ liệu hệ thống'); store.SAO_LUU_THU_MUC_ID = goc.id;
+['SaoLuu_2026-01-01_0100', 'SaoLuu_2026-01-02_0100', 'SaoLuu_2026-01-03_0100'].forEach(n => goc.createFolder(n));
+reset(); ctx.TRIGGER_saoLuuHangDem({ triggerUid: triggers[0].uid });
+const conLai = goc.children.filter(c => !c.trashed).map(c => c.name).sort();
+const banMoi = goc.children.find(c => /^SaoLuu_20[0-9]{2}-/.test(c.name) && !c.name.startsWith('SaoLuu_2026-01'));
+check('backup: nightly run copies every sheet except inaccessible one', banMoi && banMoi.files.length === soSheet - 1);
+check('backup: retention keeps newest 2, trashes older', conLai.length === 2 && conLai[0] === 'SaoLuu_2026-01-03_0100' && goc.children.filter(c => c.trashed).length === 2);
+const kqCuoi = JSON.parse(store.SAO_LUU_KET_QUA_CUOI);
+check('backup: last result stored with error detail', kqCuoi.nguon === 'Tự động' && kqCuoi.soFile === soSheet - 1 && kqCuoi.loi.length === 1 && kqCuoi.loi[0].includes('Không có quyền'));
+reset(); const tt = ctx.API(phienMoi, 'HT_layTinhTrangSaoLuu', []);
+check('backup: status report', tt.status === 'success' && tt.data.batTuDong === true && tt.data.giuLai === 2 && tt.data.dsBan.length === 2 && tt.data.soSpreadsheet === soSheet);
+cache['sao_luu_dang_chay'] = '1';
+reset(); check('backup: no overlapping runs', /đang có 1 lượt/i.test(ctx.API(phienMoi, 'HT_saoLuuNgay', []).message));
+delete cache['sao_luu_dang_chay'];
+reset(); const thuCong = ctx.API(phienMoi, 'HT_saoLuuNgay', []);
+check('backup: manual run ok + flag released', thuCong.status === 'success' && thuCong.data.nguon.includes('saoluucvhak@gmail.com') && !cache['sao_luu_dang_chay']);
+reset(); ctx.API(phienMoi, 'HT_luuCauHinhSaoLuu', [{ batTuDong: false, giuLai: 30 }]);
+check('backup: disabling removes trigger', triggers.length === 0);
+
+// ===================== 16. NHẬT KÝ HOẠT ĐỘNG =====================
+// 5.000 dòng nhật ký trải đều 20 ngày gần nhất (cũ -> mới, như ghi nối đuôi)
+const auditRows = [['Thời gian', 'Hành động', 'Trạng thái', 'Nội dung', 'Người thực hiện']];
+const bayGio = Date.now(); const N = 5000;
+for (let i = 0; i < N; i++) {
+  const t = new Date(bayGio - (N - i) * (20 * 86400000 / N));
+  auditRows.push([t, i % 3 ? 'KHODAM_NHAPKHO' : 'DANG_NHAP', i % 7 ? 'OK' : 'ERROR', 'Phiếu PN-' + i, i % 2 ? 'nv2@gmail.com' : 'Sao.LuuCVHak@gmail.com']);
+}
+let soLanDoc = 0;
+const shAudit = sheetGia(auditRows); const grGoc = shAudit.getRange;
+shAudit.getRange = (...a) => { soLanDoc++; return grGoc(...a); };
+ctx.SpreadsheetApp.openById = () => ({ getSheetByName: n => n === 'Audit' ? shAudit : null, insertSheet: () => { throw new Error('x'); } });
+const ngayStr = d => Utilities.formatDate(d, '', 'yyyy-MM-dd');
+reset(); const nk7 = ctx.API(phienMoi, 'HT_layNhatKy', [{}]);
+const kyVong7 = auditRows.slice(1).filter(r => r[0] >= new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 6)).length;
+check('log: default = last 7 days, newest first, 50/page', nk7.status === 'success' && nk7.tongSo === kyVong7 && nk7.data.length === 50 && nk7.data[0].noiDung === 'Phiếu PN-' + (N - 1));
+check('log: reads only the needed blocks (not whole sheet)', soLanDoc <= 2);
+check('log: filter lists collected', nk7.dsHanhDong.join() === 'DANG_NHAP,KHODAM_NHAPKHO' && nk7.dsTrangThai.join() === 'ERROR,OK');
+reset(); const nkLoc = ctx.API(phienMoi, 'HT_layNhatKy', [{ tuNgay: ngayStr(new Date(bayGio - 30 * 86400000)), denNgay: ngayStr(new Date()), email: 'saoluucvhak@gmail.com', hanhDong: 'DANG_NHAP', trangThai: 'ERROR', trang: 2 }]);
+const kyVongLoc = auditRows.slice(1).filter((r, i) => i % 2 === 0 && i % 3 === 0 && i % 7 === 0).length;
+check('log: combined filters (email normalised, action, status) + page 2', nkLoc.tongSo === kyVongLoc && nkLoc.trang === 2 && nkLoc.data.every(r => r.hanhDong === 'DANG_NHAP' && r.trangThai === 'ERROR'));
+reset(); const nkTk = ctx.API(phienMoi, 'HT_layNhatKy', [{ tuNgay: ngayStr(new Date(bayGio - 30 * 86400000)), tuKhoa: 'pn-4999' }]);
+check('log: keyword search', nkTk.tongSo === 1 && nkTk.data[0].noiDung === 'Phiếu PN-4999');
+reset(); check('log: bad range rejected', ctx.API(phienMoi, 'HT_layNhatKy', [{ tuNgay: '2026-05-10', denNgay: '2026-05-01' }]).status === 'error');
+reset(); check('log: staff blocked', ctx.API(nvP, 'HT_layNhatKy', [{}]).status === 'error');
+reset(); check('log: viewer blocked', throwsWith(()=>ctx.API(xemP, 'HT_layNhatKy', [{}]), 'chỉ có quyền XEM'));
+let tempRows = null;
+ctx.SpreadsheetApp.create = () => ({ getId: () => 'TMPNK', getSheets: () => [{ getSheetId: () => 0,
+  getRange: () => { const r = { setValues: v => { if (v.length > 1) tempRows = v; return r; }, setFontWeight: () => r, setBackground: () => r, setFontColor: () => r, setHorizontalAlignment: () => r, setNumberFormat: () => r }; return r; },
+  autoResizeColumns(){}, setFrozenRows(){} }] });
+ctx.DriveApp.getFolderById = () => ({ addFile(){} }); ctx.DriveApp.getRootFolder = () => ({ removeFile(){} });
+reset(); const nkX = ctx.API(phienMoi, 'HT_xuatNhatKyExcel', [{ tuKhoa: 'PN-49' }]);
+const kyVongXuat = auditRows.slice(1).filter(r => r[0] >= new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 6) && String(r[3]).includes('PN-49')).length;
+check('log: export to Excel file (' + (tempRows && tempRows.length) + '/' + kyVongXuat + ')', nkX.status === 'success' && !!nkX.fileBase64 && tempRows && tempRows.length === kyVongXuat && Object.prototype.toString.call(tempRows[0][0]) === '[object Date]');
 ctx.SpreadsheetApp.openById = ssGoc;
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

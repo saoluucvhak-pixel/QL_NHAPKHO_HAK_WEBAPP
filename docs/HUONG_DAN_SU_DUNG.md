@@ -23,6 +23,8 @@
 | Nhập/xuất dăm, độ khô, kỳ vét bãi | Nhập liệu › mục tương ứng |
 | Đơn hàng xuất bán | Nhập liệu › Đơn hàng xuất bán (Sửa/Xóa trên danh sách) |
 | Báo giá | Quản lý báo giá › Nhập báo giá / Hiệu lực báo giá |
+| Sao lưu dữ liệu (Quản trị) | Hệ thống › Lưu trữ & Sao lưu |
+| Xem ai đã làm gì (Quản trị) | Hệ thống › Nhật ký hoạt động |
 | Báo cáo & xuất file | Báo cáo tổng hợp kho › chọn báo cáo → Lọc → Xuất Excel/PDF (file tự tải về máy) |
 
 ## Lưu ý

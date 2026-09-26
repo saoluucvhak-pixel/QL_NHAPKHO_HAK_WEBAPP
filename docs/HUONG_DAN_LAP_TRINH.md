@@ -31,8 +31,8 @@
 
 ```bash
 npm install            # cài Playwright (chỉ cần cho test giao diện)
-npm test               # 68 ca máy chủ (Node, giả lập Apps Script)
-npm run test:ui        # 38 ca giao diện (Chromium). Dùng Chrome có sẵn: CHROME_PATH=/duong/dan/chrome npm run test:ui
+npm test               # 90 ca máy chủ (Node, giả lập Apps Script)
+npm run test:ui        # 46 ca giao diện (Chromium). Dùng Chrome có sẵn: CHROME_PATH=/duong/dan/chrome npm run test:ui
 ```
 - `tests/server.test.js` nạp `Config.gs + Code.gs` vào `vm` với các dịch vụ giả (PropertiesService, CacheService, Utilities (HMAC thật), UrlFetchApp, SpreadsheetApp, HtmlService...), đồng thời **chạy chính mã nguồn Cổng** do `taoMaNguonCong_` sinh ra để kiểm tra đăng nhập đầu–cuối.
 - `tests/ui.test.js` mở `Index.html` thật trong Chromium, thay `google.script.run` bằng bản giả.
@@ -51,4 +51,12 @@ npm run test:ui        # 38 ca giao diện (Chromium). Dùng Chrome có sẵn: C
 | `CONG_DN_KHOA_BI_MAT` | Khóa ký vé Cổng — **bí mật** |
 | `CONG_DN_LINK` | Link `/exec` của Cổng |
 | `LINK_WEBAPP_CHINH` | (tùy chọn) Link `/exec` webapp nếu tự nhận diện sai |
+| `SAO_LUU_THU_MUC_ID` | Thư mục gốc chứa các bản sao lưu (tự tạo lần đầu) |
+| `SAO_LUU_GIU_LAI` | Số bản sao lưu giữ lại (1–365, mặc định 30) |
+| `SAO_LUU_KET_QUA_CUOI` | Kết quả lần sao lưu gần nhất (JSON) |
 | Các khóa liên kết dữ liệu / vùng miền / Misa mặc định | Ghi đè cấu hình trong Config.gs (trang Cấu hình hệ thống) |
+
+## 6. Lịch chạy tự động (trigger)
+- Duy nhất 1 trigger: `TRIGGER_saoLuuHangDem` (hằng ngày 1–2 giờ sáng), bật/tắt ở trang Lưu trữ & Sao lưu — không tạo tay trong trình soạn thảo.
+- Hàm trigger là hàm công khai (trigger không gọi được hàm có `_` cuối) nên tự kiểm tra `e.triggerUid` khớp trigger đã cài; không nằm trong `HAM_API_`.
+- Khi thêm trigger mới: làm theo đúng mẫu này, và nhớ quyền `script.scriptapp` đã có trong `appsscript.json`.
