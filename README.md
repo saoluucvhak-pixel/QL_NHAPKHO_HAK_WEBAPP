@@ -9,4 +9,4 @@ Google Apps Script Web App: import phiếu cân, nhập liệu kho gỗ keo & d�
 | `docs/` | Báo cáo đánh giá, hướng dẫn triển khai / sử dụng / lập trình, kiểm thử |
 | `CHANGELOG.md` | Lịch sử phiên bản |
 
-Bắt đầu: [docs/HUONG_DAN_TRIEN_KHAI.md](docs/HUONG_DAN_TRIEN_KHAI.md) · Đánh giá kỹ thuật: [docs/BAO_CAO_DANH_GIA.md](docs/BAO_CAO_DANH_GIA.md)
+Bắt đầu: [docs/HUONG_DAN_TRIEN_KHAI.md](docs/HUONG_DAN_TRIEN_KHAI.md) · Phân quyền: [docs/HUONG_DAN_PHAN_QUYEN.md](docs/HUONG_DAN_PHAN_QUYEN.md) · Đánh giá kỹ thuật: [docs/BAO_CAO_DANH_GIA.md](docs/BAO_CAO_DANH_GIA.md)

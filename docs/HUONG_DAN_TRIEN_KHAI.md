@@ -25,6 +25,8 @@
 3. Sao chép link `/exec`.
 
 ### B3. Cổng đăng nhập
+> Hướng dẫn từng thao tác (kèm xử lý lỗi): [HUONG_DAN_PHAN_QUYEN.md](HUONG_DAN_PHAN_QUYEN.md)
+
 1. Trong dự án webapp chọn hàm **`CAI_DAT_CONG_DANG_NHAP`** → **Chạy** → mở **Nhật ký thực thi**, sao chép mã giữa 2 dòng `-----`.
    (Nếu nhật ký báo không nhận diện được URL: thêm thuộc tính tập lệnh `LINK_WEBAPP_CHINH` = link `/exec` rồi chạy lại.)
 2. script.new (dự án RIÊNG, VD "HAK - Cong dang nhap") → dán vào Code.gs → Lưu.
