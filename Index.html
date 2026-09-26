@@ -1681,6 +1681,24 @@
       }));
     }
 
+    // Tải xuống file Excel/PDF do máy chủ gửi kèm (fileBase64). Không mở link
+    // docs.google.com vì file nằm trong Drive của Admin, nhân viên không có quyền mở.
+    function moFileXuat(res){
+      if (res && res.fileBase64) {
+        const nhiPhan = atob(res.fileBase64);
+        const bytes = new Uint8Array(nhiPhan.length);
+        for (let i = 0; i < nhiPhan.length; i++) bytes[i] = nhiPhan.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = res.fileName || 'tai-ve';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 60000);
+        toast('Đã tải xuống: ' + a.download, true);
+        return;
+      }
+      if (res && res.url) window.open(res.url, '_blank');
+    }
+
     // Thay cho "google.script.run" ở các màn hình cũ (Kho Dăm...): giữ nguyên cú
     // pháp .withSuccessHandler(...).withFailureHandler(...).tenHam(thamSo) nhưng
     // đi qua runServer (kèm phiên đăng nhập).
@@ -2081,7 +2099,7 @@
       showOverlay('Đang tạo file mẫu…');
       try {
         const res = await runServer('taoFileMauPhieuCan');
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi tạo file mẫu: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -2253,14 +2271,14 @@
       showOverlay('Đang tạo file Excel…');
       try {
         const res = await runServer('exportBaoCaoTongHopExcel', readTongHopFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất Excel: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnPdfTongHop').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file PDF…');
       try {
         const res = await runServer('exportBaoCaoTongHopPDF', readTongHopFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất PDF: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -2326,14 +2344,14 @@
       showOverlay('Đang tạo file Excel…');
       try {
         const res = await runServer('exportBaoCaoDonGiaExcel', readDonGiaFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất Excel: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnPdfDonGia').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file PDF…');
       try {
         const res = await runServer('exportBaoCaoDonGiaPDF', readDonGiaFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất PDF: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -2341,7 +2359,7 @@
       showOverlay('Đang tạo phiếu nhập kho PDF…');
       try {
         const res = await runServer('exportPhieuCanPDF', maChungTu);
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi in phiếu: ' + err, false); } finally { hideOverlay(); }
     }
 
@@ -2397,14 +2415,14 @@
       showOverlay('Đang tạo file Excel…');
       try {
         const res = await runServer('exportBaoCaoMisaExcel', readMisaFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất Excel: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnPdfMisa').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file PDF…');
       try {
         const res = await runServer('exportBaoCaoMisaPDF', readMisaFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất PDF: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnGenMisa').addEventListener('click', async ()=>{
@@ -2421,7 +2439,7 @@
       showOverlay('Đang tạo file MISA gốc…');
       try {
         const res = await runServer('downloadMisaExcel');
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất file MISA gốc: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -3024,7 +3042,7 @@
       showOverlay('Đang tạo file Excel báo giá…');
       try {
         const res = await runServer('BG_exportFileSmart', dateStr, state.bgViewType, ids);
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất file: ' + err, false); }
       finally { hideOverlay(); }
     });
@@ -4080,7 +4098,7 @@
       showOverlay('Đang tạo file mẫu…');
       try {
         const res = await runServer('taoFileMauXuatHang');
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi tạo file mẫu: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -4383,14 +4401,14 @@
       showOverlay('Đang tạo file Excel…');
       try {
         const res = await runServer('XH_exportBaoCaoXuatQuaCanExcel', xkReadFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất Excel: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnPdfXuatQuaCan').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file PDF…');
       try {
         const res = await runServer('XH_exportBaoCaoXuatQuaCanPDF', xkReadFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất PDF: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -4425,7 +4443,7 @@
       showOverlay('Đang tạo file Excel…');
       try {
         const res = await runServer('XH_exportBaoCaoXuatMisaExcel', xmReadFilters());
-        if (res.status === 'success') window.open(res.url, '_blank'); else toast(res.message, false);
+        if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất Excel: ' + err, false); } finally { hideOverlay(); }
     });
 

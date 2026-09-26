@@ -757,7 +757,38 @@ function API(maPhien, tenHam, thamSo) {
   if (typeof fn !== "function" || String(fn).indexOf("yeuCauPhien_()") === -1) {
     throw new Error("Không được phép gọi hàm: " + ten);
   }
-  return fn.apply(null, Array.isArray(thamSo) ? thamSo : []);
+  return chuyenLinkXuatThanhFile_(fn.apply(null, Array.isArray(thamSo) ? thamSo : []));
+}
+
+// Các chức năng Xuất Excel/PDF trả về link docs.google.com/.../export của file
+// tạm vừa tạo. File đó nằm trong Drive của tài khoản Admin (webapp chạy bằng
+// quyền Admin), nhân viên mở link sẽ bị Google báo "cần quyền truy cập". Máy
+// chủ tải sẵn nội dung file (bằng quyền Admin) rồi gửi kèm trong kết quả để
+// trình duyệt tự tải xuống - không phải chia sẻ file cho ai. Chỉ áp dụng cho
+// link do chính các hàm xuất của hệ thống trả về (không nhận link từ giao diện).
+function chuyenLinkXuatThanhFile_(kq) {
+  if (!kq || typeof kq !== "object" || typeof kq.url !== "string") return kq;
+  const m = kq.url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)\/export\?(.*)$/);
+  if (!m) return kq;
+  try {
+    const laPdf = /(^|&)format=pdf(&|$)/.test(m[2]);
+    const res = UrlFetchApp.fetch(kq.url, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) throw new Error("HTTP " + res.getResponseCode());
+    let tenFile = "tai-ve";
+    try { tenFile = DriveApp.getFileById(m[1]).getName(); } catch (e) { /* giữ tên mặc định */ }
+    const out = {};
+    for (const k in kq) out[k] = kq[k];
+    out.fileBase64 = Utilities.base64Encode(res.getBlob().getBytes());
+    out.fileName = tenFile + (laPdf ? ".pdf" : ".xlsx");
+    out.mimeType = laPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    return out;
+  } catch (e) {
+    logAudit_("XUAT_FILE", "ERROR", "Không tải được file xuất: " + e);
+    return kq; // giao diện sẽ mở link như cũ (vẫn dùng được với tài khoản Admin)
+  }
 }
 
 /* ----- Luồng đăng nhập Google (không cần phiên) ----- */
