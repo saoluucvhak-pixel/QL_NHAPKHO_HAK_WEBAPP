@@ -204,6 +204,16 @@
       border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block;
     }
     @keyframes spin{to{transform:rotate(360deg);}}
+    .login-screen{position:fixed;inset:0;background:var(--bg);z-index:9997;display:none;align-items:center;justify-content:center;padding:16px;}
+    .login-screen.show{display:flex;}
+    .login-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 30px rgba(22,36,28,.12);padding:32px 28px;max-width:420px;width:100%;text-align:center;}
+    .login-box .seal{margin:0 auto 14px;}
+    .login-box h2{font-size:17px;margin:0 0 10px;color:var(--brand-dark);}
+    .login-sub{font-size:13px;color:var(--ink-soft);margin:0 0 14px;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .login-sub .spinner{border-color:rgba(27,67,50,.25);border-top-color:var(--brand);}
+    .login-msg{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;text-align:left;word-break:break-word;}
+    .login-btn{justify-content:center;width:100%;text-decoration:none;padding:12px 18px;}
+    .login-note{font-size:11.5px;color:var(--ink-soft);margin:14px 0 0;}
     .overlay-loading{
       position:fixed;inset:0;background:rgba(31,41,55,.35);z-index:9998;
       display:none;align-items:center;justify-content:center;
@@ -1484,9 +1494,9 @@
           <div class="card">
             <h2>Danh sách người dùng được cấp quyền truy cập</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Trước đây webapp cho phép <b>BẤT KỲ ai đăng nhập bằng tài khoản Google</b> (kể cả không phải nhân viên) sử dụng mọi chức năng, kể cả xóa dữ liệu. Nay chỉ những email trong danh sách dưới đây mới mở được hệ thống. Nhân viên dùng Gmail cá nhân nên phải nhập <b>đúng email Gmail</b> đang dùng để đăng nhập.
+              Nhân viên đăng nhập bằng nút <b>"Đăng nhập bằng Google"</b>; chỉ những email trong danh sách dưới đây mới vào được hệ thống. Nhập <b>đúng email Gmail</b> nhân viên dùng để đăng nhập (dấu chấm trong tên Gmail không quan trọng). Thêm/xóa có hiệu lực ngay — người bị xóa sẽ bị chặn từ thao tác kế tiếp.
               Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống.
-              Cột <b>Quyền Drive</b> là quyền trên chính Google Sheet/Drive khi bấm nút "Chia sẻ tự động" bên dưới — <b>Chỉnh sửa</b> cho ai cần nhập/sửa dữ liệu (đa số nhân viên), <b>Xem</b>/<b>Bình luận</b> chỉ phù hợp cho người CHỈ xem báo cáo, không thao tác trên webapp (chọn Xem/Bình luận cho người cần nhập liệu sẽ khiến họ bị lỗi "không có quyền" khi thao tác).
+              Cột <b>Quyền Drive</b> chỉ dùng khi bấm nút "Chia sẻ tự động" bên dưới — <b>KHÔNG cần</b> để dùng webapp.
             </p>
             <div class="table-wrap">
               <table>
@@ -1507,7 +1517,7 @@
           <div class="card">
             <h2>Chia sẻ quyền truy cập Google Sheet/Drive cho danh sách trên</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Hệ thống chạy dưới quyền của CHÍNH người đang đăng nhập, nên mỗi tài khoản trong danh sách ở trên còn cần được chia sẻ quyền trên các Google Sheet/Thư mục Drive mà webapp dùng tới thì mới thao tác được — nếu không sẽ gặp lỗi "không có quyền truy cập". Bấm nút dưới đây để tự động chia sẻ 1 lần cho toàn bộ danh sách, đúng theo mức <b>Quyền Drive</b> (Xem/Bình luận/Chỉnh sửa) đã chọn cho từng người ở bảng trên — thay vì vào Google Drive chia sẻ tay từng file.
+              <b>KHÔNG CẦN cho việc dùng webapp</b>: hệ thống chạy bằng quyền của tài khoản Quản trị, nhân viên chỉ cần có tên trong danh sách ở trên. Chỉ dùng nút này nếu anh CHỦ ĐỘNG muốn ai đó mở thẳng Google Sheet gốc (họ sẽ sửa/xóa được dữ liệu ngoài webapp, không qua kiểm soát của hệ thống). Nút sẽ chia sẻ cho toàn bộ danh sách theo mức <b>Quyền Drive</b> đã chọn ở bảng trên.
             </p>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnChiaSeTaiNguyen">🔗 Chia sẻ tự động cho danh sách người dùng</button>
@@ -1519,7 +1529,7 @@
           <div class="card">
             <h2>Tình trạng chia sẻ Google Sheet/Drive hiện tại &amp; Thu hồi quyền</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Xem CHÍNH XÁC email nào đang có quyền gì trên từng Sheet/Thư mục — dùng để rà soát định kỳ (VD phát hiện người được share tay ngoài ý muốn, hoặc nhân viên đã nghỉ việc nhưng chưa bị thu hồi quyền). <b>Lưu ý:</b> xoá email khỏi "Danh sách người dùng" ở trên chỉ chặn họ đăng nhập webapp — KHÔNG tự thu hồi quyền họ đang có trực tiếp trên Google Sheet (họ vẫn mở/sửa được nếu vào thẳng Google Drive) — phải thu hồi riêng ở đây.
+              Xem CHÍNH XÁC email nào đang có quyền gì trên từng Sheet/Thư mục — dùng để rà soát định kỳ. Nên <b>thu hồi quyền Drive của nhân viên</b> đã được chia sẻ trước đây (khi còn dùng cơ chế cũ): webapp không cần nữa, còn giữ thì họ vẫn sửa được thẳng Sheet gốc. <b>Lưu ý:</b> xoá email khỏi "Danh sách người dùng" ở trên chỉ chặn họ đăng nhập webapp — KHÔNG tự thu hồi quyền họ đang có trực tiếp trên Google Sheet (họ vẫn mở/sửa được nếu vào thẳng Google Drive) — phải thu hồi riêng ở đây.
             </p>
             <div class="btnrow">
               <button class="btn btn-ghost" id="btnTaiTinhTrangChiaSe">🔄 Xem tình trạng chia sẻ</button>
@@ -1599,6 +1609,20 @@
     </main>
   </div>
 
+  <!-- Màn hình đăng nhập: hiện mặc định khi tải trang, chỉ ẩn khi phiên đăng nhập hợp lệ -->
+  <div class="login-screen show" id="loginScreen">
+    <div class="login-box">
+      <div class="seal"><span>HAK</span></div>
+      <h2>HỆ THỐNG QUẢN LÝ HAKGROUP</h2>
+      <div id="loginDangKiemTra" class="login-sub"><span class="spinner"></span> Đang kiểm tra đăng nhập…</div>
+      <div id="loginNoiDung" style="display:none;">
+        <p class="login-sub">Đăng nhập bằng tài khoản Google (Gmail) đã được Quản trị viên cấp quyền.</p>
+        <div id="loginThongBao" class="login-msg" style="display:none;"></div>
+        <a id="btnDangNhapGoogle" class="btn btn-primary login-btn" target="_top">Đang chuẩn bị…</a>
+        <p class="login-note">Hệ thống chỉ đọc địa chỉ email của bạn để xác định quyền, không truy cập Gmail hay Google Drive của bạn.</p>
+      </div>
+    </div>
+  </div>
   <div class="overlay-loading" id="overlay"><div class="overlay-box"><span class="spinner"></span><span id="overlayText">Đang xử lý…</span></div></div>
   <div id="toast-container"></div>
 
@@ -1622,13 +1646,56 @@
       c.appendChild(el);
       setTimeout(()=>{ el.remove(); }, 5200);
     }
+    // ---------------------------------------------------------------
+    // PHIÊN ĐĂNG NHẬP (Cổng đăng nhập Gmail - xem Config.gs)
+    // Mọi lời gọi máy chủ đều đi qua API(maPhien, tenHam, thamSo). Các lời gọi
+    // phát sinh TRƯỚC khi đăng nhập xong sẽ tự XẾP HÀNG chờ (phienSanSang), nên
+    // code các màn hình không cần biết đến việc đăng nhập.
+    // ---------------------------------------------------------------
+    const PHIEN_TU_MAY_CHU = <?!= phienMoiJson ?>;
+    const THONG_BAO_DANG_NHAP = <?!= thongBaoDangNhapJson ?>;
+    const KHOA_LUU_PHIEN = 'hak_phien_dang_nhap_v1';
+    let PHIEN = '';
+    let _baoPhienSanSang;
+    const phienSanSang = new Promise(r => { _baoPhienSanSang = r; });
+    function luuPhien(ma){ PHIEN = ma; try { localStorage.setItem(KHOA_LUU_PHIEN, ma); } catch(e) {} }
+    function xoaPhienDaLuu(){ PHIEN = ''; try { localStorage.removeItem(KHOA_LUU_PHIEN); } catch(e) {} }
+    function docPhienDaLuu(){ try { return localStorage.getItem(KHOA_LUU_PHIEN) || ''; } catch(e) { return ''; } }
+    function laLoiHetPhien(err){ return String((err && err.message) || err || '').indexOf('PHIEN_HET_HAN') !== -1; }
+
     function runServer(fnName, ...args){
-      return new Promise((resolve, reject)=>{
+      return phienSanSang.then(()=> new Promise((resolve, reject)=>{
         google.script.run
           .withSuccessHandler(resolve)
-          .withFailureHandler(err => reject(err))
-          [fnName](...args);
+          .withFailureHandler(err => {
+            if (laLoiHetPhien(err)) {
+              const msg = String(err.message || err).replace(/^.*PHIEN_HET_HAN:\s*/, '');
+              xoaPhienDaLuu();
+              hienManHinhDangNhap(msg);
+              reject(new Error(msg));
+              return;
+            }
+            reject(err);
+          })
+          .API(PHIEN, fnName, args);
+      }));
+    }
+
+    // Thay cho "google.script.run" ở các màn hình cũ (Kho Dăm...): giữ nguyên cú
+    // pháp .withSuccessHandler(...).withFailureHandler(...).tenHam(thamSo) nhưng
+    // đi qua runServer (kèm phiên đăng nhập).
+    function apiRun(){
+      let onOk = function(){};
+      let onFail = function(err){ toast('Lỗi: ' + ((err && err.message) || err), false); };
+      const chain = new Proxy({}, {
+        get(_, prop){
+          if (prop === 'withSuccessHandler') return f => { onOk = f; return chain; };
+          if (prop === 'withFailureHandler') return f => { onFail = f; return chain; };
+          if (typeof prop !== 'string' || prop === 'then') return undefined;
+          return (...args) => { runServer(prop, ...args).then(r => onOk(r), e => onFail(e)); };
+        }
       });
+      return chain;
     }
 
     // ---------------------------------------------------------------
@@ -1757,9 +1824,11 @@
         if (el) el.value = t;
       });
       document.getElementById('bg_hieuLuc').value = nowDatetimeLocalStr();
+      // Các lời gọi dưới đây tự xếp hàng chờ đăng nhập xong (xem runServer).
       loadFilterOptions();
       initUserInfo();
       htLoadDashboard();
+      khoiDongDangNhap();
     });
     // FIX (phân quyền): hiển thị đang đăng nhập bằng tài khoản nào / vai trò gì,
     // và ẩn (không chỉ để trống) các mục CHỈ ADMIN mới dùng được khỏi sidebar
@@ -1773,7 +1842,10 @@
         const foot = document.querySelector('.sidebar-foot');
         if (foot) {
           foot.innerHTML = '© HAKGROUP · Quản lý Thanh toán HAK<br>👤 ' + escapeHtml(res.data.email || '(không xác định)')
-            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : 'Nhân viên');
+            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : 'Nhân viên')
+            + '<br><a href="#" id="btnDangXuat" style="color:var(--accent);">Đăng xuất</a>';
+          const btn = document.getElementById('btnDangXuat');
+          if (btn) btn.addEventListener('click', e => { e.preventDefault(); dangXuat(); });
         }
         if (!res.data.laAdmin) {
           ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru'].forEach(tabId=>{
@@ -1784,25 +1856,66 @@
           });
         }
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
-      kiemTraQuyenTruyCapCuaToi();
     }
 
-    // Với chế độ "chạy dưới tài khoản người dùng" (USER_ACCESSING), người mới được
-    // thêm vào danh sách quyền vẫn KHÔNG dùng được nếu chưa được chia sẻ từng
-    // Google Sheet/Thư mục hệ thống dùng - báo rõ thiếu ở đâu thay vì để mọi thao
-    // tác sau đó lỗi "không có quyền truy cập tài liệu" khó hiểu.
-    function kiemTraQuyenTruyCapCuaToi(){
-      runServer('HT_kiemTraQuyenTruyCapCuaToi').then(res=>{
-        if (!res || res.status !== 'success' || !res.thieu || res.thieu.length === 0) return;
-        const banner = document.createElement('div');
-        banner.className = 'card';
-        banner.style.cssText = 'background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);box-shadow:none;';
-        banner.innerHTML = '<b>⚠️ Tài khoản ' + escapeHtml(res.email) + ' chưa được chia sẻ quyền trên ' + res.thieu.length + ' Sheet/Thư mục của hệ thống</b>'
-          + '<ul style="margin:8px 0;padding-left:20px;">' + res.thieu.map(t => '<li>' + escapeHtml(t.ten) + '</li>').join('') + '</ul>'
-          + '<div style="font-size:12.5px;">Các chức năng liên quan sẽ báo lỗi "không có quyền truy cập". Nhờ Quản trị viên vào <b>Hệ thống → Quản lý người dùng</b>, bấm nút <b>🔗 Chia sẻ tự động cho danh sách người dùng</b> (phải chạy bằng tài khoản CHỦ SỞ HỮU các file), rồi tải lại trang.</div>';
-        const content = document.querySelector('main.content');
-        if (content) content.insertBefore(banner, content.firstChild);
-      }).catch(()=>{ /* chỉ là chẩn đoán, không chặn tải trang */ });
+    // ---------------------------------------------------------------
+    // ĐĂNG NHẬP / ĐĂNG XUẤT
+    // ---------------------------------------------------------------
+    function khoiDongDangNhap(){
+      if (PHIEN_TU_MAY_CHU) {
+        luuPhien(PHIEN_TU_MAY_CHU);
+        // Xóa ?code=...&state=... khỏi thanh địa chỉ để tải lại trang không dùng lại mã cũ.
+        try { google.script.history.replace(null, {}, ''); } catch(e) {}
+      }
+      const ma = PHIEN_TU_MAY_CHU || docPhienDaLuu();
+      if (!ma) { hienManHinhDangNhap(THONG_BAO_DANG_NHAP); return; }
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.status === 'success') {
+            PHIEN = ma;
+            document.getElementById('loginScreen').classList.remove('show');
+            _baoPhienSanSang(ma);
+          } else {
+            xoaPhienDaLuu();
+            hienManHinhDangNhap(THONG_BAO_DANG_NHAP || (res && res.message) || '');
+          }
+        })
+        .withFailureHandler(err => hienManHinhDangNhap('Không kết nối được máy chủ: ' + ((err && err.message) || err)))
+        .DN_kiemTraPhien(ma);
+    }
+
+    function hienManHinhDangNhap(thongBao){
+      hideOverlay();
+      const man = document.getElementById('loginScreen');
+      man.classList.add('show');
+      document.getElementById('loginDangKiemTra').style.display = 'none';
+      document.getElementById('loginNoiDung').style.display = 'block';
+      const tb = document.getElementById('loginThongBao');
+      tb.textContent = thongBao || '';
+      tb.style.display = thongBao ? 'block' : 'none';
+      const nut = document.getElementById('btnDangNhapGoogle');
+      nut.removeAttribute('href');
+      nut.textContent = 'Đang chuẩn bị…';
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.status === 'success') {
+            nut.href = res.url;
+            nut.textContent = 'Đăng nhập bằng Google';
+          } else {
+            nut.textContent = 'Không tạo được liên kết đăng nhập';
+            tb.textContent = (res && res.message) || 'Lỗi không xác định.';
+            tb.style.display = 'block';
+          }
+        })
+        .withFailureHandler(err => { nut.textContent = 'Lỗi: ' + ((err && err.message) || err); })
+        .DN_layLinkDangNhap();
+    }
+
+    function dangXuat(){
+      const ma = PHIEN;
+      xoaPhienDaLuu();
+      google.script.run.withSuccessHandler(()=>{}).withFailureHandler(()=>{}).DN_dangXuat(ma);
+      hienManHinhDangNhap('Đã đăng xuất.');
     }
 
     // ---------------------------------------------------------------
@@ -3016,7 +3129,7 @@
 
       renderScreen(`<div class="form-container"><b>📈 BÁO CÁO TỒN KHO</b><i>⏳ Đang tải...</i></div>`);
 
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(res) {
           renderBaoCaoTonKho(res);
         })
@@ -3131,7 +3244,7 @@
 
       renderScreen(`<div class="form-container"><b>⏱️ BÁO CÁO THEO KỲ VÉT BÃI</b><i>⏳ Đang tải...</i></div>`);
 
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(res) { renderBaoCaoTheoKyVetBai(res); })
         .withFailureHandler(function(err) {
           renderScreen(`<div class="form-container text-danger"><b>❌ Lỗi tải báo cáo: ${escapeHtml(err.message)}</b></div>`);
@@ -3205,7 +3318,7 @@
 
     function taiDanhSachDanhMucKho() {
       renderScreen(`<b>⏳ Đang tải...</b>`);
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(danhSach) {
           danhSach = danhSach || [];
           let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có danh mục kho nào</td></tr>' : danhSach.map(item => {
@@ -3237,19 +3350,19 @@
     
     function thucHienXoaKho(maKho) {
       if (!confirm("Xóa kho này?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa kho: " + err.message)).processFormData('Danhmuckho', { maKho: maKho, hanhDong: 'XOA' });
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa kho: " + err.message)).processFormData('Danhmuckho', { maKho: maKho, hanhDong: 'XOA' });
     }
     
     function luuDanhMucKho(btn) {
       let data = { tenNhaMay: document.getElementById('tenNhaMay').value, tenKho: document.getElementById('tenKho').value, ngayKhoiTao: document.getElementById('ngayKhoiTao').value, hanhDong: 'THEM' };
       if (!data.tenNhaMay || !data.tenKho || !data.ngayKhoiTao) { alert("Nhập đủ thông tin!"); return; }
       btn.disabled = true; btn.innerText = "Đang lưu...";
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "Lưu Kho"; }).processFormData('Danhmuckho', data);
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachDanhMucKho(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "Lưu Kho"; }).processFormData('Danhmuckho', data);
     }
 
     function taiDanhSachKyVetBai() {
       renderScreen(`<b>⏳ Đang tải...</b>`);
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(danhSach) {
           danhSach = danhSach || [];
           let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có kỳ nào</td></tr>' : danhSach.map(item => item.isLocked ? `<tr class="locked-row"><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td>🔒 Khóa</td></tr>` : `<tr><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKy('${jsAttr(item.rowIndex)}')">Xóa</button></td></tr>`).join('');
@@ -3278,7 +3391,7 @@
     
     function thucHienXoaKy(rowIdx) {
       if (!confirm("Xóa kỳ này?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).withFailureHandler(err => alert("❌ Lỗi xóa kỳ vét bãi: " + err.message)).processFormData('Thongsokho', { rowIndex: rowIdx, hanhDong: 'XOA' });
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).withFailureHandler(err => alert("❌ Lỗi xóa kỳ vét bãi: " + err.message)).processFormData('Thongsokho', { rowIndex: rowIdx, hanhDong: 'XOA' });
     }
     
     function luuKyVetBai(btn) {
@@ -3287,7 +3400,7 @@
       let tieuHaoVal = document.getElementById('tieuHao').value;
       if (!kyVal || !tuNgayVal) { alert("Nhập đủ thông tin!"); return; }
       btn.disabled = true; btn.innerText = "⏳ Đang xử lý...";
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "💾 LƯU KỲ MỚI"; }).processFormData('Thongsokho', { kyVetBai: kyVal, tuNgay: tuNgayVal, tieuHao: tieuHaoVal, hanhDong: 'THEM' });
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachKyVetBai(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "💾 LƯU KỲ MỚI"; }).processFormData('Thongsokho', { kyVetBai: kyVal, tuNgay: tuNgayVal, tieuHao: tieuHaoVal, hanhDong: 'THEM' });
     }
 
     function taiDanhSachDoKho(tuNgayOverride, denNgayOverride, trangOverride) {
@@ -3299,7 +3412,7 @@
       let trang = trangOverride || 1;
       
       renderScreen(`<b>⏳ Đang tải...</b>`);
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(ketQua) {
           ketQua = ketQua || { list: [], trang: 1, tongSoTrang: 1, tongSoPhieu: 0 };
           let danhSach = ketQua.list || [];
@@ -3358,14 +3471,14 @@
     
     function thucHienXoaDoKho(ngay) {
       if (!confirm("Xóa ngày " + ngay + "?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa độ khô: " + err.message)).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA' });
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).withFailureHandler(err => alert("❌ Lỗi xóa độ khô: " + err.message)).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA' });
     }
     
     function luuDoKhoForm(btn) {
       let data = { ngay: document.getElementById('ngayNhapDK').value, hinhThuc: document.getElementById('hinhThucDoKho').value, doKho: document.getElementById('doKho').value, doAm: document.getElementById('doAm').value, hanhDong: 'SUA' };
       if (!data.ngay) { alert("Chọn ngày!"); return; }
       btn.disabled = true; btn.innerText = "Đang lưu...";
-      google.script.run.withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "Lưu Lại"; }).processFormData('Nhapdokho', data);
+      apiRun().withSuccessHandler(res => { alert(res); taiDanhSachDoKho(); }).withFailureHandler(err => { alert(err.message); btn.disabled = false; btn.innerText = "Lưu Lại"; }).processFormData('Nhapdokho', data);
     }
 
     function moFormGiaoDich(loai, tab, tuNgayOverride, denNgayOverride, trangOverride, htTuNgayOverride, htDenNgayOverride) {
@@ -3387,7 +3500,7 @@
       }
 
       renderScreen(`<b>⏳ Đang tải dữ liệu...</b>`);
-      google.script.run
+      apiRun()
         .withSuccessHandler(function(ketQua) {
           ketQua = ketQua || { khoList: [], danhSach: [] };
           let khoList = ketQua.khoList || [];
@@ -3636,7 +3749,7 @@
       let originalText = btn.innerText;
       btn.innerText = "⏳ Đang quét dữ liệu...";
 
-      google.script.run.withSuccessHandler(function(res) {
+      apiRun().withSuccessHandler(function(res) {
         btn.disabled = false;
         btn.innerText = originalText;
         window._scannedData = res;
@@ -3677,7 +3790,7 @@
       let tuNgay = tuNgayRaw.replace('T', ' ') + ':00';
       let denNgay = denNgayRaw.replace('T', ' ') + ':59'; 
 
-      google.script.run
+      apiRun()
         .withSuccessHandler(res => {
           if (typeof res === 'string' && res.indexOf("DATA_STEP1::") === 0) {
               let data = JSON.parse(res.substring(12));
@@ -3758,7 +3871,7 @@
         if (khoXuat === khoNhap) { alert("❌ Kho Xuất và Kho Nhập không được trùng nhau. Đã hủy tạo phiếu."); return; }
       }
 
-      google.script.run
+      apiRun()
         .withSuccessHandler(res => {
           alert(res);
           locLaiDanhSachXuatBan(); // vẫn ở nguyên tab Xuất bán, sẵn sàng bấm nút 2️⃣
@@ -3786,7 +3899,7 @@
       );
       if (!dongY) return;
 
-      google.script.run
+      apiRun()
         .withSuccessHandler(res => {
           alert(res);
           locLaiDanhSachXuatBan();
@@ -3810,7 +3923,7 @@
 
     function thucHienXoaGiaoDich(loai, tab, maPhieu) {
       if (!confirm("Xóa phiếu " + maPhieu + "?")) return;
-      google.script.run.withSuccessHandler(res => { alert(res); moLaiTheoTab(loai, tab); }).withFailureHandler(err => alert("❌ Lỗi xóa phiếu: " + err.message)).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA' });
+      apiRun().withSuccessHandler(res => { alert(res); moLaiTheoTab(loai, tab); }).withFailureHandler(err => alert("❌ Lỗi xóa phiếu: " + err.message)).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA' });
     }
 
     function luuGiaoDichForm(loai, tab, btn) {
@@ -3890,7 +4003,7 @@
     function guiPhieuGiaoDich(loai, tab, btn, data) {
       let nhanNutGoc = btn.innerText;
       btn.disabled = true; btn.innerText = "Đang lưu...";
-      google.script.run
+      apiRun()
         .withSuccessHandler(res => {
           if (typeof res === 'string' && res.indexOf('⚠️TRUNG_LAP_TP::') === 0) {
             let msg = res.replace('⚠️TRUNG_LAP_TP::', '');
