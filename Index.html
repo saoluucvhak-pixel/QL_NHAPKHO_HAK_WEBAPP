@@ -214,6 +214,11 @@
     .login-msg{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;text-align:left;word-break:break-word;}
     .login-btn{justify-content:center;width:100%;text-decoration:none;padding:12px 18px;}
     .login-note{font-size:11.5px;color:var(--ink-soft);margin:14px 0 0;}
+    /* Vai trò Chỉ xem: ẩn các nút ghi dữ liệu (máy chủ vẫn chặn cứng ở API) */
+    body.che-do-chi-xem .chi-ghi,
+    body.che-do-chi-xem [data-delma], body.che-do-chi-xem [data-delkl],
+    body.che-do-chi-xem [data-editbg], body.che-do-chi-xem [data-delbg]{display:none !important;}
+    .ma-nguon-cong{width:100%;min-height:220px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;white-space:pre;}
     .overlay-loading{
       position:fixed;inset:0;background:rgba(31,41,55,.35);z-index:9998;
       display:none;align-items:center;justify-content:center;
@@ -822,7 +827,7 @@
 
         <!-- TAB CẤP 1: BÁO CÁO MISA -->
         <div class="tabpane" id="nk-tab-misa">
-          <div class="card">
+          <div class="card chi-ghi">
             <h2>Tạo / cập nhật dữ liệu Misa</h2>
             <div class="field-grid">
               <div class="field"><label>Từ ngày</label><input type="date" id="ms_genFrom"></div>
@@ -1099,7 +1104,7 @@
 
         <!-- TAB: DANH MỤC MÃ BÁO GIÁ -->
         <div class="tabpane" id="bg-tab-mabaogia">
-          <div class="card">
+          <div class="card chi-ghi">
             <h2>Thêm mã báo giá mới</h2>
             <div class="field-grid">
               <div class="field"><label>Mã Đại lý *</label><input id="bg_daiLyMa" list="bg_daiLyMaList" placeholder="VD: DT"></div>
@@ -1137,7 +1142,7 @@
 
         <!-- TAB: DANH MỤC MÃ KHỐI LƯỢNG -->
         <div class="tabpane" id="bg-tab-makl">
-          <div class="card">
+          <div class="card chi-ghi">
             <h2>Thêm mã khối lượng mới</h2>
             <div class="field-grid">
               <div class="field"><label>KL Min (Tấn) *</label><input type="number" id="bg_klMin" placeholder="0"></div>
@@ -1492,10 +1497,31 @@
         <!-- TAB: QUẢN LÝ NGƯỜI DÙNG (phân quyền - chỉ Admin xem/sửa được, server chặn cứng dù có cố tình gọi trực tiếp) -->
         <div class="tabpane" id="ht-tab-quyen">
           <div class="card">
+            <h2>🔐 Cổng đăng nhập Gmail</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Cổng là 1 dự án Apps Script RIÊNG (chỉ xin quyền xem email) để xác nhận nhân viên là ai. Cài 1 lần:
+              (1) bấm <b>📋 Sao chép mã nguồn</b>; (2) mở <b>script.new</b>, dán vào Code.gs, Lưu;
+              (3) <b>Deploy › New deployment › Web app</b>: <i>Execute as</i> = <b>User accessing the web app</b>, <i>Who has access</i> = <b>Anyone with Google account</b>;
+              (4) dán link Web app (/exec) của Cổng vào ô dưới và bấm Lưu. Nhân viên có thể lưu link Cổng làm dấu trang để vào thẳng.
+            </p>
+            <div class="field-grid">
+              <div class="field" style="grid-column:1/-1;"><label>Link Cổng đăng nhập</label><input type="url" id="ht_linkCong" placeholder="https://script.google.com/macros/s/.../exec"></div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnLuuLinkCong">💾 Lưu link Cổng</button>
+              <button class="btn btn-ghost" id="btnSaoChepMaCong">📋 Sao chép mã nguồn</button>
+              <button class="btn btn-danger" id="btnDoiKhoaCong">🔁 Đổi khóa bí mật</button>
+            </div>
+            <div id="ht_congTrangThai" style="font-size:12px;margin-top:8px;color:var(--ink-soft);"></div>
+            <textarea id="ht_maNguonCong" class="ma-nguon-cong" readonly style="display:none;margin-top:10px;"></textarea>
+            <div class="guide-warn">Mã nguồn Cổng chứa KHÓA BÍ MẬT: ai có nó đều giả được đăng nhập của bất kỳ email nào. Không gửi cho ai, không chia sẻ dự án Cổng. Nghi bị lộ thì bấm "Đổi khóa bí mật", rồi dán mã mới vào Cổng và triển khai lại (Manage deployments › Edit › New version).</div>
+          </div>
+
+          <div class="card">
             <h2>Danh sách người dùng được cấp quyền truy cập</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Nhân viên đăng nhập bằng nút <b>"Đăng nhập bằng Google"</b>; chỉ những email trong danh sách dưới đây mới vào được hệ thống. Nhập <b>đúng email Gmail</b> nhân viên dùng để đăng nhập (dấu chấm trong tên Gmail không quan trọng). Thêm/xóa có hiệu lực ngay — người bị xóa sẽ bị chặn từ thao tác kế tiếp.
-              Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống.
+              Nhân viên đăng nhập qua <b>Cổng đăng nhập Gmail</b> ở trên; chỉ những email trong danh sách dưới đây mới vào được hệ thống. Nhập <b>đúng email Gmail</b> nhân viên dùng để đăng nhập (dấu chấm trong tên Gmail không quan trọng). Thêm/xóa có hiệu lực ngay — người bị xóa sẽ bị chặn từ thao tác kế tiếp.
+              Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống. Vai trò <b>Chỉ xem</b>: chỉ xem Dashboard, báo cáo, danh sách và xuất Excel/PDF — không nhập/sửa/xóa/import được gì.
               Cột <b>Quyền Drive</b> chỉ dùng khi bấm nút "Chia sẻ tự động" bên dưới — <b>KHÔNG cần</b> để dùng webapp.
             </p>
             <div class="table-wrap">
@@ -1616,10 +1642,10 @@
       <h2>HỆ THỐNG QUẢN LÝ HAKGROUP</h2>
       <div id="loginDangKiemTra" class="login-sub"><span class="spinner"></span> Đang kiểm tra đăng nhập…</div>
       <div id="loginNoiDung" style="display:none;">
-        <p class="login-sub">Đăng nhập bằng tài khoản Google (Gmail) đã được Quản trị viên cấp quyền.</p>
+        <p class="login-sub">Đăng nhập qua Cổng đăng nhập Gmail bằng tài khoản Google đã được Quản trị viên cấp quyền.</p>
         <div id="loginThongBao" class="login-msg" style="display:none;"></div>
         <a id="btnDangNhapGoogle" class="btn btn-primary login-btn" target="_top">Đang chuẩn bị…</a>
-        <p class="login-note">Hệ thống chỉ đọc địa chỉ email của bạn để xác định quyền, không truy cập Gmail hay Google Drive của bạn.</p>
+        <p class="login-note">Cổng đăng nhập chỉ đọc địa chỉ email của bạn để xác định quyền, không truy cập Gmail hay Google Drive của bạn. Muốn đổi tài khoản: đăng xuất Google hoặc dùng cửa sổ ẩn danh.</p>
       </div>
     </div>
   </div>
@@ -1806,7 +1832,7 @@
         if (paneId === 'tab-xh-donhang' && !state.loadedDonHangXB) { state.loadedDonHangXB = true; xhInitDonHang(); }
         if (paneId === 'xk-tab-misa' && !state.loadedXuatMisa) { state.loadedXuatMisa = true; locXuatMisa(); }
         if (paneId === 'ht-tab-cauhinh' && !state.loadedCauHinh) { state.loadedCauHinh = true; htLoadCauHinh(); }
-        if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadDanhSachQuyen(); }
+        if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadCong(); htLoadDanhSachQuyen(); }
         if (paneId === 'ht-tab-luutru' && !state.loadedLuuTru) { state.loadedLuuTru = true; htLoadThongKeNam(); }
       });
     });
@@ -1860,7 +1886,7 @@
         const foot = document.querySelector('.sidebar-foot');
         if (foot) {
           foot.innerHTML = '© HAKGROUP · Quản lý Thanh toán HAK<br>👤 ' + escapeHtml(res.data.email || '(không xác định)')
-            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : 'Nhân viên')
+            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : (res.data.laChiXem ? 'Chỉ xem' : 'Nhân viên'))
             + '<br><a href="#" id="btnDangXuat" style="color:var(--accent);">Đăng xuất</a>';
           const btn = document.getElementById('btnDangXuat');
           if (btn) btn.addEventListener('click', e => { e.preventDefault(); dangXuat(); });
@@ -1873,7 +1899,36 @@
             if (tabBtn) tabBtn.style.display = 'none';
           });
         }
+        if (res.data.laChiXem) apDungCheDoChiXem();
+        if (res.data.laAdmin) nhacLuuLinkCong();
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
+    }
+
+    // Vai trò Chỉ xem: ẩn các menu/tab/nút nhập-sửa-xóa. Đây chỉ là lớp giao
+    // diện cho gọn - API() ở máy chủ mới là nơi chặn cứng (kiemTraQuyenChiXem_).
+    function apDungCheDoChiXem(){
+      document.body.classList.add('che-do-chi-xem');
+      ['view-import', 'view-router-nhaplieu'].forEach(viewId=>{
+        const mi = document.querySelector('.menu-item[data-view="' + viewId + '"]');
+        if (mi) mi.style.display = 'none';
+        const sm = document.getElementById('submenu-' + viewId.replace('view-', ''));
+        if (sm) sm.style.display = 'none';
+      });
+      const subNhap = document.querySelector('.sub-item[data-tab="bg-tab-nhap"]');
+      if (subNhap) subNhap.style.display = 'none';
+      const tabNhap = document.querySelector('.tabbtn[data-pane="bg-tab-nhap"]');
+      if (tabNhap) tabNhap.style.display = 'none';
+      const tabHieuLuc = document.querySelector('.tabbtn[data-pane="bg-tab-hieuluc"]');
+      if (tabHieuLuc) tabHieuLuc.click();
+    }
+
+    // Admin: nhắc lưu link Cổng nếu chưa có (nhân viên cần link này để đăng nhập).
+    function nhacLuuLinkCong(){
+      runServer('HT_layCauHinhCong').then(res=>{
+        if (res.status === 'success' && res.data && !res.data.linkCong) {
+          toast('Chưa lưu link Cổng đăng nhập - vào Hệ thống › Quản lý người dùng › Cổng đăng nhập để dán link (nhân viên cần link này để đăng nhập).', false);
+        }
+      }).catch(()=>{});
     }
 
     // ---------------------------------------------------------------
@@ -1918,7 +1973,7 @@
         .withSuccessHandler(res => {
           if (res && res.status === 'success') {
             nut.href = res.url;
-            nut.textContent = 'Đăng nhập bằng Google';
+            nut.textContent = 'Đăng nhập bằng Gmail';
           } else {
             nut.textContent = 'Không tạo được liên kết đăng nhập';
             tb.textContent = (res && res.message) || 'Lỗi không xác định.';
@@ -4595,7 +4650,8 @@
       return '<tr>'
         + '<td><input type="email" class="ht-quyen-email" value="'+escapeHtml(email || '')+'" placeholder="ten@gmail.com" style="width:100%;font-size:12px;"></td>'
         + '<td><select class="ht-quyen-vaitro" style="font-size:12px;">'
-          + '<option value="NHANVIEN"'+(vaiTro !== 'ADMIN' ? ' selected' : '')+'>Nhân viên</option>'
+          + '<option value="NHANVIEN"'+(vaiTro !== 'ADMIN' && vaiTro !== 'CHIXEM' ? ' selected' : '')+'>Nhân viên</option>'
+          + '<option value="CHIXEM"'+(vaiTro === 'CHIXEM' ? ' selected' : '')+'>Chỉ xem</option>'
           + '<option value="ADMIN"'+(vaiTro === 'ADMIN' ? ' selected' : '')+'>Quản trị</option>'
           + '</select></td>'
         + '<td><select class="ht-quyen-drive" style="font-size:12px;" title="Quyền trên Google Sheet/Drive khi bấm Chia sẻ tự động">'
@@ -4606,6 +4662,54 @@
         + '<td><button class="btn btn-ghost btn-sm ht-quyen-xoa" type="button" title="Xóa">🗑️</button></td>'
         + '</tr>';
     }
+    async function htLoadCong(){
+      try {
+        const res = await runServer('HT_layCauHinhCong');
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        document.getElementById('ht_linkCong').value = res.data.linkCong || '';
+        document.getElementById('ht_congTrangThai').innerHTML =
+          (res.data.linkCong ? '✅ Đã lưu link Cổng.' : '⚠️ Chưa lưu link Cổng - nhân viên chưa có nút đăng nhập.')
+          + '<br>Link webapp chính (Cổng sẽ chuyển về): <span class="mono">' + escapeHtml(res.data.linkWebappChinh || '(không xác định)') + '</span>'
+          + (res.data.linkWebappHopLe ? '' : ' - <b>không hợp lệ</b>, đặt thuộc tính tập lệnh LINK_WEBAPP_CHINH bằng URL /exec.');
+      } catch(err){ toast('Lỗi tải cấu hình Cổng: ' + err, false); }
+    }
+    function htHienMaNguonCong(ma){
+      const ta = document.getElementById('ht_maNguonCong');
+      ta.value = ma;
+      ta.style.display = 'block';
+      ta.focus(); ta.select();
+      const xong = ()=> toast('📋 Đã sao chép mã nguồn Cổng - dán vào Code.gs của dự án Cổng.', true);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ma).then(xong).catch(()=>{ try { document.execCommand('copy'); xong(); } catch(e) { toast('Hãy tự bôi đen và sao chép mã trong ô bên dưới.', false); } });
+      } else {
+        try { document.execCommand('copy'); xong(); } catch(e) { toast('Hãy tự bôi đen và sao chép mã trong ô bên dưới.', false); }
+      }
+    }
+    document.getElementById('btnLuuLinkCong').addEventListener('click', async ()=>{
+      showOverlay('Đang lưu link Cổng…');
+      try {
+        const res = await runServer('HT_luuLinkCong', document.getElementById('ht_linkCong').value.trim());
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') await htLoadCong();
+      } catch(err){ toast('Lỗi lưu link Cổng: ' + err, false); } finally { hideOverlay(); }
+    });
+    document.getElementById('btnSaoChepMaCong').addEventListener('click', async ()=>{
+      showOverlay('Đang lấy mã nguồn Cổng…');
+      try {
+        const res = await runServer('HT_layMaNguonCong');
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        htHienMaNguonCong(res.data);
+      } catch(err){ toast('Lỗi lấy mã nguồn Cổng: ' + err, false); } finally { hideOverlay(); }
+    });
+    document.getElementById('btnDoiKhoaCong').addEventListener('click', async ()=>{
+      if (!confirm('Đổi khóa bí mật? Cổng đăng nhập hiện tại sẽ NGỪNG hoạt động ngay (người đang đăng nhập vẫn dùng tiếp) cho tới khi anh dán mã nguồn MỚI vào dự án Cổng và triển khai lại phiên bản mới.')) return;
+      showOverlay('Đang đổi khóa…');
+      try {
+        const res = await runServer('HT_doiKhoaCong');
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') htHienMaNguonCong(res.data);
+      } catch(err){ toast('Lỗi đổi khóa Cổng: ' + err, false); } finally { hideOverlay(); }
+    });
     async function htLoadDanhSachQuyen(){
       try {
         const res = await runServer('HT_layDanhSachQuyen');

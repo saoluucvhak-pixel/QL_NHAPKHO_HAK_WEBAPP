@@ -15,16 +15,16 @@ function doGet(e) {
 
   // PHÂN QUYỀN (xem mục "CỔNG ĐĂNG NHẬP GMAIL" trong Config.gs): trang giao diện
   // KHÔNG chứa dữ liệu - mọi dữ liệu chỉ lấy được qua API() khi đã có phiên đăng
-  // nhập hợp lệ. doGet() chỉ lo: (1) hướng dẫn cấu hình nếu chưa có OAuth Client,
-  // (2) nhận kết quả Google chuyển về sau khi đăng nhập (?code=...&state=...).
+  // nhập hợp lệ. doGet() chỉ lo: (1) hướng dẫn cài đặt nếu chưa có Cổng đăng
+  // nhập, (2) nhận "vé" Cổng đăng nhập chuyển về sau khi đăng nhập (?cong=...).
   if (!daCauHinhDangNhap_()) return trangHuongDanCauHinhDangNhap_();
 
   const p = (e && e.parameter) || {};
   let phienMoi = "";
   let thongBao = "";
-  if (p.code || p.error) {
+  if (p.cong) {
     try {
-      const kq = xuLyCallbackDangNhap_(p);
+      const kq = xuLyVeCong_(p.cong);
       phienMoi = kq.phien || "";
       thongBao = kq.thongBao || "";
     } catch (err) {
