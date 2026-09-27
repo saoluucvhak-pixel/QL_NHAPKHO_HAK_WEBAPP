@@ -1504,7 +1504,7 @@
               Cổng là 1 dự án Apps Script RIÊNG (chỉ xin quyền xem email) để xác nhận nhân viên là ai. Cài 1 lần:
               (1) bấm <b>📋 Sao chép mã nguồn</b>; (2) mở <b>script.new</b>, dán vào Code.gs, Lưu;
               (3) <b>Deploy › New deployment › Web app</b>: <i>Execute as</i> = <b>User accessing the web app</b>, <i>Who has access</i> = <b>Anyone with Google account</b>;
-              (4) dán link Web app (/exec) của Cổng vào ô dưới và bấm Lưu. Nhân viên có thể lưu link Cổng làm dấu trang để vào thẳng.
+              (4) dán link Web app (/exec) của Cổng vào ô dưới và bấm Lưu. Khóa bí mật được tạo TỰ ĐỘNG và nằm sẵn trong mã nguồn - không cần xem, không cần nhớ, không phải mở Google Sheet hay trình soạn thảo. Chủ webapp luôn vào thẳng được, không cần qua Cổng. Nhân viên có thể lưu link Cổng làm dấu trang để vào thẳng.
             </p>
             <div class="field-grid">
               <div class="field" style="grid-column:1/-1;"><label>Link Cổng đăng nhập</label><input type="url" id="ht_linkCong" placeholder="https://script.google.com/macros/s/.../exec"></div>
@@ -1516,7 +1516,7 @@
             </div>
             <div id="ht_congTrangThai" style="font-size:12px;margin-top:8px;color:var(--ink-soft);"></div>
             <textarea id="ht_maNguonCong" class="ma-nguon-cong" readonly style="display:none;margin-top:10px;"></textarea>
-            <div class="guide-warn">Mã nguồn Cổng chứa KHÓA BÍ MẬT: ai có nó đều giả được đăng nhập của bất kỳ email nào. Không gửi cho ai, không chia sẻ dự án Cổng. Nghi bị lộ thì bấm "Đổi khóa bí mật", rồi dán mã mới vào Cổng và triển khai lại (Manage deployments › Edit › New version).</div>
+            <div class="guide-warn">Không gửi mã nguồn Cổng cho ai, không chia sẻ dự án Cổng. Chỉ khi nghi bị lộ mới bấm "Đổi khóa bí mật", rồi dán mã mới vào Cổng và triển khai lại (Manage deployments › Edit › New version).</div>
           </div>
 
           <div class="card">
