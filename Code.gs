@@ -293,6 +293,10 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
     const _rf = REGION_FORMAT();
     const rowsThemMoi = [];
     const dongGhiDe = [];
+    // Giữ dạng chữ cho Số phiếu (A) và Số CT (W) giống cách ĐNTT ghi bản sao
+    // (không mất số 0 đầu khi Sheets tự đổi "0123" thành số 123).
+    const giuChu = function (v) { return typeof v === "string" && v !== "" ? "'" + v.replace(/^'+/, "") : v; };
+    rowsMoiNK = rowsMoiNK.map(function (r) { const x = r.slice(); x[0] = giuChu(x[0]); if (x.length > 22) x[22] = giuChu(x[22]); return x; });
 
     rowsMoiNK.forEach(row => {
       const key = String(row[21] || "").trim();
@@ -541,8 +545,10 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
 
     ghiCapNhatPhieuCanGop_(dataSheet, capNhatTheoDong, _rfLoop, chuKyDongCapNhat);
 
+    let startRowMoi = 0;
     if (batchNew.length > 0) {
       const startRow = dataSheet.getLastRow() + 1;
+      startRowMoi = startRow;
       dataSheet.getRange(startRow, 1, batchNew.length, NUM_COLUMNS).setValues(batchNew);
 
       // FIX #15: REGION_FORMAT giờ là HÀM đọc động từ PropertiesService (có thể
@@ -555,10 +561,6 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       dataSheet.getRange(startRow, 4, batchNew.length, 1).setNumberFormat(_rf.DATE_FMT); // Ngày Cân 2
       dataSheet.getRange(startRow, 5, batchNew.length, 1).setNumberFormat(_rf.TIME_FMT); // Giờ Cân 2
 
-      // Tùy chọn: đồng thời lưu (ghi đè nếu trùng) các phiếu MỚI này vào Sheet
-      // Draft "Chưa thanh toán" - CHỈ nhận batchNew (đã chắc chắn là phiếu mới,
-      // không lẫn phiếu cập nhật/trùng), đúng yêu cầu "chỉ phiếu mới mới được ghi vào".
-      if (luuDraftChuaTT) ghiVaoDraftChuaTT_(batchNew);
     }
 
     // FIX #23: TRƯỚC ĐÂY tại đây quét thư mục Input, di chuyển từng file gốc
@@ -574,6 +576,19 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       // chờ khóa mà chính nó đang giữ.
       const priceResult = runCalculatePrice_core();
       priceMsg = " | " + priceResult.message;
+    }
+
+    // Tùy chọn: đồng thời lưu (ghi đè nếu trùng) các phiếu MỚI vào sheet
+    // PhieuCan_DN_CHUA_TT_DRAFT (bản sao "phiếu cân chưa thanh toán" trong File
+    // Nháp của ĐNTT - địa chỉ đặt ở Liên kết dữ liệu) - CHỈ nhận phiếu mới.
+    // DRAFT-01: ghi SAU khi tính giá, đọc lại đúng các dòng vừa thêm để kèm Đơn
+    // giá / Trạng thái / Thành tiền (X..Z): ĐNTT bỏ qua phiếu có Thành tiền <= 0
+    // khi chọn phiếu thanh toán, nên ghi trước lúc tính giá thì phiếu không hiện
+    // bên ĐNTT cho tới lần làm mới bản sao 7:30/13:00.
+    if (luuDraftChuaTT && batchNew.length > 0) {
+      const docLai = dataSheet.getRange(startRowMoi, 1, batchNew.length, 26).getValues();
+      const dungDong = docLai.every(function (r, i) { return String(r[21] || "").trim() === String(batchNew[i][21] || "").trim(); });
+      ghiVaoDraftChuaTT_(dungDong ? docLai : batchNew);
     }
     const draftMsg = luuDraftChuaTT ? ` | Đã lưu ${batchNew.length} phiếu vào Draft Chưa Thanh Toán` : "";
     const finalMsg = `Mới: ${countNew}, Cập nhật: ${countUpdate}, Bỏ qua: ${countSkip}${priceMsg}${draftMsg}`;

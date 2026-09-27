@@ -37,3 +37,8 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 - **CONCUR-01**: trước khi ghi theo số dòng (cập nhật khi import lại, tính giá), đọc lại cột A + V của đúng các dòng đích; lệch (ĐNTT vừa xóa dòng) thì không ghi gì và báo thực hiện lại.
 - **CONCUR-02**: khi ĐNTT khóa sổ chạy thật, file Phiếu Cân mang cờ Developer Metadata `HAK_KHOA_SO_NAM_DANG_CHAY` (ĐNTT v2026.9.7); webapp này thấy cờ (< 10 phút) thì tạm dừng import / nhập tay / tính giá (kể cả trigger).
 - Quy trình: khóa sổ ở ĐNTT vào đầu tháng 1, ngoài giờ nhập liệu.
+
+## Cập nhật 27/09/2026 — DRAFT-01 (bản sao phiếu chưa thanh toán của ĐNTT)
+- Ô "Đồng thời lưu… vào Draft Chưa Thanh Toán" khi import ghi phiếu mới vào sheet `PhieuCan_DN_CHUA_TT_DRAFT` trong **File Nháp của ĐNTT** (địa chỉ đặt ở Liên kết dữ liệu) — đây là bản sao ĐNTT dùng để chọn phiếu thanh toán.
+- **Lỗi (High):** trước đây phiếu được ghi vào bản sao **trước** khi tính giá và chỉ cột A..W → không có Đơn giá/Thành tiền; ĐNTT bỏ qua phiếu có Thành tiền ≤ 0 nên phiếu mới không chọn được cho tới lần làm mới bản sao 7:30/13:00. Số phiếu dạng "0123" còn bị mất số 0 đầu.
+- **Đã sửa:** ghi sau khi tính giá, đọc lại đúng các dòng vừa thêm (A..Z, kèm X Đơn giá, Y Trạng thái, Z Thành tiền); Số phiếu (A) và Số CT (W) giữ dạng chữ giống cách ĐNTT ghi. ĐNTT thấy phiếu sau tối đa ~90 giây (thời hạn bộ nhớ đệm bên ĐNTT). Test `draftChuaTT.test.js` (DRAFT-01).
