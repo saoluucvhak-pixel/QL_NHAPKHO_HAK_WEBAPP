@@ -2343,18 +2343,46 @@ function BG_getQuoteDetail_(soBaoGia) {
 // có thể bị tưởng nhầm "chưa dùng" và cho phép sửa/xóa, làm sai lệch số liệu
 // lịch sử đã tính tiền - do đó gọi LT_docPhieuCanGopLuuTru_(null, null, ...)
 // (không truyền khoảng ngày) để luôn gộp TẤT CẢ các năm đã lưu trữ.
-function BG_getPhieuCanByMaDG_() {
+// PERF-BG-01: chỉ đọc 2 cột cần dùng (B Ngày cân 1, Q Mã ĐG) thay vì 17 cột A..Q,
+// và khi biết mốc hiệu lực sớm nhất cần xét (tuTS) thì chỉ mở các sheet lưu trữ
+// từ năm đó trở đi (lùi thêm 1 ngày cho an toàn ranh giới năm) - phiếu cân năm Y
+// chỉ có thể nằm ở PhieuCan_DN hoặc PhieuCan_DN_Y (khóa sổ theo năm cân), nên
+// năm cũ hơn không thể "áp dụng" 1 báo giá hiệu lực từ tuTS. Không truyền tuTS
+// = quét TOÀN BỘ lịch sử như trước. Danh sách mốc thời gian mỗi mã được SẮP XẾP
+// để BG_daApDung_ tìm nhị phân.
+function BG_getPhieuCanByMaDG_(tuTS) {
   const byMa = {};
-  // Cột A(1)..Q(17): idx1=Ngày cân 1 (cột B), idx16=Mã ĐG (cột Q)
-  const dataPC = LT_docPhieuCanGopLuuTru_(null, null, 17);
-  dataPC.forEach(pc => {
-    const ngayCan1 = pc[1];
-    const ma = String(pc[16] || "").trim();
-    if (!ma || !(ngayCan1 instanceof Date) || isNaN(ngayCan1.getTime())) return;
-    if (!byMa[ma]) byMa[ma] = [];
-    byMa[ma].push(ngayCan1.getTime());
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const dsSheet = [ss.getSheetByName(CONFIG.DATA_SHEET)];
+  const namTu = (typeof tuTS === "number" && isFinite(tuTS))
+    ? parseInt(Utilities.formatDate(new Date(tuTS - 86400000), "GMT+7", "yyyy"), 10) : -Infinity;
+  LT_layDanhSachNamDaLuuTru_(ss).forEach(function (nam) {
+    if (nam >= namTu) dsSheet.push(ss.getSheetByName(LT_tenSheetLuuTru_(nam)));
   });
+  dsSheet.forEach(function (sh) {
+    const lastRow = sh ? sh.getLastRow() : 0;
+    if (lastRow <= 1) return;
+    const cotB = sh.getRange(2, 2, lastRow - 1, 1).getValues();
+    const cotQ = sh.getRange(2, 17, lastRow - 1, 1).getValues();
+    for (let i = 0; i < cotB.length; i++) {
+      const ngayCan1 = cotB[i][0];
+      const ma = String(cotQ[i][0] || "").trim();
+      if (!ma || !(ngayCan1 instanceof Date) || isNaN(ngayCan1.getTime())) continue;
+      (byMa[ma] || (byMa[ma] = [])).push(ngayCan1.getTime());
+    }
+  });
+  for (const ma in byMa) byMa[ma].sort(function (x, y) { return x - y; });
   return byMa;
+}
+
+// Có phiếu cân nào dùng mã "ma" với Ngày cân 1 trong [tuTS, denTS) không - cùng quy
+// ước ranh giới _tsTrongKhoangHieuLuc_. Tìm nhị phân trên danh sách đã sắp xếp.
+function BG_daApDung_(byMa, ma, tuTS, denTS) {
+  const ds = byMa[ma];
+  if (!ds || !ds.length) return false;
+  let lo = 0, hi = ds.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (ds[mid] < tuTS) lo = mid + 1; else hi = mid; }
+  return lo < ds.length && _tsTrongKhoangHieuLuc_(ds[lo], tuTS, denTS);
 }
 
 // Kiểm tra 1 nhóm giá (idBgct, gồm các mã trong maList) có được phép Sửa/Xóa không.
@@ -2364,45 +2392,59 @@ function BG_getPhieuCanByMaDG_() {
 // Đây là hàm KIỂM TRA CUỐI CÙNG ngay trước khi ghi (defense in depth) - luôn đọc
 // dữ liệu MỚI NHẤT tại thời điểm gọi, không phụ thuộc dữ liệu đã tải sẵn ở client.
 function BG_checkRowEditable_(idBgct, maList) {
-  idBgct = String(idBgct || "").trim(); // FIX: chuẩn hóa để so khớp đúng dù caller có lỡ không trim
+  const kq = BG_kiemTraSuaXoaNhieuNhom_([{ idBgct: idBgct, maList: maList }]);
+  return { editable: kq.editable, reason: kq.reason };
+}
+
+// PERF-BG-02: kiểm tra NHIỀU nhóm giá cùng lúc - chạy BG_coreLogicProcessor_ và đọc
+// phiếu cân đúng 1 lần cho cả danh sách (trước đây mỗi nhóm đọc lại toàn bộ phiếu
+// cân: xóa 1 phiếu báo giá 10 nhóm = 10 lần quét). Quy tắc và thứ tự báo lỗi giữ
+// nguyên như kiểm tra từng nhóm: theo thứ tự nhóm, trong mỗi nhóm xét "Hết hiệu lực"
+// trước rồi mới tới "đã có phiếu cân áp dụng". Trả thêm viTri = chỉ số nhóm lỗi.
+function BG_kiemTraSuaXoaNhieuNhom_(dsNhom) {
   const result = BG_coreLogicProcessor_(new Set());
-  // Dùng finalRows (có Date object thật) thay vì displayData (chuỗi đã format) để so khớp chính xác
-  const relevantRows = result.finalRows.filter(row => String(row[0] || "").trim() === idBgct && maList.indexOf(row[3]) !== -1);
-
-  for (const row of relevantRows) {
-    if (row[13] === "Hết hiệu lực") {
-      return { editable: false, reason: "Mã \"" + row[3] + "\" đã HẾT HIỆU LỰC — không thể sửa/xóa để bảo toàn lịch sử báo giá." };
-    }
-  }
-
-  if (relevantRows.length > 0) {
-    const byMa = BG_getPhieuCanByMaDG_();
+  const cacNhom = dsNhom.map(function (n) {
+    const id = String(n.idBgct || "").trim(); // FIX: chuẩn hóa để so khớp đúng dù caller có lỡ không trim
+    const maList = n.maList || [];
+    // Dùng finalRows (có Date object thật) thay vì displayData (chuỗi đã format) để so khớp chính xác
+    return result.finalRows.filter(function (row) { return String(row[0] || "").trim() === id && maList.indexOf(row[3]) !== -1; });
+  });
+  let byMa = null;
+  for (let k = 0; k < cacNhom.length; k++) {
+    const relevantRows = cacNhom[k];
     for (const row of relevantRows) {
-      const ma = row[3];
-      const tuTS = row[1].getTime();
-      const denTS = row[2].getTime();
-      const list = byMa[ma] || [];
-      const daApDung = list.some(ts => _tsTrongKhoangHieuLuc_(ts, tuTS, denTS));
-      if (daApDung) {
-        return { editable: false, reason: "Mã \"" + ma + "\" ĐÃ CÓ PHIẾU CÂN ÁP DỤNG trong khoảng hiệu lực này — không thể sửa/xóa để không làm sai lệch số liệu đã tính tiền." };
+      if (row[13] === "Hết hiệu lực") {
+        return { editable: false, viTri: k, reason: "Mã \"" + row[3] + "\" đã HẾT HIỆU LỰC — không thể sửa/xóa để bảo toàn lịch sử báo giá." };
+      }
+    }
+    if (relevantRows.length === 0) continue;
+    if (!byMa) {
+      // Đọc phiếu cân 1 lần, từ mốc hiệu lực sớm nhất của mọi nhóm cần xét.
+      let tuSomNhat = Infinity;
+      cacNhom.forEach(function (rows) { rows.forEach(function (r) { tuSomNhat = Math.min(tuSomNhat, r[1].getTime()); }); });
+      byMa = BG_getPhieuCanByMaDG_(tuSomNhat);
+    }
+    for (const row of relevantRows) {
+      if (BG_daApDung_(byMa, row[3], row[1].getTime(), row[2].getTime())) {
+        return { editable: false, viTri: k, reason: "Mã \"" + row[3] + "\" ĐÃ CÓ PHIẾU CÂN ÁP DỤNG trong khoảng hiệu lực này — không thể sửa/xóa để không làm sai lệch số liệu đã tính tiền." };
       }
     }
   }
-
-  return { editable: true, reason: "" };
+  return { editable: true, viTri: -1, reason: "" };
 }
 
 // Tính hàng loạt "editable/reason/daApDung" cho TOÀN BỘ displayData cùng lúc
 // (chỉ đọc PhieuCan_DN 1 lần), dùng để hiển thị NGAY trên bảng Hiệu lực báo giá
 // (mờ/khóa nút Sửa-Xóa cho các dòng không đủ điều kiện) thay vì phải bấm thử mới biết.
 function BG_annotateApplied_(finalRows, displayData) {
-  const byMa = BG_getPhieuCanByMaDG_();
+  let tuSomNhat = Infinity;
+  finalRows.forEach(function (r) { tuSomNhat = Math.min(tuSomNhat, r[1].getTime()); });
+  const byMa = displayData.length ? BG_getPhieuCanByMaDG_(tuSomNhat) : {};
   return displayData.map((d, idx) => {
     const finalRow = finalRows[idx]; // finalRows và displayData luôn cùng thứ tự (push song song trong BG_coreLogicProcessor_)
     const tuTS = finalRow[1].getTime();
     const denTS = finalRow[2].getTime();
-    const list = byMa[d.ma] || [];
-    const daApDung = list.some(ts => _tsTrongKhoangHieuLuc_(ts, tuTS, denTS));
+    const daApDung = BG_daApDung_(byMa, d.ma, tuTS, denTS);
     const hetHieuLuc = d.trangThai === "Hết hiệu lực";
     let reason = "";
     if (hetHieuLuc) reason = "Đã hết hiệu lực, không thể sửa/xóa.";
@@ -2494,7 +2536,7 @@ function BG_updateBaogiaRow_(payload) {
     ]]);
 
     const _canhBaoHeader = kiemTraLechHeaderSheet_(sheet, "Baogia_DN", 8); // BUG-002
-    return { status: "success", message: "Đã cập nhật báo giá " + idBgct + "." + (_canhBaoHeader ? " | " + _canhBaoHeader : "") };
+    return { status: "success", message: BG_lamMoiSaveSauGhi_("Đã cập nhật báo giá " + idBgct + "." + (_canhBaoHeader ? " | " + _canhBaoHeader : "")) };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2519,7 +2561,7 @@ function BG_deleteBaogiaRow_(idBgct) {
     if (!editCheck.editable) return { status: "error", message: "Không thể xóa: " + editCheck.reason };
 
     sheet.deleteRow(rowIndex + 2);
-    return { status: "success", message: "Đã xóa báo giá " + idBgct + "." };
+    return { status: "success", message: BG_lamMoiSaveSauGhi_("Đã xóa báo giá " + idBgct + ".") };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2544,11 +2586,9 @@ function BG_checkQuoteDeletable_(soBaoGia) {
   }
   if (rows.length === 0) return { deletable: false, reason: "Không tìm thấy nhóm giá nào thuộc báo giá này (có thể đã bị xóa).", rows: rows };
 
-  for (const row of rows) {
-    const check = BG_checkRowEditable_(row.idBgct, row.maList);
-    if (!check.editable) {
-      return { deletable: false, reason: "Nhóm mã \"" + row.maList.join(", ") + "\": " + check.reason, rows: rows };
-    }
+  const check = BG_kiemTraSuaXoaNhieuNhom_(rows);
+  if (!check.editable) {
+    return { deletable: false, reason: "Nhóm mã \"" + rows[check.viTri].maList.join(", ") + "\": " + check.reason, rows: rows };
   }
   return { deletable: true, reason: "", rows: rows };
 }
@@ -2575,13 +2615,17 @@ function BG_getQuoteListWithStatus_() {
       bySoBaoGia[so].push({ idBgct: String(r[6] || "").trim(), maList: String(r[2] || "").split(",").map(s => s.trim()).filter(Boolean) });
     });
 
-    // Tính sẵn trạng thái hiệu lực + đã áp dụng cho TẤT CẢ (id, mã) chỉ 1 lần
-    const byMa = BG_getPhieuCanByMaDG_();
+    // Tính sẵn trạng thái hiệu lực + đã áp dụng cho TẤT CẢ (id, mã) chỉ 1 lần.
+    // PERF-BG-01: dòng "Hết hiệu lực" không cần xét phiếu cân -> chỉ đọc phiếu cân
+    // từ mốc hiệu lực sớm nhất của các dòng CHƯA hết hiệu lực.
     const coreResult = BG_coreLogicProcessor_(new Set());
     const statusMap = {}; // key = idBgct + "|" + ma -> {trangThai, tuTS, denTS}
+    let tuSomNhat = Infinity;
     coreResult.finalRows.forEach(row => {
       statusMap[row[0] + "|" + row[3]] = { trangThai: row[13], tuTS: row[1].getTime(), denTS: row[2].getTime() };
+      if (row[13] !== "Hết hiệu lực") tuSomNhat = Math.min(tuSomNhat, row[1].getTime());
     });
+    const byMa = tuSomNhat < Infinity ? BG_getPhieuCanByMaDG_(tuSomNhat) : {};
 
     const result = data.map(r => {
       const soBaoGia = String(r[1] || "").trim();
@@ -2594,8 +2638,9 @@ function BG_getQuoteListWithStatus_() {
           const st = statusMap[g.idBgct + "|" + ma];
           if (!st) continue;
           if (st.trangThai === "Hết hiệu lực") { deletable = false; reason = "Mã \"" + ma + "\" đã hết hiệu lực."; break outer; }
-          const list = byMa[ma] || [];
-          const daApDung = list.some(ts => ts >= st.tuTS && ts <= st.denTS);
+          // FIX: dùng chung quy ước ranh giới [tuTS, denTS) với kiểm tra xóa thật
+          // (trước đây "<= denTS" - lệch với BG_checkRowEditable_ ở đúng mốc kết thúc).
+          const daApDung = BG_daApDung_(byMa, ma, st.tuTS, st.denTS);
           if (daApDung) { deletable = false; reason = "Mã \"" + ma + "\" đã có phiếu cân áp dụng."; break outer; }
         }
       }
@@ -2650,7 +2695,7 @@ function BG_deleteQuote_(soBaoGia) {
       xoaCacDong_(qlSheet, dsDongQL);
     }
 
-    return { status: "success", message: "Đã xóa toàn bộ báo giá " + soBaoGia + " (" + soDongXoa + " nhóm giá)." };
+    return { status: "success", message: BG_lamMoiSaveSauGhi_("Đã xóa toàn bộ báo giá " + soBaoGia + " (" + soDongXoa + " nhóm giá).") };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2708,7 +2753,7 @@ function BG_createQuote_(payload) {
     srcSheet.getRange(srcSheet.getLastRow() + 1, 1, rowsToAppend.length, 8).setValues(rowsToAppend);
 
     const _canhBaoHeader = [kiemTraLechHeaderSheet_(qlSheet, "QL_BaoGia", 5), kiemTraLechHeaderSheet_(srcSheet, "Baogia_DN", 8)]; // BUG-002
-    return { status: "success", message: noiCanhBao_("Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá.", _canhBaoHeader), soBaoGia: soBaoGiaMoi };
+    return { status: "success", message: BG_lamMoiSaveSauGhi_(noiCanhBao_("Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá.", _canhBaoHeader)), soBaoGia: soBaoGiaMoi };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2733,12 +2778,33 @@ function BG_updateHieuLuc_() {
     const activeRows = result.finalRows.filter(row => row[13] === "Còn hiệu lực");
     if (dst.getLastRow() > 1) dst.getRange(2, 1, dst.getLastRow() - 1, 14).clearContent();
     if (activeRows.length > 0) dst.getRange(2, 1, activeRows.length, 14).setValues(activeRows);
-    // Gắn sẵn editable/reason cho TOÀN BỘ trước khi lọc, để chỉ số giữa finalRows và
-    // displayData luôn khớp nhau (BG_annotateApplied_ dựa vào cùng vị trí index).
-    const annotated = BG_annotateApplied_(result.finalRows, result.displayData);
-    return { status: "success", data: annotated.filter(r => r.trangThai === "Còn hiệu lực"), viewType: "FINAL" };
+    // PERF-BG-03: chỉ gắn editable/reason cho các dòng CÒN hiệu lực (đúng những dòng
+    // trả về) - lọc finalRows và displayData theo CÙNG chỉ số để giữ khớp vị trí.
+    const chiSo = [];
+    result.displayData.forEach(function (d, i) { if (d.trangThai === "Còn hiệu lực") chiSo.push(i); });
+    const annotated = BG_annotateApplied_(chiSo.map(function (i) { return result.finalRows[i]; }), chiSo.map(function (i) { return result.displayData[i]; }));
+    return { status: "success", data: annotated, viewType: "FINAL" };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
+}
+
+// Dựng lại Baogia_DN_SAVE (toàn bộ lịch sử hiệu lực) từ Baogia_DN - đây là sheet
+// ENGINE TÍNH GIÁ đọc (CONFIG.SHEET_BAO_GIA). Gọi trong khóa.
+function BG_lamMoiSave_() {
+  const save = BG_ss_().getSheetByName(BAOGIA_CONFIG.SAVE_SHEET);
+  const result = BG_coreLogicProcessor_(new Set());
+  if (save.getLastRow() > 1) save.getRange(2, 1, save.getLastRow() - 1, 14).clearContent();
+  if (result.finalRows.length > 0) save.getRange(2, 1, result.finalRows.length, 14).setValues(result.finalRows);
+  return result;
+}
+// FIX (BUG-BG-01 - giá mới không được áp dụng): trước đây Baogia_DN_SAVE CHỈ được
+// ghi lại khi có người bấm "Xem toàn bộ lịch sử" - tạo/sửa/xóa báo giá xong, tính
+// giá phiếu cân vẫn dùng bảng giá CŨ cho tới lúc đó. Nay mọi thao tác ghi Baogia_DN
+// tự làm mới SAVE ngay trong cùng khóa. Lỗi làm mới không làm hỏng thao tác chính,
+// chỉ báo kèm để người dùng bấm "Xem toàn bộ lịch sử".
+function BG_lamMoiSaveSauGhi_(thongBao) {
+  try { BG_lamMoiSave_(); return thongBao; }
+  catch (e) { return thongBao + " | ⚠️ Chưa cập nhật được bảng giá dùng để tính giá (" + e.toString() + ") - bấm \"Xem toàn bộ lịch sử\" để cập nhật."; }
 }
 
 function BG_showAllData_() {
@@ -2747,11 +2813,7 @@ function BG_showAllData_() {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
   }
   try {
-    const ss = BG_ss_();
-    const save = ss.getSheetByName(BAOGIA_CONFIG.SAVE_SHEET);
-    const result = BG_coreLogicProcessor_(new Set());
-    if (save.getLastRow() > 1) save.getRange(2, 1, save.getLastRow() - 1, 14).clearContent();
-    if (result.finalRows.length > 0) save.getRange(2, 1, result.finalRows.length, 14).setValues(result.finalRows);
+    const result = BG_lamMoiSave_();
     const annotated = BG_annotateApplied_(result.finalRows, result.displayData);
     return { status: "success", data: annotated, viewType: "SAVE" };
   } catch (e) { return { status: "error", message: e.toString() }; }

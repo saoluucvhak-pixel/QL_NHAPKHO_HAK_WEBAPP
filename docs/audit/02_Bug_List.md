@@ -42,3 +42,12 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 - Ô "Đồng thời lưu… vào Draft Chưa Thanh Toán" khi import ghi phiếu mới vào sheet `PhieuCan_DN_CHUA_TT_DRAFT` trong **File Nháp của ĐNTT** (địa chỉ đặt ở Liên kết dữ liệu) — đây là bản sao ĐNTT dùng để chọn phiếu thanh toán.
 - **Lỗi (High):** trước đây phiếu được ghi vào bản sao **trước** khi tính giá và chỉ cột A..W → không có Đơn giá/Thành tiền; ĐNTT bỏ qua phiếu có Thành tiền ≤ 0 nên phiếu mới không chọn được cho tới lần làm mới bản sao 7:30/13:00. Số phiếu dạng "0123" còn bị mất số 0 đầu.
 - **Đã sửa:** ghi sau khi tính giá, đọc lại đúng các dòng vừa thêm (A..Z, kèm X Đơn giá, Y Trạng thái, Z Thành tiền); Số phiếu (A) và Số CT (W) giữ dạng chữ giống cách ĐNTT ghi. Test `draftChuaTT.test.js` (DRAFT-01).
+
+
+## BUG-BG-01 — Báo giá mới/sửa/xóa không được áp dụng khi tính giá (đã sửa)
+- Hiện tượng: tạo báo giá mới (hoặc sửa/xóa) xong, import/tính giá phiếu cân vẫn ra đơn giá cũ cho tới khi có người bấm "Xem toàn bộ lịch sử" ở tab Hiệu lực báo giá.
+- Nguyên nhân: engine tính giá đọc `Baogia_DN_SAVE`; sheet này chỉ được ghi trong `BG_showAllData_`.
+- Sửa: `BG_createQuote_`, `BG_updateBaogiaRow_`, `BG_deleteBaogiaRow_`, `BG_deleteQuote_` tự làm mới SAVE (`BG_lamMoiSave_`). Test: `test/baoGiaToiUu.test.js`.
+
+## BUG-BG-02 — Danh sách báo giá và nút Xóa lệch nhau ở đúng mốc kết thúc hiệu lực (đã sửa)
+- `BG_getQuoteListWithStatus_` dùng `ts <= đến`, kiểm tra xóa thật dùng `ts < đến` → nay dùng chung `_tsTrongKhoangHieuLuc_`.
