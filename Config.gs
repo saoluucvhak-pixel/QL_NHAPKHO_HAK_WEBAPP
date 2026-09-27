@@ -941,6 +941,10 @@ function taoApiRoutes_() {
     TC_chiTietPhieuNhap: r(TC_chiTietPhieuNhap_, X),
     TC_traCuuPhieuXuat: r(TC_traCuuPhieuXuat_, X),
     TC_chiTietPhieuXuat: r(TC_chiTietPhieuXuat_, X),
+    // Sửa Khách hàng/Đại lý/Nguồn gốc + tính lại giá phiếu chưa "OK" (nghiệp vụ)
+    TC_suaPhieuNhap: r(TC_suaPhieuNhap_, N),
+    TC_tinhLaiGiaPhieu: r(TC_tinhLaiGiaPhieu_, N),
+    TC_tinhLaiGiaTheoBoLoc: r(TC_tinhLaiGiaTheoBoLoc_, N),
 
     // --- Báo cáo xuất hàng (xem, xuất file) ---
     XH_getBaoCaoXuatQuaCan: r(XH_getBaoCaoXuatQuaCan_, X),

@@ -1000,7 +1000,10 @@ function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
 // nơi lưu dữ liệu kiêm nơi tính toán; muốn giảm tiếp cả bước ĐỌC này cần một
 // giải pháp lưu trữ khác (VD tách riêng sheet "đang chờ tính giá" khỏi sheet
 // lịch sử đã chốt - xem đề xuất kiến trúc lưu trữ đã trao đổi).
-function runCalculatePrice_core_() {
+// chonDong (tùy chọn): hàm (dòng A..Z) -> true/false để CHỈ tính lại một phần các
+// phiếu chưa "OK" (Tra cứu: 1 phiếu vừa sửa, hoặc các phiếu khớp bộ lọc). Không
+// truyền = tính mọi phiếu chưa "OK" như trước. Phiếu "OK" luôn được bỏ qua.
+function runCalculatePrice_core_(chonDong) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = sheet.getLastRow();
@@ -1026,6 +1029,7 @@ function runCalculatePrice_core_() {
       const r = data[i];
       const currentStatusY = String(r[24] || "").trim();
       if (currentStatusY === "OK") continue;
+      if (chonDong && !chonDong(r)) continue;
 
       const valQ = String(r[16] || "").trim().toUpperCase(); const rVal = parseFloat(r[17]) || 0; const klJ = parseFloat(r[9]) || 0; const klSoSanh = klJ / 1000;
       const dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
@@ -1035,7 +1039,7 @@ function runCalculatePrice_core_() {
       const thanhTienRaw = Math.round(klSoSanh * hieuSo);
       const thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000;
       const trangThai = (giaFound > 0 && thanhTienLamTron > 0) ? "Test giá" : "Lỗi ĐK/Báo giá";
-      capNhat.push({ rowNum: i + 2, gia: giaFound, hieuSo: hieuSo, trangThai: trangThai, thanhTien: thanhTienLamTron });
+      capNhat.push({ rowNum: i + 2, maCT: String(r[21] || "").trim(), gia: giaFound, hieuSo: hieuSo, trangThai: trangThai, thanhTien: thanhTienLamTron });
     }
 
     // Gom các dòng cần ghi thành từng KHỐI LIÊN TIẾP (rowNum liền nhau) - ghi 1
@@ -1070,7 +1074,10 @@ function runCalculatePrice_core_() {
       status: "success",
       message: capNhat.length > 0
         ? "Đã tính giá cho " + capNhat.length + " phiếu chưa chốt."
-        : "Không có phiếu nào cần tính lại giá (tất cả đã chốt OK)."
+        : "Không có phiếu nào cần tính lại giá (tất cả đã chốt OK).",
+      soPhieu: capNhat.length,
+      soLoiBaoGia: capNhat.filter(function (c) { return c.trangThai !== "Test giá"; }).length,
+      ketQua: chonDong ? capNhat : undefined
     };
   } catch (e) { return { status: "error", message: "Lỗi: " + e.toString() }; }
 }
@@ -5294,6 +5301,21 @@ function TC_nguonPhieuNhap_(ss, tuNgay, denNgay) {
   return nguon.filter(function (n) { return n.sheet; });
 }
 
+// Số phiếu, Biển số 1-2, Khách hàng, ĐL, NG, Mã ĐG, Mã chứng từ, Số CT, ID_DNTT
+const TC_COT_TIM_NHAP_ = [0, 5, 6, 11, 13, 14, 16, 21, 22, 26];
+// 1 dòng phiếu nhập có khớp bộ lọc Tra cứu không - DÙNG CHUNG cho tìm kiếm và
+// "Tính lại giá theo bộ lọc" để 2 chức năng luôn chọn đúng cùng 1 tập phiếu.
+function TC_dongNhapKhopBoLoc_(row, tuKhoa, kn) {
+  if (!String(row[21] || "").trim() && !String(row[0] || "").trim()) return false; // dòng trống
+  const ngay1 = row[1];
+  if (kn.tu || kn.den) {
+    if (!(ngay1 instanceof Date) || isNaN(ngay1.getTime())) return false;
+    if (kn.tu && ngay1 < kn.tu) return false;
+    if (kn.den && ngay1 > kn.den) return false;
+  }
+  return TC_khopTuKhoa_(row, TC_COT_TIM_NHAP_, tuKhoa);
+}
+
 // boLoc = {tuKhoa, tuNgay, denNgay} (ngày dạng yyyy-MM-dd, có thể để trống)
 function TC_traCuuPhieuNhap_(boLoc) {
   try {
@@ -5301,23 +5323,18 @@ function TC_traCuuPhieuNhap_(boLoc) {
     const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
     const kn = TC_khoangNgay_(boLoc);
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    // Số phiếu, Biển số 1-2, Khách hàng, ĐL, NG, Mã ĐG, Mã chứng từ, Số CT, ID_DNTT
-    const COT_TIM = [0, 5, 6, 11, 13, 14, 16, 21, 22, 26];
-    const ketQua = []; let tongKL = 0; let tongTien = 0;
+    const ketQua = []; let tongKL = 0; let tongTien = 0; let soChuaChot = 0;
     TC_nguonPhieuNhap_(ss, boLoc.tuNgay, boLoc.denNgay).forEach(function (n) {
       const lastRow = n.sheet.getLastRow();
       if (lastRow <= 1) return;
+      const dangTheoDoi = n.sheet.getName() === CONFIG.DATA_SHEET;
       n.sheet.getRange(2, 1, lastRow - 1, 27).getValues().forEach(function (row) {
+        if (!TC_dongNhapKhopBoLoc_(row, tuKhoa, kn)) return;
         const maCT = String(row[21] || "").trim();
-        if (!maCT && !String(row[0] || "").trim()) return; // dòng trống
-        const ngay1 = row[1];
-        if (kn.tu || kn.den) {
-          if (!(ngay1 instanceof Date) || isNaN(ngay1.getTime())) return;
-          if (kn.tu && ngay1 < kn.tu) return;
-          if (kn.den && ngay1 > kn.den) return;
-        }
-        if (!TC_khopTuKhoa_(row, COT_TIM, tuKhoa)) return;
-        const t = TC_ngayGioNhap_(ngay1, row[2]);
+        const t = TC_ngayGioNhap_(row[1], row[2]);
+        const trangThaiGia = String(row[24] || "").trim();
+        const choSua = dangTheoDoi && trangThaiGia !== "OK";
+        if (choSua) soChuaChot++;
         const klHang = parseFloat(row[9]) || 0;
         const thanhTien = parseFloat(row[25]) || 0;
         const idDntt = String(row[26] || "").trim();
@@ -5333,9 +5350,10 @@ function TC_traCuuPhieuNhap_(boLoc) {
           klHang: klHang,
           donGia: parseFloat(row[23]) || 0,
           thanhTien: thanhTien,
-          trangThaiGia: String(row[24] || "").trim(),
+          trangThaiGia: trangThaiGia,
           trangThaiThanhToan: idDntt || "Chưa lập ĐNTT",
           noiLuu: n.nhan,
+          choSua: choSua,
           ts: t ? t.getTime() : 0
         });
       });
@@ -5345,6 +5363,7 @@ function TC_traCuuPhieuNhap_(boLoc) {
       status: "success",
       data: ketQua.slice(0, TC_GIOI_HAN_KET_QUA_),
       tongSoDong: ketQua.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
+      soChuaChot: soChuaChot, // phiếu chưa "OK" ở sheet đang theo dõi - sửa/tính lại giá được
       summary: { soLuong: ketQua.length, tongKL: tongKL, tongTien: tongTien }
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -5389,11 +5408,15 @@ function TC_chiTietPhieuNhap_(maChungTu) {
     const tieuDe = TC_tieuDe_(vt.sheet, soCot, TC_TIEU_DE_NHAP_);
     const ten = vt.sheet.getName();
     const idDntt = String(row[26] || "").trim();
+    const daOK = String(row[24] || "").trim() === "OK";
     return {
       status: "success",
       data: {
         loai: "NHAP",
         maChungTu: maCT,
+        choSua: ten === CONFIG.DATA_SHEET && !daOK,
+        lyDoKhongSua: ten !== CONFIG.DATA_SHEET ? "Phiếu đã chuyển sang sheet lưu trữ (đã khóa sổ) - không sửa, không tính lại giá."
+          : (daOK ? "Phiếu đã đóng thanh toán (Trạng thái giá = OK) - không sửa, không tính lại giá." : ""),
         noiLuu: ten === CONFIG.DATA_SHEET ? "Đang theo dõi (" + ten + ")" : "Lưu trữ (" + ten + ")",
         tomTat: {
           soPhieu: TC_giaTriHienThi_(row[0]),
@@ -5505,4 +5528,187 @@ function TC_chiTietPhieuXuat_(soPhieu, ts) {
       }
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/* ---------- SỬA PHIẾU CÂN NHẬP + TÍNH LẠI GIÁ (từ Tra cứu) ----------
+ * Chỉ áp dụng cho phiếu ở sheet đang theo dõi (PhieuCan_DN) và CHƯA "OK" (cột Y
+ * - ĐNTT ghi "OK" khi đã đóng thanh toán). Sửa Khách hàng / Đại lý / Nguồn gốc
+ * theo ĐÚNG quy tắc import: K = ĐL_NG, N = ĐL, O = NG (chữ hoa), Q (Mã ĐG) =
+ * ĐL_NG_Y, S = thời điểm cập nhật; rồi tính lại giá bằng chính engine tính giá.
+ * Phiếu có trong sheet Draft Chưa Thanh Toán được cập nhật theo (không thêm mới).
+ * Có khóa hệ thống + cờ Khóa sổ ĐNTT + kiểm tra dòng đích (CONCUR-01/02). */
+function TC_chayCoKhoa_(viec) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  } catch (e) {
+    return { status: "error", message: "Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây." };
+  }
+  try {
+    const dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
+    if (dnttKhoaSo) return { status: "error", message: dnttKhoaSo };
+    return viec();
+  } catch (e) {
+    return { status: "error", message: e.message || e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Số dòng (1-based) của phiếu trong PhieuCan_DN theo Mã chứng từ; 0 = không có.
+function TC_timDongDangTheoDoi_(sheet, maCT) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 0;
+  const ma = sheet.getRange(2, 22, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ma.length; i++) if (String(ma[i][0] || "").trim() === maCT) return i + 2;
+  return 0;
+}
+
+// Báo lỗi rõ ràng khi phiếu không sửa/tính lại giá được.
+function TC_loiPhieuKhongSuaDuoc_(ss, maCT) {
+  if (TC_timPhieuNhap_(ss, maCT)) return "Phiếu " + maCT + " đã chuyển sang sheet lưu trữ (đã khóa sổ) - không sửa, không tính lại giá.";
+  return "Không tìm thấy phiếu cân nhập " + maCT + ".";
+}
+
+function TC_moTaGia_(kq) {
+  if (!kq) return "";
+  return kq.trangThai === "Test giá"
+    ? "Đơn giá " + Number(kq.hieuSo).toLocaleString("vi-VN") + " · Thành tiền " + Number(kq.thanhTien).toLocaleString("vi-VN")
+    : "⚠️ Lỗi ĐK/Báo giá: chưa có báo giá khớp Mã ĐG + khối lượng + ngày cân";
+}
+
+// Cập nhật (KHÔNG thêm mới) các phiếu đang có trong sheet Draft Chưa Thanh Toán
+// theo dữ liệu PhieuCan_DN vừa ghi (26 cột A..Z, cùng khuôn DRAFT-01). ketQua =
+// [{rowNum, maCT}] từ engine tính giá. Lỗi Draft không làm hỏng thao tác chính.
+function TC_dongBoDraftChuaTT_(sheetPC, ketQua) {
+  if (!ketQua || ketQua.length === 0) return 0;
+  try {
+    const sh = SpreadsheetApp.openById(CONFIG.DRAFT_CHUATT_SPREADSHEET_ID).getSheetByName(CONFIG.DRAFT_CHUATT_SHEET);
+    if (!sh || sh.getLastRow() <= 1) return 0;
+    const dongPC = new Map();
+    ketQua.forEach(function (k) { if (k.maCT) dongPC.set(k.maCT, k.rowNum); });
+    const dongDraft = new Map(); // maCT -> dòng trong Draft
+    sh.getRange(2, 22, sh.getLastRow() - 1, 1).getValues().forEach(function (r, i) {
+      const k = String(r[0] || "").trim();
+      if (k && dongPC.has(k) && !dongDraft.has(k)) dongDraft.set(k, i + 2);
+    });
+    if (dongDraft.size === 0) return 0;
+    let tu = Infinity, den = 0;
+    dongDraft.forEach(function (x, k) { const r = dongPC.get(k); if (r < tu) tu = r; if (r > den) den = r; });
+    const khoi = sheetPC.getRange(tu, 1, den - tu + 1, 26).getValues();
+    const giuChu = function (v) { return typeof v === "string" && v !== "" ? "'" + v.replace(/^'+/, "") : v; };
+    const ghi = [];
+    dongDraft.forEach(function (dong, k) {
+      const x = khoi[dongPC.get(k) - tu].slice();
+      if (String(x[21] || "").trim() !== k) return; // dòng PhieuCan vừa đổi vị trí -> bỏ qua an toàn
+      x[0] = giuChu(x[0]); x[22] = giuChu(x[22]);
+      ghi.push({ dong: dong, row: x });
+    });
+    ghi.sort(function (a, b) { return a.dong - b.dong; });
+    let i = 0;
+    while (i < ghi.length) {
+      let j = i;
+      while (j + 1 < ghi.length && ghi[j + 1].dong === ghi[j].dong + 1) j++;
+      sh.getRange(ghi[i].dong, 1, j - i + 1, 26).setValues(ghi.slice(i, j + 1).map(function (g) { return g.row; }));
+      i = j + 1;
+    }
+    logAudit_("DRAFT_CHUATT", "OK", "Cập nhật " + ghi.length + " phiếu trong Draft Chưa Thanh Toán sau khi sửa/tính lại giá ở Tra cứu.");
+    return ghi.length;
+  } catch (e) {
+    logAudit_("DRAFT_CHUATT", "ERROR", e.toString());
+    return 0;
+  }
+}
+
+// thongTin = {khachHang, daiLy, nguonGoc}
+function TC_suaPhieuNhap_(maChungTu, thongTin) {
+  return TC_chayCoKhoa_(function () {
+    const maCT = String(maChungTu || "").trim();
+    thongTin = thongTin || {};
+    const kh = sanitize_(String(thongTin.khachHang || "").trim());
+    const dl = sanitize_(String(thongTin.daiLy || "").trim().toUpperCase());
+    const ng = sanitize_(String(thongTin.nguonGoc || "").trim().toUpperCase());
+    if (!maCT) throw new Error("Thiếu Mã chứng từ.");
+    if (!kh || !dl || !ng) throw new Error("Vui lòng nhập đủ Khách hàng, Đại lý và Nguồn gốc.");
+
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const dong = TC_timDongDangTheoDoi_(sheet, maCT);
+    if (!dong) throw new Error(TC_loiPhieuKhongSuaDuoc_(ss, maCT));
+    const cu = sheet.getRange(dong, 1, 1, 26).getValues()[0];
+    if (String(cu[24] || "").trim() === "OK") throw new Error("Phiếu " + maCT + " đã đóng thanh toán (Trạng thái giá = OK) - không sửa được.");
+
+    const truoc = { kh: String(cu[11] || ""), dl: String(cu[13] || ""), ng: String(cu[14] || "") };
+    // K..S (cột 11..19): giữ nguyên M (Mã hàng), P, R (Giảm giá) đã đọc trong khóa.
+    const moi = cu.slice(10, 19);
+    moi[0] = dl + "_" + ng; moi[1] = kh; moi[3] = dl; moi[4] = ng; moi[6] = dl + "_" + ng + "_Y"; moi[8] = new Date();
+    PC_kiemTraDongConDung_(sheet, new Map([[dong, PC_chuKyDong_(cu)]]));
+    // ĐNTT (dự án khác) có thể vừa đóng thanh toán phiếu này -> đọc lại cột Y ngay trước khi ghi.
+    if (String(sheet.getRange(dong, 25).getValue() || "").trim() === "OK") throw new Error("Phiếu " + maCT + " vừa được đóng thanh toán (OK) - không sửa được.");
+    sheet.getRange(dong, 11, 1, 9).setValues([moi]);
+
+    const gia = runCalculatePrice_core_(function (r) { return String(r[21] || "").trim() === maCT; });
+    if (gia.status !== "success") {
+      logAudit_("SUA_PHIEU_CAN", "ERROR", maCT + ": đã sửa thông tin nhưng tính giá lỗi - " + gia.message);
+      return { status: "error", message: "Đã lưu Khách hàng/Đại lý/Nguồn gốc nhưng tính lại giá bị lỗi: " + gia.message + " - bấm \"Tính lại giá\" để thử lại." };
+    }
+    const kq = (gia.ketQua || [])[0];
+    const soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
+    const thayDoi = [["Khách hàng", truoc.kh, kh], ["Đại lý", truoc.dl, dl], ["Nguồn gốc", truoc.ng, ng]]
+      .filter(function (x) { return x[1] !== x[2]; }).map(function (x) { return x[0] + ": " + x[1] + " → " + x[2]; });
+    logAudit_("SUA_PHIEU_CAN", "OK", maCT + " | " + (thayDoi.join("; ") || "không đổi thông tin") + " | " + (kq ? kq.trangThai + ", đơn giá " + kq.hieuSo + ", thành tiền " + kq.thanhTien : ""));
+    return {
+      status: "success",
+      message: "Đã lưu phiếu " + maCT + (thayDoi.length ? " (" + thayDoi.join("; ") + ")" : "") + " và tính lại giá: " + TC_moTaGia_(kq)
+        + (soDraft ? " · đã cập nhật bản sao trong Draft Chưa TT" : ""),
+      ketQua: kq
+    };
+  });
+}
+
+// Tính lại giá 1 phiếu (không sửa thông tin).
+function TC_tinhLaiGiaPhieu_(maChungTu) {
+  return TC_chayCoKhoa_(function () {
+    const maCT = String(maChungTu || "").trim();
+    if (!maCT) throw new Error("Thiếu Mã chứng từ.");
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const dong = TC_timDongDangTheoDoi_(sheet, maCT);
+    if (!dong) throw new Error(TC_loiPhieuKhongSuaDuoc_(ss, maCT));
+    if (String(sheet.getRange(dong, 25).getValue() || "").trim() === "OK") throw new Error("Phiếu " + maCT + " đã đóng thanh toán (Trạng thái giá = OK) - không tính lại giá.");
+    const gia = runCalculatePrice_core_(function (r) { return String(r[21] || "").trim() === maCT; });
+    if (gia.status !== "success") return gia;
+    const kq = (gia.ketQua || [])[0];
+    const soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
+    logAudit_("TINH_LAI_GIA", "OK", maCT + " | " + (kq ? kq.trangThai + ", đơn giá " + kq.hieuSo + ", thành tiền " + kq.thanhTien : ""));
+    return {
+      status: "success",
+      message: "Đã tính lại giá phiếu " + maCT + ": " + TC_moTaGia_(kq) + (soDraft ? " · đã cập nhật bản sao trong Draft Chưa TT" : ""),
+      ketQua: kq
+    };
+  });
+}
+
+// Tính lại giá HÀNG LOẠT: mọi phiếu CHƯA "OK" ở sheet đang theo dõi khớp đúng bộ
+// lọc Tra cứu (từ khóa + khoảng ngày) - kể cả phần vượt quá 500 dòng hiển thị.
+function TC_tinhLaiGiaTheoBoLoc_(boLoc) {
+  return TC_chayCoKhoa_(function () {
+    boLoc = boLoc || {};
+    const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
+    const kn = TC_khoangNgay_(boLoc);
+    const gia = runCalculatePrice_core_(function (r) { return TC_dongNhapKhopBoLoc_(r, tuKhoa, kn); });
+    if (gia.status !== "success") return gia;
+    if (!gia.soPhieu) return { status: "success", message: "Không có phiếu chưa đóng thanh toán nào khớp bộ lọc để tính lại giá.", soPhieu: 0, soLoiBaoGia: 0 };
+    const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.DATA_SHEET);
+    const soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
+    const moTaBoLoc = [boLoc.tuKhoa ? "từ khóa \"" + boLoc.tuKhoa + "\"" : "", boLoc.tuNgay ? "từ " + boLoc.tuNgay : "", boLoc.denNgay ? "đến " + boLoc.denNgay : ""].filter(Boolean).join(", ") || "toàn bộ";
+    logAudit_("TINH_LAI_GIA", "OK", "Hàng loạt (" + moTaBoLoc + "): " + gia.soPhieu + " phiếu, " + gia.soLoiBaoGia + " phiếu Lỗi ĐK/Báo giá, cập nhật Draft " + soDraft + " phiếu.");
+    return {
+      status: "success",
+      message: "Đã tính lại giá " + gia.soPhieu + " phiếu chưa đóng thanh toán"
+        + (gia.soLoiBaoGia ? " - ⚠️ " + gia.soLoiBaoGia + " phiếu Lỗi ĐK/Báo giá (chưa có báo giá khớp)" : "")
+        + (soDraft ? " · đã cập nhật " + soDraft + " phiếu trong Draft Chưa TT" : "") + ".",
+      soPhieu: gia.soPhieu, soLoiBaoGia: gia.soLoiBaoGia
+    };
+  });
 }
