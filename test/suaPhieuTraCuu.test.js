@@ -31,6 +31,7 @@ function nap(env, dsDangTheoDoi, luuTru) {
     ['TS', 'Từ', 'Đến', 'Mã ĐG', 'Min', 'Max', 'Giá'],
     [tu, tu, den, 'DL1_NG1_Y', 0, 1000, 1000],
     [tu, tu, den, 'DL2_NG2_Y', 0, 1000, 1500],
+    [tu, tu, den, 'DL1_NG1_N', 0, 1000, 800], // cùng ĐL/NG nhưng KHÔNG hình ảnh -> giá khác
   ]);
   return sh || ss.getSheetByName('PhieuCan_DN');
 }
@@ -257,5 +258,90 @@ describe('Khóa, cờ Khóa sổ ĐNTT, quyền', () => {
     const nv = createGasEnv({ email: 'nv@gmail.com', vaiTro: 'NHANVIEN' });
     nap(nv, [phieu('1/2026/NK')]);
     expect(nv.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DL2', nguonGoc: 'NG2' }).status).toBe('success');
+  });
+});
+
+describe('Hình ảnh (Y/N) - phần thứ 3 của Mã ĐG', () => {
+  test('đổi Hình ảnh Y -> N: P = N, Mã ĐG = ĐL_NG_N, giá theo báo giá "không hình ảnh"', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Cũ', daiLy: 'DL1', nguonGoc: 'NG1', hinhAnh: 'n' });
+    expect(res.status).toBe('success');
+    expect(res.message).toMatch(/Hình ảnh: Y → N/);
+    const r = dongCua(env, '1/2026/NK');
+    expect([r[10], r[15], r[16]]).toEqual(['DL1_NG1', 'N', 'DL1_NG1_N']);
+    expect(r.slice(23, 26)).toEqual([800, 'Test giá', 16000]);
+  });
+
+  test('đổi Hình ảnh sang mã chưa có báo giá -> CHƯA LƯU, không ghi', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK', { dl: 'DL2', ng: 'NG2' })]);
+    mocks.resetApiCounter_();
+    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Cũ', daiLy: 'DL2', nguonGoc: 'NG2', hinhAnh: 'N' });
+    expect(res.message).toMatch(/^CHƯA LƯU: không tính được giá cho Mã ĐG DL2_NG2_N/);
+    expect(mocks.getApiCounter_().oWrite).toBe(0);
+    expect(dongCua(env, '1/2026/NK')[15]).toBe('Y');
+  });
+
+  test('giá trị Hình ảnh không hợp lệ -> báo lỗi; không gửi Hình ảnh -> giữ giá trị cũ', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    expect(env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DL1', nguonGoc: 'NG1', hinhAnh: 'X' }).message).toMatch(/Y .*hoặc N/);
+    env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DL2', nguonGoc: 'NG2' });
+    expect(dongCua(env, '1/2026/NK').slice(15, 17)).toEqual(['Y', 'DL2_NG2_Y']);
+  });
+
+  test('tra cứu + chi tiết trả Hình ảnh; ô P trống -> lấy theo đuôi Mã ĐG', () => {
+    const env = createGasEnv();
+    const p = phieu('2/2026/NK'); p[15] = ''; p[16] = 'DL1_NG1_N';
+    nap(env, [phieu('1/2026/NK'), p]);
+    const tim = env.call('TC_traCuuPhieuNhap', {}).data;
+    expect(tim.map((r) => [r.maChungTu, r.hinhAnh]).sort()).toEqual([['1/2026/NK', 'Y'], ['2/2026/NK', 'N']]);
+    expect(env.call('TC_chiTietPhieuNhap', '2/2026/NK').data.tomTat.hinhAnh).toBe('N');
+  });
+});
+
+describe('Tính lại giá các phiếu ĐƯỢC CHỌN', () => {
+  test('chỉ phiếu được chọn và chưa OK; bỏ qua phiếu OK / lưu trữ / không có, báo đủ số', () => {
+    const env = createGasEnv();
+    nap(env, [
+      phieu('1/2026/NK'), phieu('2/2026/NK', { dl: 'DLX', ng: 'NGX' }), phieu('3/2026/NK', { y: 'OK' }), phieu('4/2026/NK'),
+    ], { 2025: [phieu('9/2025/NK', { y: 'OK' })] });
+    const res = env.call('TC_tinhLaiGiaCacPhieu', ['1/2026/NK', '2/2026/NK', '3/2026/NK', '9/2025/NK', 'KHONG', '1/2026/NK', ' ']);
+    expect(res.status).toBe('success');
+    expect(res).toMatchObject({ soPhieu: 2, soLoiBaoGia: 1, soBoQua: 3 });
+    expect(res.message).toMatch(/2\/5 phiếu đã chọn.*1 phiếu Lỗi.*bỏ qua 3 phiếu/);
+    expect(dongCua(env, '1/2026/NK')[25]).toBe(20000);
+    expect(dongCua(env, '2/2026/NK')[24]).toBe('Lỗi ĐK/Báo giá');
+    expect(dongCua(env, '3/2026/NK')[25]).toBe(999); // OK giữ nguyên
+    expect(dongCua(env, '4/2026/NK')[25]).toBe(999); // không chọn -> giữ nguyên
+  });
+
+  test('không chọn phiếu nào / vượt giới hạn -> báo lỗi, không ghi', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    mocks.resetApiCounter_();
+    expect(env.call('TC_tinhLaiGiaCacPhieu', []).message).toMatch(/Chưa chọn/);
+    expect(env.call('TC_tinhLaiGiaCacPhieu', Array.from({ length: 5001 }, (_, i) => i + '/2026/NK')).message).toMatch(/tối đa 5000/);
+    expect(mocks.getApiCounter_().oWrite).toBe(0);
+  });
+
+  test('cập nhật Draft Chưa TT cho phiếu được chọn có trong Draft', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK'), phieu('2/2026/NK')]);
+    const ss = env.spreadsheetApp.openById(PHIEUCAN_ID);
+    ss.__setSheet(DRAFT, [header.slice(0, 26), phieu('2/2026/NK').slice(0, 26)]);
+    expect(env.call('TC_tinhLaiGiaCacPhieu', ['1/2026/NK', '2/2026/NK']).message).toMatch(/cập nhật 1 phiếu trong Draft/);
+    expect(ss.getSheetByName(DRAFT).__data[1][25]).toBe(20000);
+  });
+
+  test('khóa bận / Chỉ xem bị chặn', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    env.lockService.__giuBoiPhienKhac = true;
+    expect(env.call('TC_tinhLaiGiaCacPhieu', ['1/2026/NK']).message).toMatch(/bận/);
+    const xem = createGasEnv({ email: 'xem@gmail.com', vaiTro: 'CHIXEM' });
+    nap(xem, [phieu('1/2026/NK')]);
+    expect(() => xem.call('TC_tinhLaiGiaCacPhieu', ['1/2026/NK'])).toThrow(/\[QUYEN\]/);
   });
 });

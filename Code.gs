@@ -5360,6 +5360,7 @@ function TC_traCuuPhieuNhap_(boLoc) {
           khachHang: String(row[11] || "").trim(),
           daiLy: String(row[13] || "").trim(),
           nguonGoc: String(row[14] || "").trim(),
+          hinhAnh: TC_hinhAnhCuaDong_(row),
           klHang: klHang,
           donGia: parseFloat(row[23]) || 0,
           thanhTien: thanhTien,
@@ -5437,7 +5438,7 @@ function TC_chiTietPhieuNhap_(maChungTu) {
           ngayGioCan2: TC_giaTriHienThi_(TC_ngayGioNhap_(row[3], row[4]) || ""),
           soXe: String(row[5] || "").trim() + (String(row[6] || "").trim() ? " / " + String(row[6]).trim() : ""),
           khachHang: String(row[11] || "").trim(),
-          daiLy: String(row[13] || "").trim(), nguonGoc: String(row[14] || "").trim(),
+          daiLy: String(row[13] || "").trim(), nguonGoc: String(row[14] || "").trim(), hinhAnh: TC_hinhAnhCuaDong_(row),
           klCan1: parseFloat(row[7]) || 0, klCan2: parseFloat(row[8]) || 0, klHang: parseFloat(row[9]) || 0,
           maDonGia: String(row[16] || "").trim(),
           donGia: parseFloat(row[23]) || 0, thanhTien: parseFloat(row[25]) || 0,
@@ -5547,7 +5548,8 @@ function TC_chiTietPhieuXuat_(soPhieu, ts) {
  * Chỉ áp dụng cho phiếu ở sheet đang theo dõi (PhieuCan_DN) và CHƯA "OK" (cột Y
  * - ĐNTT ghi "OK" khi đã đóng thanh toán). Sửa Khách hàng / Đại lý / Nguồn gốc
  * theo ĐÚNG quy tắc import: K = ĐL_NG, N = ĐL, O = NG (chữ hoa), Q (Mã ĐG) =
- * ĐL_NG_Y, S = thời điểm cập nhật. Đổi ĐL/NG bắt buộc tính được giá mới mới lưu
+ * ĐL_NG_<Hình ảnh Y/N> (P = Hình ảnh), S = thời điểm cập nhật. Đổi ĐL/NG/Hình ảnh
+ * bắt buộc tính được giá mới mới lưu
  * (cùng công thức engine tính giá - TG_tinhGiaDong_).
  * Phiếu có trong sheet Draft Chưa Thanh Toán được cập nhật theo (không thêm mới).
  * Có khóa hệ thống + cờ Khóa sổ ĐNTT + kiểm tra dòng đích (CONCUR-01/02). */
@@ -5634,8 +5636,17 @@ function TC_dongBoDraftChuaTT_(sheetPC, ketQua) {
   }
 }
 
-// thongTin = {khachHang, daiLy, nguonGoc}
-// BẮT BUỘC: đổi Đại lý hoặc Nguồn gốc (-> đổi Mã ĐG) thì phải TÍNH ĐƯỢC giá mới
+// Hình ảnh (cột P) của 1 phiếu: "Y"/"N"; ô trống/lạ -> lấy đuôi Mã ĐG (Q), mặc định "Y"
+// (import luôn ghi "Y"). Là phần thứ 3 của Mã ĐG: ĐL_NG_<Hình ảnh>.
+function TC_hinhAnhCuaDong_(r) {
+  const p = String(r[15] || "").trim().toUpperCase();
+  if (p === "Y" || p === "N") return p;
+  const duoi = String(r[16] || "").trim().toUpperCase().split("_").pop();
+  return duoi === "N" ? "N" : "Y";
+}
+
+// thongTin = {khachHang, daiLy, nguonGoc, hinhAnh: "Y"|"N"}
+// BẮT BUỘC: đổi Đại lý, Nguồn gốc hoặc Hình ảnh (-> đổi Mã ĐG) thì phải TÍNH ĐƯỢC giá mới
 // (có báo giá khớp Mã ĐG + khối lượng + ngày cân) mới lưu. Giá được tính TRƯỚC,
 // không tính được -> KHÔNG ghi gì; tính được -> ghi thông tin + giá cùng lượt,
 // không có trạng thái "đã đổi Mã ĐG nhưng giá còn cũ/lỗi".
@@ -5657,9 +5668,11 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
     const cu = sheet.getRange(dong, 1, 1, 26).getValues()[0];
     if (String(cu[24] || "").trim() === "OK") throw new Error("Phiếu " + maCT + " đã đóng thanh toán (Trạng thái giá = OK) - không sửa được.");
 
-    const truoc = { kh: String(cu[11] || ""), dl: String(cu[13] || ""), ng: String(cu[14] || "") };
-    const doiMaDG = truoc.dl !== dl || truoc.ng !== ng;
-    const thayDoi = [["Khách hàng", truoc.kh, kh], ["Đại lý", truoc.dl, dl], ["Nguồn gốc", truoc.ng, ng]]
+    const truoc = { kh: String(cu[11] || ""), dl: String(cu[13] || ""), ng: String(cu[14] || ""), ha: TC_hinhAnhCuaDong_(cu) };
+    const ha = thongTin.hinhAnh === undefined || thongTin.hinhAnh === "" ? truoc.ha : String(thongTin.hinhAnh).trim().toUpperCase();
+    if (ha !== "Y" && ha !== "N") throw new Error("Hình ảnh chỉ nhận Y (có hình ảnh) hoặc N (không hình ảnh).");
+    const doiMaDG = truoc.dl !== dl || truoc.ng !== ng || truoc.ha !== ha;
+    const thayDoi = [["Khách hàng", truoc.kh, kh], ["Đại lý", truoc.dl, dl], ["Nguồn gốc", truoc.ng, ng], ["Hình ảnh", truoc.ha, ha]]
       .filter(function (x) { return x[1] !== x[2]; }).map(function (x) { return x[0] + ": " + x[1] + " → " + x[2]; });
     if (!thayDoi.length) throw new Error("Không có thay đổi nào để lưu.");
 
@@ -5668,13 +5681,13 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
     moi[11] = kh; moi[18] = new Date();
     let kq = null;
     if (doiMaDG) {
-      moi[10] = dl + "_" + ng; moi[13] = dl; moi[14] = ng; moi[16] = dl + "_" + ng + "_Y";
+      moi[10] = dl + "_" + ng; moi[13] = dl; moi[14] = ng; moi[15] = ha; moi[16] = dl + "_" + ng + "_" + ha;
       kq = TG_tinhGiaDong_(moi, TG_docBaoGia_());
       if (kq.trangThai !== "Test giá") {
         const klTan = (parseFloat(cu[9]) || 0) / 1000;
         const ngay = cu[1] instanceof Date ? Utilities.formatDate(cu[1], "GMT+7", "dd/MM/yyyy") : String(cu[1] || "");
         throw new Error("CHƯA LƯU: không tính được giá cho Mã ĐG " + moi[16] + " (khối lượng " + klTan.toLocaleString("vi-VN")
-          + " tấn, ngày cân " + ngay + ") - chưa có báo giá hiệu lực khớp. Kiểm tra lại Đại lý / Nguồn gốc, hoặc nhập báo giá cho mã này trước.");
+          + " tấn, ngày cân " + ngay + ") - chưa có báo giá hiệu lực khớp. Kiểm tra lại Đại lý / Nguồn gốc / Hình ảnh, hoặc nhập báo giá cho mã này trước.");
       }
       moi[19] = kq.gia; moi[23] = kq.hieuSo; moi[24] = kq.trangThai; moi[25] = kq.thanhTien;
     }
@@ -5725,6 +5738,36 @@ function TC_tinhLaiGiaPhieu_(maChungTu) {
       status: "success",
       message: "Đã tính lại giá phiếu " + maCT + ": " + TC_moTaGia_(kq) + (soDraft ? " · đã cập nhật bản sao trong Draft Chưa TT" : ""),
       ketQua: kq
+    };
+  });
+}
+
+// Tính lại giá các phiếu ĐƯỢC CHỌN (ô chọn ở bảng Tra cứu). Phiếu đã OK, đã chuyển
+// sang lưu trữ hoặc không còn trong PhieuCan_DN được bỏ qua và báo số lượng.
+const TC_TOI_DA_PHIEU_CHON_ = 5000;
+function TC_tinhLaiGiaCacPhieu_(dsMaChungTu) {
+  return TC_chayCoKhoa_(function () {
+    const ds = Array.from(new Set((Array.isArray(dsMaChungTu) ? dsMaChungTu : []).map(function (x) { return String(x == null ? "" : x).trim(); }).filter(Boolean)));
+    if (!ds.length) throw new Error("Chưa chọn phiếu nào.");
+    if (ds.length > TC_TOI_DA_PHIEU_CHON_) throw new Error("Chọn tối đa " + TC_TOI_DA_PHIEU_CHON_ + " phiếu mỗi lần - dùng \"Tính lại giá theo bộ lọc\" cho số lượng lớn hơn.");
+    const can = new Set(ds);
+    const gia = runCalculatePrice_core_(function (r) { return can.has(String(r[21] || "").trim()); });
+    if (gia.status !== "success") return gia;
+    const boQua = ds.length - gia.soPhieu;
+    let soDraft = 0;
+    if (gia.soPhieu) {
+      const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.DATA_SHEET);
+      soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
+    }
+    logAudit_("TINH_LAI_GIA", "OK", "Phiếu đã chọn: " + gia.soPhieu + "/" + ds.length + " phiếu, " + gia.soLoiBaoGia + " phiếu Lỗi ĐK/Báo giá, bỏ qua " + boQua
+      + ", cập nhật Draft " + soDraft + " phiếu. " + ds.slice(0, 50).join(", ") + (ds.length > 50 ? "…" : ""));
+    return {
+      status: "success",
+      message: (gia.soPhieu ? "Đã tính lại giá " + gia.soPhieu + "/" + ds.length + " phiếu đã chọn" : "Không tính lại được phiếu nào trong " + ds.length + " phiếu đã chọn")
+        + (gia.soLoiBaoGia ? " - ⚠️ " + gia.soLoiBaoGia + " phiếu Lỗi ĐK/Báo giá (chưa có báo giá khớp)" : "")
+        + (boQua ? " · bỏ qua " + boQua + " phiếu đã đóng thanh toán (OK) / đã khóa sổ / không còn trong sheet" : "")
+        + (soDraft ? " · đã cập nhật " + soDraft + " phiếu trong Draft Chưa TT" : "") + ".",
+      soPhieu: gia.soPhieu, soLoiBaoGia: gia.soLoiBaoGia, soBoQua: boQua
     };
   });
 }

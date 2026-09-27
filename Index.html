@@ -1044,19 +1044,27 @@
             <div class="stat"><div class="label">TỔNG THÀNH TIỀN</div><div class="value" id="tcn_sumTien">0</div></div>
           </div>
           <div class="card">
-            <div class="btnrow chi-ghi" id="tcn_hanhDong" style="display:none;align-items:center;margin:0 0 12px;">
-              <button class="btn btn-accent" id="btnTinhLaiGiaLoat">🔄 Tính lại giá</button>
-              <span id="tcn_hanhDongGhiChu" style="font-size:12px;color:var(--ink-soft);"></span>
+            <div class="chi-ghi" id="tcn_hanhDong" style="display:none;margin:0 0 12px;">
+              <div class="btnrow" style="align-items:center;margin:0 0 6px;">
+                <button class="btn btn-primary" id="btnTinhLaiGiaChon" disabled>🔄 Tính lại giá 0 phiếu đã chọn</button>
+                <button class="btn btn-ghost btn-sm" id="btnBoChonTraCuu" disabled>Bỏ chọn</button>
+                <span style="font-size:12px;color:var(--ink-soft);">Tích ô ☐ đầu dòng để chọn phiếu (chỉ phiếu chưa đóng thanh toán mới chọn được); ô ở tiêu đề = chọn tất cả phiếu đang hiển thị.</span>
+              </div>
+              <div class="btnrow" style="align-items:center;margin:0;">
+                <button class="btn btn-accent" id="btnTinhLaiGiaLoat">🔄 Tính lại giá</button>
+                <span id="tcn_hanhDongGhiChu" style="font-size:12px;color:var(--ink-soft);"></span>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
+                    <th class="chi-ghi" style="width:34px;text-align:center;"><input type="checkbox" id="tcn_chonTatCa" title="Chọn tất cả phiếu chưa đóng thanh toán đang hiển thị"></th>
                     <th>Mã chứng từ</th><th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Biển số</th><th>Khách hàng</th>
-                    <th>Đại lý</th><th>Nguồn gốc</th><th class="num">KL Hàng (Kg)</th><th class="num">Thành tiền</th><th>Trạng thái giá</th><th>Thanh toán</th><th>Nơi lưu</th><th></th>
+                    <th>Đại lý</th><th>Nguồn gốc</th><th>Hình ảnh</th><th class="num">KL Hàng (Kg)</th><th class="num">Thành tiền</th><th>Trạng thái giá</th><th>Thanh toán</th><th>Nơi lưu</th><th></th>
                   </tr>
                 </thead>
-                <tbody id="tcn_tableBody"><tr><td colspan="13" class="empty-state">Nhập từ khóa hoặc chọn ngày rồi bấm Tìm.</td></tr></tbody>
+                <tbody id="tcn_tableBody"><tr><td colspan="15" class="empty-state">Nhập từ khóa hoặc chọn ngày rồi bấm Tìm.</td></tr></tbody>
               </table>
             </div>
             <div id="tcn_ghiChu" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
@@ -1503,7 +1511,8 @@
                   <li><b>Phiếu cân nhập</b>: gõ số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc hoặc mã đơn giá (không cần gõ dấu) rồi bấm <b>Tìm</b> hoặc Enter. Mặc định tìm trong 90 ngày gần nhất; xóa trống 2 ô ngày để tìm toàn bộ, kể cả các năm đã khóa sổ (cột "Nơi lưu" cho biết phiếu đang ở sheet nào).</li>
                   <li><b>Phiếu cân xuất</b>: tìm theo số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/kho nhập.</li>
                   <li>Bấm vào 1 dòng (hoặc nút <b>🔍 Xem</b>) để mở <b>chi tiết phiếu</b>: thông tin chính + toàn bộ các cột trên sheet; phiếu nhập có nút <b>In Phiếu Nhập Kho</b>. Nút <b>🔍 Chi tiết</b> cũng có sẵn trên từng dòng của các báo cáo phiếu cân nhập/xuất.</li>
-                  <li><b>Sửa phiếu nhập</b> (vai trò Nhân viên trở lên): trong chi tiết phiếu CHƯA đóng thanh toán (Trạng thái giá khác "OK"), sửa <b>Khách hàng / Đại lý / Nguồn gốc</b> rồi bấm <b>Lưu &amp; tính lại giá</b> - Mã ĐG tự đổi thành <code>ĐL_NG_Y</code>. Đổi Đại lý / Nguồn gốc <b>bắt buộc tính được giá mới</b> theo báo giá hiệu lực tại ngày cân mới lưu; không có báo giá khớp thì <b>không lưu gì</b> (báo rõ Mã ĐG, khối lượng, ngày cân để kiểm tra). Chỉ đổi Khách hàng thì giá giữ nguyên. Nút <b>Chỉ tính lại giá</b> tính lại mà không sửa gì. Phiếu đã OK hoặc đã chuyển sang sheet lưu trữ thì không sửa được.</li>
+                  <li><b>Sửa phiếu nhập</b> (vai trò Nhân viên trở lên): trong chi tiết phiếu CHƯA đóng thanh toán (Trạng thái giá khác "OK"), sửa <b>Khách hàng / Đại lý / Nguồn gốc / Hình ảnh (Y/N)</b> rồi bấm <b>Lưu &amp; tính lại giá</b> - Mã ĐG tự đổi thành <code>ĐL_NG_Y</code> (có hình ảnh) hoặc <code>ĐL_NG_N</code> (không hình ảnh). Đổi Đại lý / Nguồn gốc / Hình ảnh <b>bắt buộc tính được giá mới</b> theo báo giá hiệu lực tại ngày cân mới lưu; không có báo giá khớp thì <b>không lưu gì</b> (báo rõ Mã ĐG, khối lượng, ngày cân để kiểm tra). Chỉ đổi Khách hàng thì giá giữ nguyên. Nút <b>Chỉ tính lại giá</b> tính lại mà không sửa gì. Phiếu đã OK hoặc đã chuyển sang sheet lưu trữ thì không sửa được.</li>
+                  <li><b>Chọn nhiều phiếu</b>: tích ô ☐ đầu dòng (chỉ phiếu chưa đóng thanh toán) hoặc ô ở tiêu đề để chọn tất cả phiếu đang hiển thị, rồi bấm <b>🔄 Tính lại giá … phiếu đã chọn</b>.</li>
                   <li><b>Tính lại giá hàng loạt</b>: sau khi Tìm, nút <b>🔄 Tính lại giá … phiếu chưa đóng thanh toán</b> tính lại giá mọi phiếu chưa OK khớp đúng bộ lọc vừa tìm (kể cả phiếu ngoài 500 dòng đang hiển thị). Phiếu đã OK không bị động tới.</li>
                   <li>Phiếu có trong sheet Draft Chưa Thanh Toán được cập nhật theo khi sửa/tính lại giá. Mọi thao tác sửa/tính lại giá đều ghi vào Nhật ký hoạt động. Vai trò Chỉ xem chỉ tra cứu, xem chi tiết.</li>
                 </ul>
@@ -2059,7 +2068,7 @@
       loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null, dhEditingStt: null,
       loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
       loadedLuuTru: false, loadedNhatKy: false, nkTrang: 1, currentUser: null,
-      loadedTraCuuNhap: false, loadedTraCuuXuat: false, tcBoLocNhap: null, tcSoChuaChot: 0
+      loadedTraCuuNhap: false, loadedTraCuuXuat: false, tcBoLocNhap: null, tcSoChuaChot: 0, tcChon: new Set()
     };
 
     // ---------------------------------------------------------------
@@ -2752,11 +2761,12 @@
     }
     async function tcTimNhap(){
       const body = document.getElementById('tcn_tableBody');
-      body.innerHTML = '<tr><td colspan="13" class="empty-state">Đang tìm…</td></tr>';
+      body.innerHTML = '<tr><td colspan="15" class="empty-state">Đang tìm…</td></tr>';
+      state.tcChon = new Set(); tcCapNhatChon();
       try {
         const boLoc = tcBoLoc('tcn');
         const res = await runServer('TC_traCuuPhieuNhap', boLoc);
-        if (res.status !== 'success') { body.innerHTML = '<tr><td colspan="13" class="empty-state">' + escapeHtml(res.message) + '</td></tr>'; return; }
+        if (res.status !== 'success') { body.innerHTML = '<tr><td colspan="15" class="empty-state">' + escapeHtml(res.message) + '</td></tr>'; return; }
         document.getElementById('tcn_sumSoLuong').textContent = fmtNum(res.summary.soLuong);
         document.getElementById('tcn_sumKL').textContent = fmtNum(res.summary.tongKL);
         document.getElementById('tcn_sumTien').textContent = fmtNum(res.summary.tongTien);
@@ -2766,10 +2776,11 @@
         document.getElementById('tcn_hanhDong').style.display = state.tcSoChuaChot > 0 ? '' : 'none';
         document.getElementById('btnTinhLaiGiaLoat').textContent = '🔄 Tính lại giá ' + fmtNum(state.tcSoChuaChot) + ' phiếu chưa đóng thanh toán';
         document.getElementById('tcn_hanhDongGhiChu').textContent = 'Các phiếu khớp bộ lọc có Trạng thái giá khác "OK" (kể cả phiếu ngoài 500 dòng đang hiển thị). Phiếu đã OK không bị động tới.';
-        if (!res.data.length) { body.innerHTML = '<tr><td colspan="13" class="empty-state">Không tìm thấy phiếu cân nhập nào.</td></tr>'; return; }
+        if (!res.data.length) { body.innerHTML = '<tr><td colspan="15" class="empty-state">Không tìm thấy phiếu cân nhập nào.</td></tr>'; return; }
         veBangTheoLo(body, res.data, r=>{
           const daLap = r.trangThaiThanhToan !== 'Chưa lập ĐNTT';
           return '<tr data-tc-mo data-tc-nhap-dong="' + escapeHtml(r.maChungTu) + '">'
+            + '<td class="chi-ghi tc-o-chon" style="text-align:center;">' + (r.choSua ? '<input type="checkbox" class="tc-chon" value="' + escapeHtml(r.maChungTu) + '"' + (state.tcChon.has(r.maChungTu) ? ' checked' : '') + '>' : '') + '</td>'
             + '<td class="mono">' + escapeHtml(r.maChungTu) + '</td>'
             + '<td>' + escapeHtml(r.soPhieu) + '</td>'
             + '<td>' + escapeHtml(r.ngayGioCan1) + '</td>'
@@ -2777,6 +2788,7 @@
             + '<td>' + escapeHtml(r.khachHang) + '</td>'
             + '<td>' + escapeHtml(r.daiLy) + '</td>'
             + '<td>' + escapeHtml(r.nguonGoc) + '</td>'
+            + '<td>' + (r.hinhAnh === 'N' ? 'Không (N)' : 'Có (Y)') + '</td>'
             + '<td class="num">' + fmtNum(r.klHang) + '</td>'
             + '<td class="num">' + fmtNum(r.thanhTien) + '</td>'
             + '<td><span class="badge ' + (r.trangThaiGia === 'OK' ? 'badge-ok' : (r.trangThaiGia === 'Test giá' ? 'badge-neutral' : 'badge-warn')) + '">' + escapeHtml(r.trangThaiGia || '—') + '</span></td>'
@@ -2784,9 +2796,51 @@
             + '<td>' + escapeHtml(r.noiLuu) + '</td>'
             + '<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-tc-nhap="' + escapeHtml(r.maChungTu) + '">🔍 Xem</button></td>'
             + '</tr>';
-        }, 13);
-      } catch(err){ body.innerHTML = '<tr><td colspan="13" class="empty-state">Lỗi tra cứu: ' + escapeHtml(err) + '</td></tr>'; }
+        }, 15);
+      } catch(err){ body.innerHTML = '<tr><td colspan="15" class="empty-state">Lỗi tra cứu: ' + escapeHtml(err) + '</td></tr>'; }
     }
+    // --- Chọn nhiều phiếu để tính lại giá ---
+    function tcCapNhatChon(){
+      const n = state.tcChon.size;
+      const nut = document.getElementById('btnTinhLaiGiaChon');
+      nut.textContent = '🔄 Tính lại giá ' + fmtNum(n) + ' phiếu đã chọn';
+      nut.disabled = n === 0;
+      document.getElementById('btnBoChonTraCuu').disabled = n === 0;
+      const tatCa = document.querySelectorAll('#tcn_tableBody .tc-chon');
+      const daTich = document.querySelectorAll('#tcn_tableBody .tc-chon:checked');
+      const o = document.getElementById('tcn_chonTatCa');
+      o.checked = tatCa.length > 0 && daTich.length === tatCa.length;
+      o.indeterminate = daTich.length > 0 && daTich.length < tatCa.length;
+    }
+    document.getElementById('tcn_tableBody').addEventListener('change', e=>{
+      if (!e.target.classList || !e.target.classList.contains('tc-chon')) return;
+      if (e.target.checked) state.tcChon.add(e.target.value); else state.tcChon.delete(e.target.value);
+      tcCapNhatChon();
+    });
+    document.getElementById('tcn_chonTatCa').addEventListener('change', e=>{
+      document.querySelectorAll('#tcn_tableBody .tc-chon').forEach(o=>{
+        o.checked = e.target.checked;
+        if (o.checked) state.tcChon.add(o.value); else state.tcChon.delete(o.value);
+      });
+      tcCapNhatChon();
+    });
+    document.getElementById('btnBoChonTraCuu').addEventListener('click', ()=>{
+      state.tcChon.clear();
+      document.querySelectorAll('#tcn_tableBody .tc-chon').forEach(o=>{ o.checked = false; });
+      tcCapNhatChon();
+    });
+    document.getElementById('btnTinhLaiGiaChon').addEventListener('click', async ()=>{
+      const ds = Array.from(state.tcChon);
+      if (!ds.length) return;
+      if (!confirm('Tính lại giá ' + fmtNum(ds.length) + ' phiếu đã chọn theo báo giá hiệu lực tại ngày cân của từng phiếu?\n\nPhiếu vừa được đóng thanh toán (OK) trong lúc chờ sẽ tự bỏ qua.')) return;
+      showOverlay('Đang tính lại giá ' + fmtNum(ds.length) + ' phiếu đã chọn…');
+      try {
+        const res = await runServer('TC_tinhLaiGiaCacPhieu', ds);
+        toast(res.message, res.status === 'success');
+        if (res.status === 'success') tcTimNhap();
+      } catch(err){ toast('Lỗi tính lại giá: ' + err, false); } finally { hideOverlay(); }
+    });
+
     async function tcTimXuat(){
       const body = document.getElementById('tcx_tableBody');
       body.innerHTML = '<tr><td colspan="11" class="empty-state">Đang tìm…</td></tr>';
@@ -2864,7 +2918,7 @@
         const html = tcTheHtml([
           ['Số phiếu', t.soPhieu], ['Mã chứng từ', d.maChungTu], ['Biển số', t.soXe],
           ['Ngày giờ cân 1', t.ngayGioCan1], ['Ngày giờ cân 2', t.ngayGioCan2], ['Khách hàng', t.khachHang],
-          ['Đại lý', t.daiLy], ['Nguồn gốc', t.nguonGoc], ['Mã đơn giá', t.maDonGia],
+          ['Đại lý', t.daiLy], ['Nguồn gốc', t.nguonGoc], ['Hình ảnh', t.hinhAnh === 'N' ? 'Không hình ảnh (N)' : 'Có hình ảnh (Y)'], ['Mã đơn giá', t.maDonGia],
           ['Cân lần 1 (Kg)', fmtSo(t.klCan1)], ['Cân lần 2 (Kg)', fmtSo(t.klCan2)], ['KL hàng (Kg)', fmtSo(t.klHang), true],
           ['Đơn giá', fmtSo(t.donGia)], ['Thành tiền', fmtNum(t.thanhTien), true], ['Trạng thái giá', t.trangThaiGia],
           ['Thanh toán (ĐNTT)', t.trangThaiThanhToan]
@@ -2905,18 +2959,24 @@
         + '<div class="field"><label>Khách hàng</label><input id="tcs_kh" list="tcdl_kh" value="' + escapeHtml(t.khachHang) + '"></div>'
         + '<div class="field"><label>Đại lý (ĐL)</label><input id="tcs_dl" list="tcdl_dl" value="' + escapeHtml(t.daiLy) + '" style="text-transform:uppercase;"></div>'
         + '<div class="field"><label>Nguồn gốc (NG)</label><input id="tcs_ng" list="tcdl_ng" value="' + escapeHtml(t.nguonGoc) + '" style="text-transform:uppercase;"></div>'
+        + '<div class="field"><label>Hình ảnh</label><select id="tcs_ha">'
+        + '<option value="Y"' + (t.hinhAnh === 'N' ? '' : ' selected') + '>Có hình ảnh (Y)</option>'
+        + '<option value="N"' + (t.hinhAnh === 'N' ? ' selected' : '') + '>Không hình ảnh (N)</option></select></div>'
         + '</div>'
-        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Mã ĐG mới: <b id="tcs_maDG">' + escapeHtml(t.maDonGia) + '</b> · Đổi <b>Đại lý / Nguồn gốc</b> bắt buộc tính được giá mới (có báo giá hiệu lực khớp Mã ĐG + khối lượng + ngày cân) mới lưu - không tính được giá thì <b>không lưu</b>. Chỉ đổi Khách hàng thì giá giữ nguyên.</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Mã ĐG mới: <b id="tcs_maDG">' + escapeHtml(t.maDonGia) + '</b> · Đổi <b>Đại lý / Nguồn gốc / Hình ảnh</b> bắt buộc tính được giá mới (có báo giá hiệu lực khớp Mã ĐG + khối lượng + ngày cân) mới lưu - không tính được giá thì <b>không lưu</b>. Chỉ đổi Khách hàng thì giá giữ nguyên.</div>'
         + '<div class="btnrow" style="margin:0;">'
         + '<button type="button" class="btn btn-primary" data-tc-luu>💾 Lưu &amp; tính lại giá</button>'
         + '<button type="button" class="btn btn-ghost" data-tc-tinhgia>🔄 Chỉ tính lại giá</button>'
         + '</div></div>';
     }
     document.getElementById('tcModalNoiDung').addEventListener('input', e=>{
-      if (e.target.id !== 'tcs_dl' && e.target.id !== 'tcs_ng') return;
+      if (['tcs_dl', 'tcs_ng', 'tcs_ha'].indexOf(e.target.id) === -1) return;
       const dl = document.getElementById('tcs_dl').value.trim().toUpperCase();
       const ng = document.getElementById('tcs_ng').value.trim().toUpperCase();
-      document.getElementById('tcs_maDG').textContent = dl + '_' + ng + '_Y';
+      document.getElementById('tcs_maDG').textContent = dl + '_' + ng + '_' + document.getElementById('tcs_ha').value;
+    });
+    document.getElementById('tcModalNoiDung').addEventListener('change', e=>{
+      if (e.target.id === 'tcs_ha') e.target.dispatchEvent(new Event('input', { bubbles: true }));
     });
     async function tcSauKhiGhi(res, maCT){
       toast(res.message, res.status === 'success');
@@ -2932,7 +2992,8 @@
         const thongTin = {
           khachHang: document.getElementById('tcs_kh').value.trim(),
           daiLy: document.getElementById('tcs_dl').value.trim(),
-          nguonGoc: document.getElementById('tcs_ng').value.trim()
+          nguonGoc: document.getElementById('tcs_ng').value.trim(),
+          hinhAnh: document.getElementById('tcs_ha').value
         };
         if (!thongTin.khachHang || !thongTin.daiLy || !thongTin.nguonGoc) { toast('Vui lòng nhập đủ Khách hàng, Đại lý và Nguồn gốc.', false); return; }
         showOverlay('Đang lưu và tính lại giá…');
@@ -2963,7 +3024,7 @@
       if (nutNhap) { tcMoChiTietNhap(nutNhap.getAttribute('data-tc-nhap')); return; }
       const nutXuat = e.target.closest('[data-tc-xuat]');
       if (nutXuat) { tcMoChiTietXuat(nutXuat.getAttribute('data-tc-xuat'), nutXuat.getAttribute('data-tc-ts')); return; }
-      if (e.target.closest('button, a, input, select')) return;
+      if (e.target.closest('button, a, input, select, .tc-o-chon')) return;
       const dong = e.target.closest('tr[data-tc-mo]');
       if (!dong) return;
       if (dong.hasAttribute('data-tc-nhap-dong')) tcMoChiTietNhap(dong.getAttribute('data-tc-nhap-dong'));
