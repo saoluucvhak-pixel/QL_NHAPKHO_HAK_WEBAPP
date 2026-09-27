@@ -52,7 +52,7 @@ function createGasEnv(opts) {
   const propertiesService = mocks.makeFakePropertiesService();
   const spreadsheetApp = mocks.makeFakeSpreadsheetApp();
   // Mặc định đăng nhập bằng Admin gốc (đa số test kiểm tra nghiệp vụ); test phân quyền truyền email riêng hoặc ''.
-  const session = mocks.makeFakeSession(opts.email === undefined ? ADMIN_GOC : opts.email);
+  const session = mocks.makeFakeSession(opts.email === undefined ? ADMIN_GOC : opts.email, opts.chuScript === undefined ? ADMIN_GOC : opts.chuScript);
   const driveApp = mocks.makeFakeDriveApp();
   const cacheService = mocks.makeFakeCacheService();
   const lockService = mocks.makeFakeLockService(); // khóa toàn cục dùng chung - xem gasMocks

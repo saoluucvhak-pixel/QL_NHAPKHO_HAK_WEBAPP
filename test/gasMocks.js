@@ -392,10 +392,12 @@ function makeFakeLockService() {
   return Object.assign(state, { getScriptLock: () => lock, getUserLock: () => lock, getDocumentLock: () => lock });
 }
 
-function makeFakeSession(initialEmail) {
+// chuScript: email tài khoản triển khai webapp (Session.getEffectiveUser - chủ script).
+function makeFakeSession(initialEmail, chuScript) {
   let email = initialEmail || '';
   return {
     getActiveUser: () => ({ getEmail: () => email }),
+    getEffectiveUser: () => ({ getEmail: () => chuScript || '' }),
     getScriptTimeZone: () => 'Asia/Ho_Chi_Minh',
     __setEmail: (e) => { email = e; },
   };

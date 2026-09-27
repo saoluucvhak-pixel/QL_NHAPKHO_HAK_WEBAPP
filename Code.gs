@@ -15,10 +15,11 @@ function doGet(e) {
 
   // PHÂN QUYỀN (xem mục "CỔNG ĐĂNG NHẬP GMAIL" trong Config.gs): trang giao diện
   // KHÔNG chứa dữ liệu - mọi dữ liệu chỉ lấy được qua API() khi đã có phiên đăng
-  // nhập hợp lệ. doGet() chỉ lo: (1) hướng dẫn cài đặt nếu chưa có Cổng đăng
-  // nhập, (2) nhận "vé" Cổng đăng nhập chuyển về sau khi đăng nhập (?cong=...).
-  if (!daCauHinhDangNhap_()) return trangHuongDanCauHinhDangNhap_();
-
+  // nhập hợp lệ. doGet() cấp phiên khi: (1) nhận "vé" Cổng đăng nhập (?cong=...),
+  // hoặc (2) Google cho biết thẳng email người mở (chủ script, người cùng tên miền
+  // Google Workspace) - nhờ vậy chủ script vào được ngay cả khi CHƯA cài Cổng, rồi
+  // cài Cổng ngay trên giao diện (Hệ thống › Quản lý người dùng), không cần mở
+  // trình soạn thảo Apps Script.
   const p = (e && e.parameter) || {};
   let phienMoi = "";
   let thongBao = "";
@@ -30,6 +31,9 @@ function doGet(e) {
     } catch (err) {
       thongBao = "Lỗi khi đăng nhập: " + err;
     }
+  } else {
+    const nd = DN_nhanDienTrucTiep_();
+    if (nd) phienMoi = taoPhien_(nd.email);
   }
 
   const t = HtmlService.createTemplateFromFile('Index');

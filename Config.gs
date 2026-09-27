@@ -583,12 +583,12 @@ function HT_thuHoiToanBoQuyenDriveChoEmail_(email) {
 //    được bằng google.script.run. KHI THÊM CHỨC NĂNG MỚI cho giao diện: viết
 //    hàm tenHam_(...) rồi thêm 1 dòng vào taoApiRoutes_ kèm mức quyền.
 //
-// CÀI ĐẶT 1 LẦN (trang hướng dẫn tự hiện khi chưa cài): trong trình soạn thảo
-// Apps Script chọn hàm CAI_DAT_CONG_DANG_NHAP → Chạy → sao chép mã nguồn Cổng
-// trong "Nhật ký thực thi" → tạo dự án mới (script.new), dán vào, triển khai
-// Web app (Execute as: User accessing the web app · Who has access: Anyone
-// with Google account) → mở link Cổng bằng tài khoản Admin để đăng nhập → vào
-// Hệ thống › Quản lý người dùng › Cổng đăng nhập, dán link Cổng rồi Lưu.
+// CÀI ĐẶT 1 LẦN - làm hết trên giao diện, không cần mở trình soạn thảo: chủ
+// script mở webapp là vào thẳng (Google cho biết email chủ script), vào Hệ thống
+// › Quản lý người dùng › Cổng đăng nhập: bấm "Sao chép mã nguồn" (khóa bí mật tự
+// tạo và nằm sẵn trong mã, không ai phải nhớ) → dán vào dự án mới ở script.new →
+// Deploy Web app (Execute as: User accessing the web app · Who has access:
+// Anyone with Google account) → dán link Web app của Cổng vào ô và Lưu.
 //
 // 4 vai trò (xem VAI_TRO / QUYEN_THEO_VAI_TRO bên dưới): Quản trị (toàn quyền),
 // Tổng hợp (nghiệp vụ + Sao lưu, Nhật ký), Nhân viên (nghiệp vụ hằng ngày), Chỉ
@@ -610,8 +610,8 @@ const QUYEN_THEO_VAI_TRO = {
   NHANVIEN: [QUYEN.XEM, QUYEN.NGHIEP_VU],
   CHIXEM: [QUYEN.XEM]
 };
-// Quản trị cố định: LUÔN là Quản trị, không khóa/đổi được từ webapp (tránh tự
-// khóa nhầm mình ra ngoài). Thêm/bớt email trực tiếp tại đây.
+// Quản trị cố định (cùng với CHỦ SCRIPT): LUÔN là Quản trị, không khóa/đổi được
+// từ webapp (tránh tự khóa nhầm mình ra ngoài). Thêm/bớt email trực tiếp tại đây.
 const QUAN_TRI_CO_DINH = ["saoluucvhak@gmail.com", "phuthuy.apple@gmail.com"];
 const TRANG_THAI_ND = { HOAT_DONG: "Hoạt động", KHOA: "Khóa" };
 
@@ -707,9 +707,30 @@ function chuanHoaEmailSoSanh_(email) {
   return m[1].split("+")[0].replace(/\./g, "") + "@gmail.com";
 }
 
+/** Email chủ script (tài khoản triển khai webapp) - luôn là Quản trị. */
+function emailChuScript_() {
+  try { return String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { return ""; }
+}
+function danhSachQuanTriCoDinh_() {
+  const ds = QUAN_TRI_CO_DINH.map(function (x) { return String(x).toLowerCase(); });
+  const chu = emailChuScript_();
+  if (chu && !ds.some(function (x) { return chuanHoaEmailSoSanh_(x) === chuanHoaEmailSoSanh_(chu); })) ds.unshift(chu);
+  return ds;
+}
 function laQuanTriCoDinh_(email) {
   const e = chuanHoaEmailSoSanh_(email);
-  return !!e && QUAN_TRI_CO_DINH.some(function (x) { return chuanHoaEmailSoSanh_(x) === e; });
+  return !!e && danhSachQuanTriCoDinh_().some(function (x) { return chuanHoaEmailSoSanh_(x) === e; });
+}
+
+/** Người mở webapp mà Google cho biết thẳng email (chủ script; người cùng tên miền
+ * Workspace) và có quyền -> được cấp phiên ngay, không cần qua Cổng. Người khác
+ * Google không cho biết email (trả rỗng) -> phải đăng nhập qua Cổng. */
+function DN_nhanDienTrucTiep_() {
+  let email = "";
+  try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { email = ""; }
+  if (!email) return null;
+  const nd = timNguoiDungTheoEmail_(email);
+  return nd.coQuyen ? nd : null;
 }
 
 /** Người dùng + vai trò HIỆU LỰC (null nếu chưa được cấp quyền hoặc đang bị Khóa). */
@@ -846,28 +867,6 @@ function taoMaNguonCong_(khoa, linkChinh) {
     '}',
     ''
   ].join("\n");
-}
-
-// CHẠY TAY 1 LẦN TRONG TRÌNH SOẠN THẢO APPS SCRIPT (chọn hàm này → Chạy):
-// tạo khóa bí mật (nếu chưa có) rồi in mã nguồn Cổng ra "Nhật ký thực thi".
-// Hàm KHÔNG trả về gì và chỉ ghi vào nhật ký của chủ dự án, nên dù ai đó cố
-// gọi thẳng từ trình duyệt cũng không lấy được khóa; API() cũng không cho gọi.
-function CAI_DAT_CONG_DANG_NHAP() {
-  const khoa = layKhoaCong_() || taoKhoaCongMoi_();
-  const linkChinh = layLinkWebappChinh_();
-  console.log(
-    "=== CỔNG ĐĂNG NHẬP GMAIL - làm theo các bước ===\n" +
-    "1. Mở script.new (tạo dự án Apps Script MỚI, đặt tên VD \"HAK - Cong dang nhap\").\n" +
-    "2. Xóa hết nội dung Code.gs, dán TOÀN BỘ đoạn mã giữa 2 dòng ----- bên dưới, bấm Lưu.\n" +
-    "3. Deploy > New deployment > Web app: Execute as = User accessing the web app;\n" +
-    "   Who has access = Anyone with Google account > Deploy, sao chép link Web app (/exec).\n" +
-    "4. Mở link đó bằng saoluucvhak@gmail.com, cấp quyền xem email, bấm \"Vào hệ thống\".\n" +
-    "5. Trong webapp: Hệ thống > Quản lý người dùng > Cổng đăng nhập: dán link Cổng và Lưu.\n" +
-    (laLinkWebAppHopLe_(linkChinh) ? "" :
-      "!! Không tự nhận diện được URL /exec của webapp chính (" + (linkChinh || "trống") + "): đặt thuộc tính tập lệnh\n" +
-      "   LINK_WEBAPP_CHINH = URL /exec của webapp chính rồi chạy lại hàm này.\n") +
-    "-----\n" + taoMaNguonCong_(khoa, linkChinh) + "-----"
-  );
 }
 
 /* ----- Phiên đăng nhập ----- */
@@ -1083,10 +1082,10 @@ function chuyenLinkXuatThanhFile_(kq) {
 /* ----- Luồng đăng nhập qua Cổng (không cần phiên) ----- */
 function DN_layLinkDangNhap() {
   try {
-    if (!daCauHinhDangNhap_()) return { status: "error", message: "Hệ thống chưa cài đặt Cổng đăng nhập - liên hệ Quản trị viên." };
+    if (!daCauHinhDangNhap_()) return { status: "error", message: "Hệ thống chưa cài Cổng đăng nhập. Quản trị viên: mở webapp bằng tài khoản chủ webapp (vào thẳng, không cần đăng nhập) rồi cài ở Hệ thống › Quản lý người dùng › Cổng đăng nhập." };
     const link = layLinkCong_();
     if (!link) {
-      return { status: "error", message: "Chưa lưu link Cổng đăng nhập. Quản trị viên: mở trực tiếp link Cổng (Web app /exec của dự án Cổng) để đăng nhập, rồi dán link đó vào Hệ thống › Quản lý người dùng › Cổng đăng nhập." };
+      return { status: "error", message: "Chưa lưu link Cổng đăng nhập. Quản trị viên: mở webapp bằng tài khoản chủ webapp (vào thẳng), dán link Cổng vào Hệ thống › Quản lý người dùng › Cổng đăng nhập." };
     }
     return { status: "success", url: link };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -1152,26 +1151,6 @@ function xuLyVeCong_(ve) {
   return { phien: taoPhien_(nd.email) };
 }
 
-// Trang hướng dẫn cài đặt 1 lần (hiện khi chưa có khóa Cổng). Không chứa bí
-// mật nào - chỉ hướng dẫn Admin tự lấy mã nguồn Cổng trong trình soạn thảo.
-function trangHuongDanCauHinhDangNhap_() {
-  return HtmlService.createHtmlOutput(
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:40px auto;padding:28px;border:1px solid #DCE0D8;border-radius:12px;line-height:1.6;color:#1E211C;">' +
-    '<h2 style="margin-top:0;color:#1B4332;">⚙️ Cần cài đặt Cổng đăng nhập Gmail (làm 1 lần)</h2>' +
-    '<ol>' +
-    '<li>Mở dự án Apps Script của webapp này bằng tài khoản <b>saoluucvhak@gmail.com</b>.</li>' +
-    '<li>Trên thanh công cụ, chọn hàm <code>CAI_DAT_CONG_DANG_NHAP</code> rồi bấm <b>Chạy</b> (Run).</li>' +
-    '<li>Trong <b>Nhật ký thực thi</b> (Execution log) hiện ra, sao chép toàn bộ mã nguồn Cổng nằm giữa 2 dòng <code>-----</code>.</li>' +
-    '<li>Mở <b>script.new</b> (tạo dự án mới, VD đặt tên "HAK - Cong dang nhap"), xóa nội dung Code.gs, dán mã vừa sao chép, bấm Lưu.</li>' +
-    '<li><b>Deploy › New deployment › Web app</b>: <i>Execute as</i> = <b>User accessing the web app</b>; <i>Who has access</i> = <b>Anyone with Google account</b> → Deploy, sao chép link Web app.</li>' +
-    '<li>Mở link Cổng đó bằng saoluucvhak@gmail.com (cấp quyền xem email) → bấm <b>Vào hệ thống</b>.</li>' +
-    '<li>Trong webapp: <b>Hệ thống › Quản lý người dùng › Cổng đăng nhập</b>: dán link Cổng và bấm Lưu, rồi thêm email nhân viên kèm vai trò.</li>' +
-    '</ol>' +
-    '<p style="font-size:13px;color:#5B6259;">Giữ bí mật mã nguồn Cổng (có chứa khóa ký vé). Không chia sẻ dự án Cổng cho ai.</p>' +
-    '</div>'
-  ).setTitle("Cài đặt Cổng đăng nhập");
-}
-
 /* ----- Quản trị Cổng đăng nhập (chỉ Admin) ----- */
 function HT_layCauHinhCong_() {
   try {
@@ -1218,7 +1197,7 @@ function HT_layDanhSachQuyen_() {
     return {
       status: "success",
       data: DS_QUYEN_(),
-      quanTriCoDinh: QUAN_TRI_CO_DINH.slice(),
+      quanTriCoDinh: danhSachQuanTriCoDinh_(),
       vaiTro: Object.keys(VAI_TRO_NHAN).map(function (ma) { return { ma: ma, nhan: VAI_TRO_NHAN[ma] }; })
     };
   } catch (e) { return { status: "error", message: e.toString() }; }

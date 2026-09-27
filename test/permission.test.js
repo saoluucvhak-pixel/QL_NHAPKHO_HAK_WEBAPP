@@ -69,10 +69,53 @@ describe('Cổng đăng nhập: đổi vé lấy phiên (xuLyVeCong_)', () => {
 });
 
 describe('doGet()', () => {
-  test('chưa cài Cổng đăng nhập -> trang hướng dẫn cài đặt, KHÔNG render giao diện', () => {
-    const env = createGasEnv();
+  // Giống ĐNTT: chủ script mở webapp là vào thẳng (Google cho biết email chủ
+  // script) - cài Cổng ngay trên giao diện, không đụng khóa bí mật/Google Sheet/
+  // trình soạn thảo Apps Script.
+  test('CHƯA cài Cổng: chủ script mở webapp -> vào thẳng với vai trò Quản trị', () => {
+    const env = createGasEnv({ email: 'chu.webapp@gmail.com', chuScript: 'chu.webapp@gmail.com' });
     const out = env.call('doGet', { parameter: {} });
-    expect(out.__html).toMatch(/Cần cài đặt Cổng đăng nhập/);
+    expect(out.__template.__ten).toBe('Index');
+    const phien = JSON.parse(out.__template.phienMoiJson);
+    expect(phien).toMatch(/^[a-f0-9]{64}$/);
+    const u = env.callApi(phien, 'HT_layThongTinNguoiDungHienTai').data;
+    expect(u.email).toBe('chu.webapp@gmail.com');
+    expect(u.laAdmin).toBe(true);
+    // chủ script tự lấy được mã nguồn Cổng (khóa tự tạo) và lưu link Cổng trên giao diện
+    expect(env.callApi(phien, 'HT_layMaNguonCong').status).toBe('success');
+    expect(env.propertiesService.getScriptProperties().getProperty('CONG_DN_KHOA_BI_MAT')).toBeTruthy();
+    expect(env.callApi(phien, 'HT_luuLinkCong', 'https://script.google.com/macros/s/CONG/exec').status).toBe('success');
+    expect(env.call('DN_layLinkDangNhap')).toEqual({ status: 'success', url: 'https://script.google.com/macros/s/CONG/exec' });
+    expect(env.callApi(phien, 'HT_layDanhSachQuyen').quanTriCoDinh).toContain('chu.webapp@gmail.com');
+  });
+
+  test('Google không cho biết email (người ngoài tên miền) -> không có phiên, hiện màn hình đăng nhập', () => {
+    const env = createGasEnv({ email: '' });
+    const out = env.call('doGet', { parameter: {} });
+    expect(out.__template.__ten).toBe('Index');
+    expect(JSON.parse(out.__template.phienMoiJson)).toBe('');
+    expect(env.call('DN_layLinkDangNhap').message).toMatch(/chưa cài Cổng/);
+  });
+
+  test('email Google cho biết nhưng KHÔNG có trong danh sách / đang bị Khóa -> không tự cấp phiên', () => {
+    const env = createGasEnv();
+    const ma = env.maPhien();
+    env.callApi(ma, 'HT_luuDanhSachQuyen', [
+      { email: ADMIN_GOC, vaiTro: 'ADMIN' },
+      { email: 'bi-khoa@congty.vn', vaiTro: 'NHANVIEN', trangThai: 'Khóa' },
+    ]);
+    ['la@congty.vn', 'bi-khoa@congty.vn'].forEach((email) => {
+      env.session.__setEmail(email);
+      expect(JSON.parse(env.call('doGet', { parameter: {} }).__template.phienMoiJson)).toBe('');
+    });
+  });
+
+  test('người cùng tên miền Workspace có trong danh sách -> vào thẳng đúng vai trò của mình (không thành Admin)', () => {
+    const env = createGasEnv({ email: 'nv@congty.vn', vaiTro: 'NHANVIEN' });
+    const phien = JSON.parse(env.call('doGet', { parameter: {} }).__template.phienMoiJson);
+    const u = env.callApi(phien, 'HT_layThongTinNguoiDungHienTai').data;
+    expect(u.laAdmin).toBe(false);
+    expect(u.vaiTro).toBe('NHANVIEN');
   });
 
   test('đã cài Cổng + vé hợp lệ -> render Index kèm mã phiên; cho phép nhúng iframe (Portal)', () => {
@@ -139,7 +182,7 @@ describe('Bảng phân quyền API_ROUTES', () => {
     const fs = require('fs'); const path = require('path');
     const src = ['Config.gs', 'Code.gs'].map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n');
     const congKhai = [...src.matchAll(/^function ([A-Za-z0-9_$]+)\s*\(/gm)].map((m) => m[1]).filter((n) => !n.endsWith('_')).sort();
-    expect(congKhai).toEqual(['API', 'CAI_DAT_CONG_DANG_NHAP', 'DN_dangXuat', 'DN_kiemTraPhien', 'DN_layLinkDangNhap', 'TRIGGER_saoLuuHangDem', 'doGet', 'runCalculatePrice'].sort());
+    expect(congKhai).toEqual(['API', 'DN_dangXuat', 'DN_kiemTraPhien', 'DN_layLinkDangNhap', 'TRIGGER_saoLuuHangDem', 'doGet', 'runCalculatePrice'].sort());
   });
 
   describe.each(Object.keys(QUYEN_CUA_VAI_TRO))('Vai trò %s: được/không được gọi đúng từng chức năng', (vaiTro) => {
