@@ -35,3 +35,11 @@ Nghiệp vụ, công thức tính giá, tên Sheet, tên/thứ tự cột, API `
 
 ## Tương thích / Quay lui
 Không đổi dữ liệu hay cấu trúc Sheet → quay lại bản trước chỉ cần dán lại 3 file cũ và deploy phiên bản mới.
+
+## Cập nhật 27/09/2026 — Bỏ chức năng "Chốt sổ năm" (theo yêu cầu)
+
+- Đã gỡ: nút/bảng "Lưu trữ phiếu cân theo năm (Chốt sổ)" trong Hệ thống › Lưu trữ & Sao lưu; hàm máy chủ `HT_chotSoNam`, `HT_layThongKeNamPhieuCan`, `LT_locDongChuaLuuTru_` và 2 mục tương ứng trong `HAM_API_`. Phần Sao lưu tự động giữ nguyên.
+- Giữ lại phần **đọc** sheet `PhieuCan_DN_<năm>` nếu trước đây từng tạo, để báo cáo / kiểm tra trùng khi import / tra cứu vẫn thấy dữ liệu đó. Không có sheet nào như vậy thì chỉ tốn 1 lệnh `getSheets()`.
+- STUCK-01 không còn áp dụng (chức năng liên quan đã bỏ).
+- Hệ quả cần biết: toàn bộ lịch sử phiếu cân nằm mãi trong `PhieuCan_DN`. Import (kiểm tra trùng) và Tính giá đọc toàn bộ sheet này, nên thời gian các thao tác đó sẽ tăng dần theo số năm dữ liệu; trần 10 triệu ô/file (~370.000 phiếu với 27 cột) áp dụng trực tiếp cho sheet này.
+- Test: 204/204 đạt (bỏ 11 test của chức năng đã gỡ).

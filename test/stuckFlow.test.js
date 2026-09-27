@@ -24,7 +24,6 @@ describe('Khóa bị người khác giữ quá lâu -> trả lỗi "đang bận"
   test.each([
     ['step1_ConfirmImport', [[phieuImport(1, 'CT1')], false]],
     ['addManualPhieuCan', [{ soPhieu: 'X', soXe: 'Y' }]],
-    ['HT_chotSoNam', [2024]],
     ['copyDataWithFinalLookup', ['2026-01-01', '2026-01-31']],
     ['runCalculatePrice', []],
     ['BG_addMaBaoGia', [{}]], ['BG_deleteMaBaoGia', ['X']], ['BG_addMaKL', [{}]], ['BG_deleteMaKL', ['X']],
@@ -97,49 +96,6 @@ describe('Google Sheets lỗi/timeout GIỮA CHỪNG lúc ghi -> báo lỗi, tr�
     expect(sheet.__data[1][24]).toBe('Test giá');
     expect(sheet.__data[1][25]).toBe(20000000);
     khoaDaTraHet(env);
-  });
-
-  test('Chốt sổ năm bị ngắt giữa lúc XÓA dòng -> chạy lại tự hết trùng, báo cáo không cộng đôi (STUCK-01)', () => {
-    const env = createGasEnv({ email: ADMIN });
-    const ss = env.spreadsheetApp.openById(PHIEUCAN_ID);
-    const header = new Array(27).fill('H');
-    const dong = (i, trangThai) => {
-      const r = new Array(27).fill('');
-      r[0] = 'P' + i; r[1] = new Date(2024, i % 12, 5, 12); r[9] = 1000; r[21] = 'CT' + i; r[24] = trangThai; r[25] = 100;
-      return r;
-    };
-    // OK xen kẽ chưa OK -> nhiều khối rời, nhiều lệnh deleteRows
-    const rows = [];
-    for (let i = 1; i <= 10; i++) rows.push(dong(i, i % 2 ? 'OK' : ''));
-    ss.__setSheet('PhieuCan_DN', [header, ...rows]);
-    const tongTruoc = env.call('getBaoCaoTongHop', { fromDate: '2024-01-01', toDate: '2024-12-31' }).summary;
-    expect(tongTruoc.soLuong).toBe(10);
-
-    mocks.tiemLoiSheets_({ method: 'deleteRows', lanThu: 3 }); // xóa được 2 khối rồi lỗi
-    const loi = env.call('HT_chotSoNam', 2024);
-    expect(loi.status).toBe('error');
-    khoaDaTraHet(env);
-    // trạng thái dở dang: 3 phiếu OK còn ở CẢ 2 nơi -> báo cáo bị cộng trùng
-    expect(env.call('getBaoCaoTongHop', { fromDate: '2024-01-01', toDate: '2024-12-31' }).summary.soLuong).toBe(13);
-
-    const chayLai = env.call('HT_chotSoNam', 2024);
-    expect(chayLai.status).toBe('success');
-    expect(chayLai.message).toMatch(/3 phiếu đã có sẵn trong lưu trữ/);
-    const luuTru = ss.getSheetByName('PhieuCan_DN_2024').__data.slice(1).map((r) => r[21]).sort();
-    expect(luuTru).toEqual(['CT1', 'CT3', 'CT5', 'CT7', 'CT9']);
-    expect(ss.getSheetByName('PhieuCan_DN').__data.slice(1).map((r) => r[21])).toEqual(['CT2', 'CT4', 'CT6', 'CT8', 'CT10']);
-    expect(env.call('getBaoCaoTongHop', { fromDate: '2024-01-01', toDate: '2024-12-31' }).summary).toEqual(tongTruoc);
-    khoaDaTraHet(env);
-  });
-
-  test('Chốt sổ chạy bình thường 2 lần liên tiếp -> lần 2 không chép trùng gì', () => {
-    const env = createGasEnv({ email: ADMIN });
-    const ss = env.spreadsheetApp.openById(PHIEUCAN_ID);
-    const r = new Array(27).fill(''); r[1] = new Date(2024, 3, 1, 12); r[21] = 'CT1'; r[24] = 'OK';
-    ss.__setSheet('PhieuCan_DN', [new Array(27).fill('H'), r]);
-    expect(env.call('HT_chotSoNam', 2024).message).not.toMatch(/có sẵn/);
-    expect(env.call('HT_chotSoNam', 2024).message).toMatch(/Không có (phiếu nào|dữ liệu)/);
-    expect(ss.getSheetByName('PhieuCan_DN_2024').__data.length).toBe(2);
   });
 
   test('Kho Dăm: lỗi Sheets khi ghi -> trả "❌ Lỗi", khóa đã trả, không treo', () => {
