@@ -179,3 +179,27 @@ describe('PERF-04 runCalculatePrice_core: gộp lệnh ghi - GIÁ TRỊ và Đ�
     expect(sheet.__formats).toEqual(mongDoi);
   });
 });
+
+describe('TRIGGER-01: trigger theo giờ tính giá chạy được dù không có phiên đăng nhập', () => {
+  function chuanBi() {
+    const env = createGasEnv();
+    setupBaoGia(env, [[new Date(), new Date(2000, 0, 1), new Date(2100, 0, 1), 'A_B_Y', 0, 1000, 1000000]]);
+    setupPhieuCan(env, [makeRow({ 1: new Date(2026, 5, 15), 9: 20000, 16: 'A_B_Y', 17: 0 })]);
+    env.scriptApp.__triggers.push({ uid: 'uid-that-123', ham: 'runCalculatePrice' });
+    return env;
+  }
+
+  test('trigger THẬT của dự án (triggerUid khớp) -> tính giá thành công, không cần đăng nhập', () => {
+    const env = chuanBi();
+    const res = env.context.runCalculatePrice({ triggerUid: 'uid-that-123' }); // gọi thẳng như Apps Script gọi trigger
+    expect(res.status).toBe('success');
+    const sheet = env.spreadsheetApp.openById(PHIEUCAN_SPREADSHEET_ID).getSheetByName(DATA_SHEET);
+    expect(sheet.__data[1][24]).toBe('Test giá');
+  });
+
+  test('trình duyệt tự bịa triggerUid để né đăng nhập -> vẫn bị chặn', () => {
+    const env = chuanBi();
+    expect(() => env.context.runCalculatePrice({ triggerUid: 'doan-bua' })).toThrow(/PHIEN_HET_HAN/);
+    expect(() => env.context.runCalculatePrice()).toThrow(/PHIEN_HET_HAN/);
+  });
+});

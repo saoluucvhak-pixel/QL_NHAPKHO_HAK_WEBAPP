@@ -11,7 +11,7 @@ describe('GAS test harness (smoke test)', () => {
       'doGet', 'sanitize', 'parseSoTheoLocale_', 'REGION_FORMAT', 'MISA_FORMAT',
       'MISA_DEFAULTS', 'combineDateTime_', 'toDateOnly_', 'toTimeOnly_', 'toDateObj',
       'parseDate', '_tsTrongKhoangHieuLuc_', 'layThongTinNguoiDungHienTai_',
-      'yeuCauQuyenAdmin_', 'yeuCauDangNhap_', 'DS_QUYEN_', 'HT_luuDanhSachQuyen',
+      'yeuCauQuyenAdmin_', 'yeuCauPhien_', 'API', 'xacThucPhien_', 'xuLyVeCong_', 'DS_QUYEN_', 'HT_luuDanhSachQuyen',
       'kiemTraLechHeaderSheet_', 'apDungOverrideLienKet_', 'HT_luuLienKetDuLieu',
     ];
     expectedFunctions.forEach((name) => {

@@ -154,6 +154,7 @@ const REGION_FORMAT_MAC_DINH = "VN"; // Giá trị mặc định nếu CHƯA t�
 const SO_THAP_PHAN_CO_DINH = 2;      // Cố định 2 số lẻ cho khối lượng - không cấu hình được, không liên quan Locale
 
 function REGION_FORMAT() {
+  yeuCauPhien_();
   const mien = PropertiesService.getScriptProperties().getProperty("REGION_FORMAT_MIEN") || REGION_FORMAT_MAC_DINH;
   const dateFmt = mien === "VN" ? "dd/MM/yyyy" : "MM/dd/yyyy";
   return {
@@ -198,6 +199,7 @@ function parseSoTheoLocale_(rawValue) {
 const MISA_FORMAT_MAC_DINH = "VN";
 
 function MISA_FORMAT() {
+  yeuCauPhien_();
   const mien = PropertiesService.getScriptProperties().getProperty("MISA_FORMAT_MIEN") || MISA_FORMAT_MAC_DINH;
   const dateFmt = mien === "VN" ? "dd/MM/yyyy" : "MM/dd/yyyy";
   return {
@@ -211,6 +213,7 @@ function MISA_FORMAT() {
 // Lấy TOÀN BỘ cấu hình hiện tại (Locale hệ thống + Locale Misa riêng) - dùng
 // cho giao diện Cấu hình hệ thống hiển thị đúng trạng thái đang áp dụng.
 function HT_layCauHinhVungMien() {
+  yeuCauPhien_();
   try {
     // FIX (phân quyền - phát hiện qua test tự động): hàm này bị BỎ SÓT khi gate
     // quyền Admin cho cả mục "Cấu hình hệ thống" - dù giá trị trả về (VN/US) ít
@@ -229,6 +232,7 @@ function HT_layCauHinhVungMien() {
 // xem có KHỚP với Locale hệ thống đang chọn hay không - đây chính là cách duy
 // nhất để biết chắc có bị lệch hay không, thay vì đoán.
 function HT_layLocaleThatCuaSheet() {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     const dsSheet = [
@@ -268,6 +272,7 @@ function HT_layLocaleThatCuaSheet() {
 
 // Lưu TOÀN BỘ cấu hình mới - áp dụng NGAY LẬP TỨC cho mọi lần ghi Sheet tiếp theo
 function HT_luuCauHinhVungMien(mien, mienMisa) {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi Locale toàn hệ thống ảnh hưởng mọi người dùng - chỉ Admin
     const props = PropertiesService.getScriptProperties();
@@ -306,6 +311,7 @@ const MISA_DEFAULTS_MAC_DINH = {
 };
 
 function MISA_DEFAULTS() {
+  yeuCauPhien_();
   const saved = PropertiesService.getScriptProperties().getProperty("MISA_DEFAULTS_JSON");
   if (!saved) return MISA_DEFAULTS_MAC_DINH;
   try {
@@ -315,10 +321,12 @@ function MISA_DEFAULTS() {
 }
 
 function HT_layMisaDefaults() {
+  yeuCauPhien_();
   try { yeuCauQuyenAdmin_(); return { status: "success", data: MISA_DEFAULTS() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
 function HT_luuMisaDefaults(data) {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi giá trị mặc định báo cáo Misa (TK kế toán, mã hàng...) ảnh hưởng toàn công ty - chỉ Admin
     data = data || {};
@@ -394,6 +402,7 @@ function apDungOverrideLienKet_() {
 apDungOverrideLienKet_(); // chạy ngay khi project được nạp
 
 function HT_layLienKetDuLieu() {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_(); // FIX (phân quyền): trước đây AI có link đăng nhập Google cũng xem/đổi được ID Spreadsheet/Thư mục toàn hệ thống
     const props = PropertiesService.getScriptProperties();
@@ -413,6 +422,7 @@ function HT_layLienKetDuLieu() {
 // overrides = { CONFIG_SPREADSHEET_ID: "...", ... } - để trống 1 trường nghĩa
 // là khôi phục lại giá trị GỐC trong code cho đúng trường đó.
 function HT_luuLienKetDuLieu(overrides) {
+  yeuCauPhien_();
   try {
     // FIX (NGHIÊM TRỌNG - phân quyền): TRƯỚC ĐÂY hàm này không có bất kỳ kiểm
     // tra quyền nào - bất kỳ ai đăng nhập Google mở được webapp đều có thể đổi
@@ -451,6 +461,7 @@ function HT_luuLienKetDuLieu(overrides) {
 // trong trình soạn thảo Apps Script rồi bấm Run) - nếu không sẽ thấy lỗi ở
 // từng dòng kết quả tương ứng, KHÔNG dừng cả quá trình.
 function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     const nguoiDung = DS_QUYEN_().map(function (u) {
@@ -507,6 +518,7 @@ function _layDanhSachTaiNguyenDaGopId_() {
 // (getViewers() gộp chung cả 2 nhóm) - đây là giới hạn của chính API, không
 // phải lỗi code.
 function HT_layTinhTrangChiaSeTaiNguyen() {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     const ketQua = [];
@@ -530,6 +542,7 @@ function HT_layTinhTrangChiaSeTaiNguyen() {
 // Thu hồi quyền Drive của 1 email trên ĐÚNG 1 tài nguyên cụ thể (id/loai lấy
 // từ chính dòng do HT_layTinhTrangChiaSeTaiNguyen() trả về).
 function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     email = String(email || "").trim().toLowerCase();
@@ -549,6 +562,7 @@ function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
 // chỉ chặn đăng nhập webapp, KHÔNG tự thu hồi quyền họ đã có trực tiếp trên
 // Google Sheet (họ vẫn mở/sửa được Sheet nếu vào thẳng Google Drive).
 function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     email = String(email || "").trim().toLowerCase();
@@ -571,29 +585,50 @@ function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-/* ---------- PHÂN QUYỀN NGƯỜI DÙNG (chống truy cập trái phép) ---------- */
-// TRƯỚC ĐÂY webapp không có BẤT KỲ rào chắn nào ngoài việc appsscript.json đặt
-// access:"ANYONE" (yêu cầu đăng nhập bằng 1 tài khoản Google BẤT KỲ, nhưng
-// KHÔNG giới hạn tài khoản nào) - nghĩa là ai có link, đăng nhập bằng bất kỳ
-// Gmail nào, cũng dùng được MỌI chức năng, kể cả xóa dữ liệu và đổi cấu hình
-// toàn hệ thống. Nay bổ sung 1 lớp allowlist tối thiểu: chỉ những email được
-// liệt kê dưới đây (hoặc đã được ADMIN thêm qua giao diện Hệ thống → Quản lý
-// người dùng) mới mở được webapp. Nhân viên dùng Gmail cá nhân (không có
-// domain công ty riêng để giới hạn theo tên miền) nên bắt buộc dùng danh sách
-// email cụ thể thay vì giới hạn theo domain.
+/* ---------- PHÂN QUYỀN NGƯỜI DÙNG: CỔNG ĐĂNG NHẬP GMAIL ---------- */
+// CƠ CHẾ (thay cho cách cũ "chạy dưới tài khoản người dùng" - USER_ACCESSING):
+//  - Webapp chạy bằng quyền của tài khoản triển khai (Admin) - appsscript.json
+//    executeAs:"USER_DEPLOYING". Nhân viên KHÔNG cần được chia sẻ Google Sheet/
+//    Thư mục nào, KHÔNG phải cấp quyền Drive cho script, nên cũng không thể mở
+//    thẳng Sheet gốc để sửa/xóa dữ liệu ngoài webapp.
+//  - Danh tính người dùng lấy từ "CỔNG ĐĂNG NHẬP": 1 dự án Apps Script RIÊNG,
+//    rất nhỏ, triển khai "Execute as: User accessing the web app" - chỉ xin
+//    quyền XEM ĐỊA CHỈ EMAIL của người mở cổng (không đụng Sheet/Drive/Gmail).
+//    Cổng đọc email Google của người đang mở rồi chuyển về webapp chính kèm
+//    "vé" ?cong=... có chữ ký HMAC-SHA256 bằng khóa bí mật chung (chỉ Admin
+//    biết), vé hết hạn sau 5 phút và chỉ dùng được 1 lần. Webapp chính kiểm tra
+//    chữ ký + hạn + đối chiếu danh sách quyền rồi cấp 1 "mã phiên" (lưu ở
+//    CacheService, hết hạn tối đa PHIEN_TOI_DA_MS_).
+//  - MỌI lời gọi từ giao diện đều đi qua 1 cổng duy nhất API(maPhien, tenHam,
+//    thamSo): kiểm tra phiên + kiểm tra email VẪN còn trong danh sách quyền (thu
+//    hồi có hiệu lực ngay lần gọi kế tiếp) + vai trò Chỉ xem chỉ được gọi các
+//    hàm đọc, rồi mới chạy hàm nghiệp vụ.
+//  - Mỗi hàm công khai (không kết thúc bằng "_") trong Code.gs/Config.gs đều
+//    mở đầu bằng yeuCauPhien_(): gọi thẳng hàm đó qua google.script.run mà
+//    không đi qua API (không có phiên hợp lệ) sẽ bị từ chối. KHI THÊM HÀM MỚI
+//    cho giao diện gọi, BẮT BUỘC thêm dòng yeuCauPhien_() ở đầu hàm VÀ thêm tên
+//    hàm vào HAM_API_ - API() chỉ cho gọi hàm thỏa CẢ 2 điều kiện. Nếu hàm mới
+//    CHỈ ĐỌC dữ liệu và người Chỉ xem cũng cần dùng, thêm tên hàm vào
+//    HAM_CHO_PHEP_CHI_XEM_ bên dưới.
 //
-// 2 vai trò:
+// CÀI ĐẶT 1 LẦN (trang hướng dẫn tự hiện khi chưa cài): trong trình soạn thảo
+// Apps Script chọn hàm CAI_DAT_CONG_DANG_NHAP → Chạy → sao chép mã nguồn Cổng
+// trong "Nhật ký thực thi" → tạo dự án mới (script.new), dán vào, triển khai
+// Web app (Execute as: User accessing the web app · Who has access: Anyone
+// with Google account) → mở link Cổng bằng tài khoản Admin để đăng nhập → vào
+// Hệ thống › Quản lý người dùng › Cổng đăng nhập, dán link Cổng rồi Lưu.
+//
+// 3 vai trò:
 //  - ADMIN: toàn quyền, bao gồm cả Cấu hình hệ thống / Liên kết dữ liệu /
-//    Cấu hình Misa mặc định / Quản lý người dùng (những mục có thể ảnh hưởng
-//    TOÀN BỘ hệ thống và mọi người dùng khác nếu chỉnh sai).
-//  - NHANVIEN: dùng các chức năng nghiệp vụ hàng ngày (import phiếu cân, nhập
-//    liệu, báo cáo, báo giá, kho dăm, xuất hàng...) nhưng KHÔNG vào được các
+//    Cấu hình Misa mặc định / Quản lý người dùng / Cổng đăng nhập.
+//  - NHANVIEN: dùng các chức năng nghiệp vụ hàng ngày nhưng KHÔNG vào được các
 //    mục cấu hình toàn hệ thống nói trên.
+//  - CHIXEM: chỉ xem Dashboard, báo cáo, danh sách và xuất file Excel/PDF;
+//    KHÔNG nhập/sửa/xóa/import được gì (chặn cứng ở API(), không chỉ ẩn nút).
 //
 // Danh sách THẬT được lưu trong PropertiesService (đổi được ngay trên giao
-// diện Hệ thống → Quản lý người dùng, không cần sửa code/deploy lại). Mảng
-// dưới đây chỉ là giá trị KHỞI TẠO LẦN ĐẦU (dùng khi chưa từng lưu danh sách
-// nào) - Admin đầu tiên do người triển khai hệ thống xác nhận.
+// diện Hệ thống → Quản lý người dùng). Mảng dưới đây chỉ là giá trị KHỞI TẠO
+// LẦN ĐẦU (dùng khi chưa từng lưu danh sách nào).
 const DANH_SACH_QUYEN_MAC_DINH = [
   { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN", quyenDrive: "EDITOR" }
 ];
@@ -607,70 +642,455 @@ function DS_QUYEN_() {
   } catch (e) { return DANH_SACH_QUYEN_MAC_DINH; }
 }
 
-// Lấy thông tin quyền của người đang mở webapp, dựa vào email tài khoản Google
-// đang đăng nhập. PHỤ THUỘC 2 CẤU HÌNH TRONG appsscript.json:
-//  1) access:"ANYONE" (yêu cầu ĐÃ đăng nhập Google) - giữ nguyên, KHÔNG đổi
-//     sang "ANYONE_ANONYMOUS" (nếu đổi, hàm này luôn trả về rỗng, KHÔNG AI vào được).
-//  2) webapp.executeAs:"USER_ACCESSING" (chạy dưới danh nghĩa CHÍNH người đang
-//     truy cập) - BẮT BUỘC phải là "USER_ACCESSING", KHÔNG được để
-//     "USER_DEPLOYING" ("Thực thi với tư cách: Tôi"). ĐÃ THỰC TẾ GẶP LỖI: với
-//     "USER_DEPLOYING", Session.getActiveUser().getEmail() CHỈ đọc được email
-//     nếu người truy cập cùng miền Google Workspace với tài khoản deploy -
-//     với nhân viên dùng Gmail cá nhân (@gmail.com, không có miền riêng), hàm
-//     này LUÔN trả về CHUỖI RỖNG cho MỌI người, kể cả chính Admin - khiến
-//     TOÀN BỘ hệ thống bị khóa ngoài không ai vào được (không phải lỗi sai
-//     tài khoản, mà lỗi không đọc được danh tính người truy cập).
-//     ĐÁNH ĐỔI khi dùng "USER_ACCESSING": mỗi người dùng phải tự cấp quyền
-//     (OAuth) cho script ở lần truy cập đầu tiên, VÀ mỗi người dùng phải được
-//     CHIA SẺ (Editor) trực tiếp tất cả Google Sheet/Thư mục Drive mà hệ
-//     thống dùng tới (CONFIG/BAOGIA_CONFIG/KHODAM_CONFIG/XUATHANG_CONFIG ở
-//     trên) - script giờ chạy dưới quyền CHÍNH họ, không còn "mượn" quyền của
-//     tài khoản deploy nữa. Nên tạo 1 Google Group gồm toàn bộ nhân viên rồi
-//     chia sẻ 1 lần cho cả Group, thay vì chia sẻ riêng lẻ từng người.
-function layThongTinNguoiDungHienTai_() {
-  let email = "";
-  try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch (e) { email = ""; }
-  const ds = DS_QUYEN_();
-  const found = ds.find(function (u) { return String(u.email || "").trim().toLowerCase() === email; });
+// Gmail bỏ qua dấu "." và phần "+..." ở tên đăng nhập (nguyen.van.a@gmail.com,
+// nguyenvana@gmail.com, NguyenVanA+hak@gmail.com là CÙNG 1 tài khoản) - Admin gõ
+// email vào danh sách theo dạng nào cũng phải khớp.
+function chuanHoaEmailSoSanh_(email) {
+  const e = String(email || "").trim().toLowerCase();
+  const m = e.match(/^([^@]+)@(gmail\.com|googlemail\.com)$/);
+  if (!m) return e;
+  return m[1].split("+")[0].replace(/\./g, "") + "@gmail.com";
+}
+
+function timNguoiDungTheoEmail_(email) {
+  email = String(email || "").trim().toLowerCase();
+  const emailSoSanh = chuanHoaEmailSoSanh_(email);
+  const found = email ? DS_QUYEN_().find(function (u) { return chuanHoaEmailSoSanh_(u.email) === emailSoSanh; }) : null;
   return {
     email: email,
     vaiTro: found ? found.vaiTro : null,
     coQuyen: !!found,
-    laAdmin: !!found && found.vaiTro === "ADMIN"
+    laAdmin: !!found && found.vaiTro === "ADMIN",
+    laChiXem: !!found && found.vaiTro === "CHIXEM"
   };
 }
 
-// Chặn cứng Ở SERVER (không chỉ ẩn nút trên giao diện - người dùng vẫn có thể
-// tự gọi hàm qua Console trình duyệt) cho các hàm CHỈ ADMIN được phép gọi.
-// Gọi hàm này ở NGAY ĐẦU mỗi hàm loại đó, ném lỗi rõ ràng nếu không đủ quyền.
+const VAI_TRO_HOP_LE_ = ["ADMIN", "NHANVIEN", "CHIXEM"];
+
+// Vai trò CHIXEM chỉ được gọi các hàm CHỈ ĐỌC dưới đây (xem/lọc báo cáo, tải
+// danh sách, xuất file Excel/PDF từ dữ liệu có sẵn). Mọi hàm khác - nhập, sửa,
+// xóa, import, tạo phiếu, cấu hình - bị API() từ chối.
+const HAM_CHO_PHEP_CHI_XEM_ = {
+  HT_layThongTinNguoiDungHienTai: true, HT_layDashboard: true, HT_layCauHinhVungMien: true,
+  getFilterOptions: true, getDataForGiaoDichForm: true,
+  getBaoCaoTongHop: true, getBaoCaoMisa: true, getBaoCaoDonGia: true,
+  exportBaoCaoTongHopExcel: true, exportBaoCaoTongHopPDF: true,
+  exportBaoCaoMisaExcel: true, exportBaoCaoMisaPDF: true,
+  exportBaoCaoDonGiaExcel: true, exportBaoCaoDonGiaPDF: true, exportPhieuCanPDF: true,
+  XH_getBaoCaoXuatQuaCan: true, XH_getBaoCaoXuatMisa: true,
+  XH_exportBaoCaoXuatQuaCanExcel: true, XH_exportBaoCaoXuatQuaCanPDF: true, XH_exportBaoCaoXuatMisaExcel: true,
+  XH_getDonHangList: true, XH_getDonHangByRow: true, XH_getKhoXuatList: true, XH_tinhDoKhoNhaMay: true,
+  BG_getQuoteList: true, BG_getQuoteListWithStatus: true, BG_getQuoteDetail: true, BG_showAllData: true,
+  BG_getBaogiaRowByHash: true, BG_getMaBaoGiaList: true, BG_getMaKLList: true, BG_exportFileSmart: true,
+  // BG_updateHieuLuc chỉ dựng lại bảng "Còn hiệu lực" (tự tính từ dữ liệu báo
+  // giá gốc, không đổi dữ liệu nhập) - cần để xem báo giá đang hiệu lực.
+  BG_updateHieuLuc: true,
+  layBaoCaoTonKho: true, layDanhSachDanhMucKho: true, layDanhSachDoKhoTheoBoLoc: true, layDanhSachKyVetBai: true,
+  processFormData: true
+};
+// processFormData gom nhiều thao tác - Chỉ xem chỉ được các thao tác báo cáo.
+const HANH_DONG_CHO_PHEP_CHI_XEM_ = { Baocaotonkho: true, BaocaoKyVetBai: true };
+
+function kiemTraQuyenChiXem_(nd, ten, thamSo) {
+  if (!nd || !nd.laChiXem) return;
+  const duocPhep = HAM_CHO_PHEP_CHI_XEM_[ten] === true &&
+    (ten !== "processFormData" || HANH_DONG_CHO_PHEP_CHI_XEM_[String((thamSo || [])[0])] === true);
+  if (!duocPhep) {
+    throw new Error("Tài khoản " + nd.email + " chỉ có quyền XEM - không được thực hiện thao tác nhập/sửa/xóa này. Liên hệ Quản trị viên nếu cần được cấp quyền Nhân viên.");
+  }
+}
+
+// Người dùng của lượt thực thi hiện tại - CHỈ được gán bởi API() sau khi đã
+// xác thực phiên. Mỗi lời gọi google.script.run là 1 lượt thực thi mới, biến
+// toàn cục luôn bắt đầu là null, nên gọi thẳng 1 hàm (không qua API) sẽ không
+// có người dùng hợp lệ.
+var PHIEN_HIEN_TAI_ = null;
+
+const MA_LOI_PHIEN_ = "PHIEN_HET_HAN: ";
+const PHIEN_TOI_DA_MS_ = 12 * 60 * 60 * 1000;   // tối đa 12 giờ kể từ lúc đăng nhập
+const PHIEN_CACHE_GIAY_ = 6 * 60 * 60;          // không thao tác 6 giờ thì hết phiên (giới hạn tối đa của CacheService)
+
+function layThongTinNguoiDungHienTai_() {
+  return PHIEN_HIEN_TAI_ || { email: "", vaiTro: null, coQuyen: false, laAdmin: false };
+}
+
+// Dòng đầu tiên của MỌI hàm công khai (xem giải thích ở đầu mục này).
+function yeuCauPhien_() {
+  if (!PHIEN_HIEN_TAI_ || !PHIEN_HIEN_TAI_.coQuyen) {
+    throw new Error(MA_LOI_PHIEN_ + "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+  }
+  return PHIEN_HIEN_TAI_;
+}
+
+// Chặn cứng Ở SERVER cho các hàm CHỈ ADMIN được phép gọi.
 function yeuCauQuyenAdmin_() {
-  const nd = layThongTinNguoiDungHienTai_();
+  const nd = yeuCauPhien_();
   if (!nd.laAdmin) {
     const dsAdmin = DS_QUYEN_().filter(function (u) { return u.vaiTro === "ADMIN"; }).map(function (u) { return u.email; }).join(", ");
-    throw new Error("Bạn không có quyền Quản trị để thực hiện thao tác này" + (nd.email ? " (tài khoản: " + nd.email + ")" : "") + ". Liên hệ Quản trị viên (" + dsAdmin + ") nếu cần được cấp quyền.");
+    throw new Error("Bạn không có quyền Quản trị để thực hiện thao tác này (tài khoản: " + nd.email + "). Liên hệ Quản trị viên (" + dsAdmin + ") nếu cần được cấp quyền.");
   }
   return nd;
 }
 
-// Chặn cứng cho các hàm CẦN ĐĂNG NHẬP HỢP LỆ (bất kỳ vai trò nào trong danh
-// sách) - phòng trường hợp 1 hàm bị gọi trực tiếp ngoài luồng bình thường của
-// giao diện (doGet() đã chặn chính, đây là lớp phòng thủ thứ 2).
-function yeuCauDangNhap_() {
-  const nd = layThongTinNguoiDungHienTai_();
-  if (!nd.coQuyen) {
-    throw new Error("Tài khoản " + (nd.email || "(chưa xác định)") + " chưa được cấp quyền sử dụng hệ thống này. Liên hệ Quản trị viên để được thêm vào danh sách truy cập.");
-  }
-  return nd;
-}
-
-// Cho giao diện gọi để tự nhận biết đang đăng nhập là ai / có quyền gì (ẩn
-// hiện đúng menu, hiện đúng thông báo) - KHÔNG dùng để CHẶN (chặn thật luôn ở
-// server qua yeuCauQuyenAdmin_()/yeuCauDangNhap_() và ở doGet() - xem Code.gs).
 function HT_layThongTinNguoiDungHienTai() {
+  yeuCauPhien_();
   try { return { status: "success", data: layThongTinNguoiDungHienTai_() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
+/* ----- Cấu hình Cổng đăng nhập ----- */
+const KHOA_CONG_PROP_ = "CONG_DN_KHOA_BI_MAT";   // khóa ký vé, chung giữa Cổng và webapp chính
+const LINK_CONG_PROP_ = "CONG_DN_LINK";          // link /exec của Cổng (nút "Đăng nhập" trỏ tới)
+const VE_CONG_HIEU_LUC_MS_ = 5 * 60 * 1000;
+
+function layKhoaCong_() {
+  return String(PropertiesService.getScriptProperties().getProperty(KHOA_CONG_PROP_) || "");
+}
+
+function taoKhoaCongMoi_() {
+  const khoa = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "").toLowerCase();
+  PropertiesService.getScriptProperties().setProperty(KHOA_CONG_PROP_, khoa);
+  return khoa;
+}
+
+function layLinkCong_() {
+  return String(PropertiesService.getScriptProperties().getProperty(LINK_CONG_PROP_) || "").trim();
+}
+
+function daCauHinhDangNhap_() { return !!layKhoaCong_(); }
+
+// URL /exec của CHÍNH webapp này - Cổng chỉ chuyển vé về đúng địa chỉ này.
+// Nếu tự nhận diện sai (VD ra link /dev), đặt thuộc tính tập lệnh
+// LINK_WEBAPP_CHINH bằng đúng URL /exec rồi lấy lại mã nguồn Cổng.
+function layLinkWebappChinh_() {
+  const ghiDe = String(PropertiesService.getScriptProperties().getProperty("LINK_WEBAPP_CHINH") || "").trim();
+  if (ghiDe) return ghiDe;
+  try { return ScriptApp.getService().getUrl() || ""; } catch (e) { return ""; }
+}
+
+function laLinkWebAppHopLe_(url) {
+  return /^https:\/\/script\.google\.com\/(macros|a\/macros\/[^\/\s?#]+)\/s\/[A-Za-z0-9_-]+\/exec$/.test(String(url || ""));
+}
+
+// Mã nguồn đầy đủ của dự án Cổng (dán nguyên vào Code.gs của dự án mới).
+function taoMaNguonCong_(khoa, linkChinh) {
+  return [
+    '/**',
+    ' * CỔNG ĐĂNG NHẬP GMAIL - HỆ THỐNG QUẢN LÝ HAKGROUP',
+    ' * Dự án Apps Script RIÊNG, chỉ làm 1 việc: đọc email Google của người đang',
+    ' * mở cổng rồi chuyển vào webapp chính kèm "vé" có chữ ký (hết hạn sau 5',
+    ' * phút, dùng 1 lần). KHÔNG đọc/ghi Sheet, Drive hay Gmail nào.',
+    ' *',
+    ' * Triển khai: Deploy > New deployment > Web app',
+    ' *   - Execute as:      User accessing the web app',
+    ' *   - Who has access:  Anyone with Google account',
+    ' * GIỮ BÍ MẬT mã này (có KHOA_BI_MAT): không gửi cho ai, không chia sẻ dự án.',
+    ' * Ai có KHOA_BI_MAT đều giả mạo được đăng nhập của bất kỳ email nào.',
+    ' */',
+    'const LINK_WEBAPP_CHINH = ' + JSON.stringify(linkChinh) + ';',
+    'const KHOA_BI_MAT = ' + JSON.stringify(khoa) + ';',
+    '',
+    'function doGet() {',
+    '  const email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();',
+    '  if (!email) {',
+    '    return trang_("Không đọc được email Google", "Hãy đăng nhập Google rồi mở lại link này. Nếu trình duyệt đang đăng nhập NHIỀU tài khoản Google, hãy dùng cửa sổ ẩn danh (hoặc 1 hồ sơ Chrome riêng) chỉ đăng nhập đúng tài khoản được cấp quyền.", "");',
+    '  }',
+    '  const than = Utilities.base64EncodeWebSafe(JSON.stringify({ v: 1, e: email, x: Date.now() + 5 * 60 * 1000, n: Utilities.getUuid() }));',
+    '  const chuKy = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(than, KHOA_BI_MAT));',
+    '  const link = LINK_WEBAPP_CHINH + "?cong=" + encodeURIComponent(than + "." + chuKy);',
+    '  return trang_("Xin chào " + email, "Bấm nút dưới đây để vào hệ thống (liên kết có hiệu lực 5 phút).", link);',
+    '}',
+    '',
+    'function trang_(tieuDe, noiDung, link) {',
+    '  const esc = function (x) { return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };',
+    '  let html = \'<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:60px auto;padding:28px;border:1px solid #DCE0D8;border-radius:12px;text-align:center;color:#1E211C;">\' +',
+    '    \'<h2 style="color:#1B4332;margin-top:0;">\' + esc(tieuDe) + \'</h2><p>\' + esc(noiDung) + \'</p>\';',
+    '  if (link) {',
+    '    html += \'<a href="\' + esc(link) + \'" target="_top" style="display:inline-block;margin-top:10px;padding:12px 26px;background:#1B4332;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">➡️ Vào hệ thống HAKGROUP</a>\' +',
+    '      \'<script>try { window.top.location.href = \' + JSON.stringify(link).replace(/</g, "\\\\u003c") + \'; } catch (e) {}<\\/script>\';',
+    '  }',
+    '  html += \'<p style="font-size:12px;color:#5B6259;margin-top:18px;">Muốn đăng nhập bằng tài khoản khác: đăng xuất Google hoặc mở link Cổng trong cửa sổ ẩn danh.</p></div>\';',
+    '  return HtmlService.createHtmlOutput(html).setTitle("Đăng nhập HAKGROUP");',
+    '}',
+    ''
+  ].join("\n");
+}
+
+// CHẠY TAY 1 LẦN TRONG TRÌNH SOẠN THẢO APPS SCRIPT (chọn hàm này → Chạy):
+// tạo khóa bí mật (nếu chưa có) rồi in mã nguồn Cổng ra "Nhật ký thực thi".
+// Hàm KHÔNG trả về gì và chỉ ghi vào nhật ký của chủ dự án, nên dù ai đó cố
+// gọi thẳng từ trình duyệt cũng không lấy được khóa; API() cũng không cho gọi.
+function CAI_DAT_CONG_DANG_NHAP() {
+  const khoa = layKhoaCong_() || taoKhoaCongMoi_();
+  const linkChinh = layLinkWebappChinh_();
+  console.log(
+    "=== CỔNG ĐĂNG NHẬP GMAIL - làm theo các bước ===\n" +
+    "1. Mở script.new (tạo dự án Apps Script MỚI, đặt tên VD \"HAK - Cong dang nhap\").\n" +
+    "2. Xóa hết nội dung Code.gs, dán TOÀN BỘ đoạn mã giữa 2 dòng ----- bên dưới, bấm Lưu.\n" +
+    "3. Deploy > New deployment > Web app: Execute as = User accessing the web app;\n" +
+    "   Who has access = Anyone with Google account > Deploy, sao chép link Web app (/exec).\n" +
+    "4. Mở link đó bằng saoluucvhak@gmail.com, cấp quyền xem email, bấm \"Vào hệ thống\".\n" +
+    "5. Trong webapp: Hệ thống > Quản lý người dùng > Cổng đăng nhập: dán link Cổng và Lưu.\n" +
+    (laLinkWebAppHopLe_(linkChinh) ? "" :
+      "!! Không tự nhận diện được URL /exec của webapp chính (" + (linkChinh || "trống") + "): đặt thuộc tính tập lệnh\n" +
+      "   LINK_WEBAPP_CHINH = URL /exec của webapp chính rồi chạy lại hàm này.\n") +
+    "-----\n" + taoMaNguonCong_(khoa, linkChinh) + "-----"
+  );
+}
+
+/* ----- Phiên đăng nhập ----- */
+function taoPhien_(email) {
+  const ma = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "").toLowerCase();
+  CacheService.getScriptCache().put("phien_" + ma, JSON.stringify({ email: email, taoLuc: Date.now() }), PHIEN_CACHE_GIAY_);
+  return ma;
+}
+
+function xacThucPhien_(maPhien) {
+  const ma = String(maPhien || "");
+  if (!/^[a-f0-9]{64}$/.test(ma)) throw new Error(MA_LOI_PHIEN_ + "Chưa đăng nhập.");
+  const cache = CacheService.getScriptCache();
+  const raw = cache.get("phien_" + ma);
+  if (!raw) throw new Error(MA_LOI_PHIEN_ + "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+  let phien;
+  try { phien = JSON.parse(raw); } catch (e) { cache.remove("phien_" + ma); throw new Error(MA_LOI_PHIEN_ + "Phiên đăng nhập không hợp lệ."); }
+  if (Date.now() - Number(phien.taoLuc || 0) > PHIEN_TOI_DA_MS_) {
+    cache.remove("phien_" + ma);
+    throw new Error(MA_LOI_PHIEN_ + "Phiên đăng nhập đã hết hạn (quá 12 giờ), vui lòng đăng nhập lại.");
+  }
+  // Kiểm tra lại danh sách quyền MỖI lần gọi: Admin xóa ai khỏi danh sách thì
+  // người đó bị chặn ngay từ thao tác kế tiếp, không phải chờ phiên hết hạn.
+  const nd = timNguoiDungTheoEmail_(phien.email);
+  if (!nd.coQuyen) {
+    cache.remove("phien_" + ma);
+    throw new Error(MA_LOI_PHIEN_ + "Tài khoản " + nd.email + " không còn trong danh sách được cấp quyền.");
+  }
+  cache.put("phien_" + ma, raw, PHIEN_CACHE_GIAY_); // gia hạn trượt khi còn thao tác
+  return nd;
+}
+
+/* ----- Cổng gọi hàm duy nhất từ giao diện ----- */
+// DANH SÁCH TƯỜNG MINH các hàm giao diện được phép gọi qua API(). Các hàm công
+// khai còn lại (VD xuLySuaXoaGiaoDich, taoPhieuDieuChinhKho, sanitize...) là
+// hàm NỘI BỘ: chỉ được gọi qua hàm điều phối có khóa LockService + ghi nhật ký
+// (processFormData...), gọi thẳng sẽ bỏ qua khóa ghi đồng thời và nhật ký nên
+// bị chặn. KHI THÊM CHỨC NĂNG MỚI CHO GIAO DIỆN: thêm tên hàm vào đây (hàm cũng
+// phải mở đầu bằng yeuCauPhien_()); nếu chỉ đọc dữ liệu và vai trò Chỉ xem cần
+// dùng thì thêm cả vào HAM_CHO_PHEP_CHI_XEM_.
+const HAM_API_ = [
+  // Hệ thống / phân quyền / cổng đăng nhập
+  "HT_layThongTinNguoiDungHienTai", "HT_layDashboard", "HT_layThongKeNamPhieuCan", "HT_chotSoNam",
+  "HT_layCauHinhVungMien", "HT_luuCauHinhVungMien", "HT_layLocaleThatCuaSheet", "HT_xacNhanCauTrucSheetHienTai",
+  "HT_layLienKetDuLieu", "HT_luuLienKetDuLieu", "HT_layMisaDefaults", "HT_luuMisaDefaults",
+  "HT_layDanhSachQuyen", "HT_luuDanhSachQuyen", "HT_chiaSeTaiNguyenChoDanhSachQuyen", "HT_layTinhTrangChiaSeTaiNguyen",
+  "HT_thuHoiQuyenTaiNguyen", "HT_thuHoiToanBoQuyenDriveChoEmail",
+  "HT_layCauHinhCong", "HT_layMaNguonCong", "HT_luuLinkCong", "HT_doiKhoaCong",
+  "HT_layTinhTrangSaoLuu", "HT_luuCauHinhSaoLuu", "HT_saoLuuNgay", "HT_layNhatKy", "HT_xuatNhatKyExcel",
+  // Import / nhập liệu phiếu cân nhập
+  "step1_PreviewDraft", "step1_ConfirmImport", "addManualPhieuCan", "taoFileMauPhieuCan", "taoFileMauXuatHang",
+  // Báo cáo nhập kho + Misa
+  "getFilterOptions", "getBaoCaoTongHop", "getBaoCaoMisa", "getBaoCaoDonGia", "runCreateMisaData", "downloadMisaExcel",
+  "exportBaoCaoTongHopExcel", "exportBaoCaoTongHopPDF", "exportBaoCaoMisaExcel", "exportBaoCaoMisaPDF",
+  "exportBaoCaoDonGiaExcel", "exportBaoCaoDonGiaPDF", "exportPhieuCanPDF",
+  // Báo giá
+  "BG_getMaBaoGiaList", "BG_addMaBaoGia", "BG_deleteMaBaoGia", "BG_getMaKLList", "BG_addMaKL", "BG_deleteMaKL",
+  "BG_getQuoteList", "BG_getQuoteListWithStatus", "BG_getQuoteDetail", "BG_createQuote", "BG_deleteQuote",
+  "BG_getBaogiaRowByHash", "BG_updateBaogiaRow", "BG_deleteBaogiaRow", "BG_updateHieuLuc", "BG_showAllData", "BG_exportFileSmart",
+  // Kho dăm (ghi dữ liệu đi qua processFormData để có khóa + nhật ký)
+  "processFormData", "getDataForGiaoDichForm", "layBaoCaoTonKho", "layDanhSachDanhMucKho",
+  "layDanhSachDoKhoTheoBoLoc", "layDanhSachKyVetBai", "xuLyNhapSanPhamSanXuat",
+  // Xuất hàng + báo cáo xuất kho
+  "XH_step1_PreviewDraft", "XH_step1_ConfirmImport", "XH_getKhoXuatList", "XH_tinhDoKhoNhaMay",
+  "XH_saveDonHang", "XH_getDonHangList", "XH_getDonHangByRow", "XH_updateDonHang", "XH_deleteDonHang",
+  "XH_getBaoCaoXuatQuaCan", "XH_getBaoCaoXuatMisa",
+  "XH_exportBaoCaoXuatQuaCanExcel", "XH_exportBaoCaoXuatQuaCanPDF", "XH_exportBaoCaoXuatMisaExcel"
+].reduce(function (m, ten) { m[ten] = true; return m; }, {});
+
+function API(maPhien, tenHam, thamSo) {
+  PHIEN_HIEN_TAI_ = xacThucPhien_(maPhien);
+  const ten = String(tenHam || "");
+  const fn = HAM_API_[ten] === true ? globalThis[ten] : null;
+  // Chỉ cho gọi đúng các hàm trong HAM_API_ và vẫn phải có dòng yeuCauPhien_()
+  // ở đầu (2 lớp: quên 1 trong 2 thì hàm bị chặn chứ không bị lộ).
+  if (typeof fn !== "function" || String(fn).indexOf("yeuCauPhien_()") === -1) {
+    throw new Error("Không được phép gọi hàm: " + ten);
+  }
+  kiemTraQuyenChiXem_(PHIEN_HIEN_TAI_, ten, thamSo);
+  return chuyenLinkXuatThanhFile_(fn.apply(null, Array.isArray(thamSo) ? thamSo : []));
+}
+
+// Các chức năng Xuất Excel/PDF trả về link docs.google.com/.../export của file
+// tạm vừa tạo. File đó nằm trong Drive của tài khoản Admin (webapp chạy bằng
+// quyền Admin), nhân viên mở link sẽ bị Google báo "cần quyền truy cập". Máy
+// chủ tải sẵn nội dung file (bằng quyền Admin) rồi gửi kèm trong kết quả để
+// trình duyệt tự tải xuống - không phải chia sẻ file cho ai. Chỉ áp dụng cho
+// link do chính các hàm xuất của hệ thống trả về (không nhận link từ giao diện).
+function chuyenLinkXuatThanhFile_(kq) {
+  if (!kq || typeof kq !== "object" || typeof kq.url !== "string") return kq;
+  const m = kq.url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)\/export\?(.*)$/);
+  if (!m) return kq;
+  try {
+    const laPdf = /(^|&)format=pdf(&|$)/.test(m[2]);
+    const res = UrlFetchApp.fetch(kq.url, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) throw new Error("HTTP " + res.getResponseCode());
+    let tenFile = "tai-ve";
+    try { tenFile = DriveApp.getFileById(m[1]).getName(); } catch (e) { /* giữ tên mặc định */ }
+    const out = {};
+    for (const k in kq) out[k] = kq[k];
+    out.fileBase64 = Utilities.base64Encode(res.getBlob().getBytes());
+    out.fileName = tenFile + (laPdf ? ".pdf" : ".xlsx");
+    out.mimeType = laPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    return out;
+  } catch (e) {
+    logAudit_("XUAT_FILE", "ERROR", "Không tải được file xuất: " + e);
+    return kq; // giao diện sẽ mở link như cũ (vẫn dùng được với tài khoản Admin)
+  }
+}
+
+/* ----- Luồng đăng nhập qua Cổng (không cần phiên) ----- */
+function DN_layLinkDangNhap() {
+  try {
+    if (!daCauHinhDangNhap_()) return { status: "error", message: "Hệ thống chưa cài đặt Cổng đăng nhập - liên hệ Quản trị viên." };
+    const link = layLinkCong_();
+    if (!link) {
+      return { status: "error", message: "Chưa lưu link Cổng đăng nhập. Quản trị viên: mở trực tiếp link Cổng (Web app /exec của dự án Cổng) để đăng nhập, rồi dán link đó vào Hệ thống › Quản lý người dùng › Cổng đăng nhập." };
+    }
+    return { status: "success", url: link };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function DN_kiemTraPhien(maPhien) {
+  try {
+    return { status: "success", data: xacThucPhien_(maPhien) };
+  } catch (e) {
+    return { status: "het_han", message: String(e.message || e).replace(MA_LOI_PHIEN_, "") };
+  }
+}
+
+function DN_dangXuat(maPhien) {
+  const ma = String(maPhien || "");
+  if (/^[a-f0-9]{64}$/.test(ma)) CacheService.getScriptCache().remove("phien_" + ma);
+  return { status: "success" };
+}
+
+// So sánh chữ ký không phụ thuộc thời gian (tránh dò chữ ký theo độ trễ).
+function soSanhChuoiAnToan_(a, b) {
+  a = String(a); b = String(b);
+  let khac = a.length ^ b.length;
+  for (let i = 0; i < a.length; i++) khac |= a.charCodeAt(i) ^ b.charCodeAt(i % (b.length || 1));
+  return khac === 0;
+}
+
+// Cổng chuyển người dùng về doGet(e) kèm ?cong=<thân>.<chữ ký>. Trả về
+// { phien } nếu vé hợp lệ và email có trong danh sách quyền, ngược lại { thongBao }.
+function xuLyVeCong_(ve) {
+  const khoa = layKhoaCong_();
+  const phan = String(ve || "").split(".");
+  const loiVe = "Vé đăng nhập không hợp lệ. Vui lòng bấm Đăng nhập lại.";
+  if (!khoa || phan.length !== 2 || !phan[0] || !phan[1] || phan[0].length > 2000) return { thongBao: loiVe };
+
+  const chuKyDung = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(phan[0], khoa));
+  if (!soSanhChuoiAnToan_(chuKyDung, phan[1])) {
+    logAudit_("DANG_NHAP", "TU_CHOI", "Vé Cổng sai chữ ký (Cổng đang dùng mã nguồn/khóa cũ?).");
+    return { thongBao: "Vé đăng nhập sai chữ ký - Cổng đăng nhập đang dùng mã nguồn cũ. Quản trị viên cần lấy lại mã nguồn Cổng (Hệ thống › Quản lý người dùng › Cổng đăng nhập) và triển khai lại." };
+  }
+
+  let noiDung;
+  try { noiDung = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(phan[0])).getDataAsString("UTF-8")); } catch (e) { return { thongBao: loiVe }; }
+  const bayGio = Date.now();
+  const hetHan = Number(noiDung && noiDung.x);
+  const nonce = String((noiDung && noiDung.n) || "");
+  if (!noiDung || !noiDung.e || !/^[A-Za-z0-9-]{8,64}$/.test(nonce)) return { thongBao: loiVe };
+  if (!(hetHan > bayGio) || hetHan > bayGio + VE_CONG_HIEU_LUC_MS_ + 60000) {
+    return { thongBao: "Liên kết đăng nhập đã hết hạn (quá 5 phút). Vui lòng bấm Đăng nhập lại." };
+  }
+  // Mỗi vé chỉ dùng 1 lần (chặn dùng lại link cũ còn trong lịch sử trình duyệt).
+  const cache = CacheService.getScriptCache();
+  if (cache.get("cong_ve_" + nonce)) return { thongBao: "Liên kết đăng nhập này đã được dùng. Vui lòng bấm Đăng nhập lại." };
+  cache.put("cong_ve_" + nonce, "1", Math.ceil((VE_CONG_HIEU_LUC_MS_ + 120000) / 1000));
+
+  const nd = timNguoiDungTheoEmail_(noiDung.e);
+  PHIEN_HIEN_TAI_ = nd; // để logAudit_ ghi đúng người
+  if (!nd.coQuyen) {
+    logAudit_("DANG_NHAP", "TU_CHOI", nd.email + " không có trong danh sách quyền.");
+    return { thongBao: "Tài khoản " + nd.email + " chưa được cấp quyền sử dụng hệ thống. Gửi đúng email này cho Quản trị viên để được thêm vào danh sách, hoặc đăng nhập bằng tài khoản Google khác." };
+  }
+  logAudit_("DANG_NHAP", "OK", nd.email + " (" + nd.vaiTro + ")");
+  return { phien: taoPhien_(nd.email) };
+}
+
+// Trang hướng dẫn cài đặt 1 lần (hiện khi chưa có khóa Cổng). Không chứa bí
+// mật nào - chỉ hướng dẫn Admin tự lấy mã nguồn Cổng trong trình soạn thảo.
+function trangHuongDanCauHinhDangNhap_() {
+  return HtmlService.createHtmlOutput(
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:40px auto;padding:28px;border:1px solid #DCE0D8;border-radius:12px;line-height:1.6;color:#1E211C;">' +
+    '<h2 style="margin-top:0;color:#1B4332;">⚙️ Cần cài đặt Cổng đăng nhập Gmail (làm 1 lần)</h2>' +
+    '<ol>' +
+    '<li>Mở dự án Apps Script của webapp này bằng tài khoản <b>saoluucvhak@gmail.com</b>.</li>' +
+    '<li>Trên thanh công cụ, chọn hàm <code>CAI_DAT_CONG_DANG_NHAP</code> rồi bấm <b>Chạy</b> (Run).</li>' +
+    '<li>Trong <b>Nhật ký thực thi</b> (Execution log) hiện ra, sao chép toàn bộ mã nguồn Cổng nằm giữa 2 dòng <code>-----</code>.</li>' +
+    '<li>Mở <b>script.new</b> (tạo dự án mới, VD đặt tên "HAK - Cong dang nhap"), xóa nội dung Code.gs, dán mã vừa sao chép, bấm Lưu.</li>' +
+    '<li><b>Deploy › New deployment › Web app</b>: <i>Execute as</i> = <b>User accessing the web app</b>; <i>Who has access</i> = <b>Anyone with Google account</b> → Deploy, sao chép link Web app.</li>' +
+    '<li>Mở link Cổng đó bằng saoluucvhak@gmail.com (cấp quyền xem email) → bấm <b>Vào hệ thống</b>.</li>' +
+    '<li>Trong webapp: <b>Hệ thống › Quản lý người dùng › Cổng đăng nhập</b>: dán link Cổng và bấm Lưu, rồi thêm email nhân viên kèm vai trò.</li>' +
+    '</ol>' +
+    '<p style="font-size:13px;color:#5B6259;">Giữ bí mật mã nguồn Cổng (có chứa khóa ký vé). Không chia sẻ dự án Cổng cho ai.</p>' +
+    '</div>'
+  ).setTitle("Cài đặt Cổng đăng nhập");
+}
+
+/* ----- Quản trị Cổng đăng nhập (chỉ Admin) ----- */
+function HT_layCauHinhCong() {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const linkChinh = layLinkWebappChinh_();
+    return { status: "success", data: { linkCong: layLinkCong_(), linkWebappChinh: linkChinh, linkWebappHopLe: laLinkWebAppHopLe_(linkChinh) } };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_layMaNguonCong() {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const linkChinh = layLinkWebappChinh_();
+    if (!laLinkWebAppHopLe_(linkChinh)) throw new Error("Không tự nhận diện được URL /exec của webapp chính (" + (linkChinh || "trống") + "). Đặt thuộc tính tập lệnh LINK_WEBAPP_CHINH bằng đúng URL /exec rồi thử lại.");
+    logAudit_("CONG_DANG_NHAP", "OK", "Xem mã nguồn Cổng");
+    return { status: "success", data: taoMaNguonCong_(layKhoaCong_() || taoKhoaCongMoi_(), linkChinh) };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function HT_luuLinkCong(link) {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    link = String(link || "").trim();
+    if (!laLinkWebAppHopLe_(link)) throw new Error("Link Cổng không hợp lệ - phải là link Web app dạng https://script.google.com/macros/s/.../exec");
+    if (link === layLinkWebappChinh_()) throw new Error("Đây là link của CHÍNH webapp quản lý, không phải link dự án Cổng đăng nhập.");
+    PropertiesService.getScriptProperties().setProperty(LINK_CONG_PROP_, link);
+    logAudit_("CONG_DANG_NHAP", "OK", "Lưu link Cổng: " + link);
+    return { status: "success", message: "✅ Đã lưu link Cổng đăng nhập." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Đổi khóa khi nghi mã nguồn Cổng bị lộ: Cổng cũ ngừng hoạt động ngay (các
+// phiên đang đăng nhập vẫn giữ nguyên) cho tới khi dán mã nguồn mới vào Cổng
+// và triển khai lại (Manage deployments › Edit › New version).
+function HT_doiKhoaCong() {
+  yeuCauPhien_();
+  try {
+    yeuCauQuyenAdmin_();
+    const linkChinh = layLinkWebappChinh_();
+    if (!laLinkWebAppHopLe_(linkChinh)) throw new Error("Không tự nhận diện được URL /exec của webapp chính - đặt thuộc tính LINK_WEBAPP_CHINH trước.");
+    const ma = taoMaNguonCong_(taoKhoaCongMoi_(), linkChinh);
+    logAudit_("CONG_DANG_NHAP", "OK", "Đổi khóa Cổng");
+    return { status: "success", data: ma, message: "✅ Đã đổi khóa. Dán mã nguồn mới vào dự án Cổng và triển khai lại phiên bản mới ngay." };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
 function HT_layDanhSachQuyen() {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     return { status: "success", data: DS_QUYEN_() };
@@ -678,17 +1098,15 @@ function HT_layDanhSachQuyen() {
 }
 
 // Quyền chia sẻ Google Drive (Xem/Bình luận/Chỉnh sửa) - ĐỘC LẬP với vaiTro
-// (vaiTro là quyền TRONG webapp: ADMIN/NHANVIEN; quyenDrive là quyền TRÊN
-// chính Google Sheet/Drive khi HT_chiaSeTaiNguyenChoDanhSachQuyen() chạy).
-// LƯU Ý: đa số chức năng nghiệp vụ (nhập phiếu cân, sửa, xuất hàng...) GHI
-// dữ liệu trực tiếp vào Sheet dưới danh nghĩa CHÍNH người dùng (executeAs:
-// USER_ACCESSING) - nên hầu hết nhân viên vẫn cần "Chỉnh sửa" (EDITOR) thì
-// mới thao tác được. "Xem"/"Bình luận" chỉ phù hợp cho người CHỈ xem báo
-// cáo, không nhập/sửa gì.
+// (vaiTro là quyền TRONG webapp: ADMIN/NHANVIEN/CHIXEM; quyenDrive là quyền
+// TRÊN chính Google Sheet/Drive khi HT_chiaSeTaiNguyenChoDanhSachQuyen() chạy).
+// Webapp chạy bằng quyền Admin nên nhân viên KHÔNG cần quyền Drive nào để
+// dùng webapp - chỉ chia sẻ khi CHỦ ĐỘNG muốn ai đó mở thẳng Sheet gốc.
 const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
 
 // danhSach = [{email, vaiTro, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
 function HT_luuDanhSachQuyen(danhSach) {
+  yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_();
     if (!Array.isArray(danhSach) || danhSach.length === 0) {
@@ -696,7 +1114,8 @@ function HT_luuDanhSachQuyen(danhSach) {
     }
     const clean = danhSach.map(function (u) {
       const email = String(u.email || "").trim().toLowerCase();
-      const vaiTro = (String(u.vaiTro || "").toUpperCase() === "ADMIN") ? "ADMIN" : "NHANVIEN";
+      const vaiTroTho = String(u.vaiTro || "").toUpperCase();
+      const vaiTro = VAI_TRO_HOP_LE_.indexOf(vaiTroTho) !== -1 ? vaiTroTho : "NHANVIEN";
       const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
       const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -706,7 +1125,10 @@ function HT_luuDanhSachQuyen(danhSach) {
     });
     // Loại email trùng (giữ lần xuất hiện đầu tiên)
     const seen = {}; const finalList = [];
-    clean.forEach(function (u) { if (!seen[u.email]) { seen[u.email] = true; finalList.push(u); } });
+    clean.forEach(function (u) {
+      const key = chuanHoaEmailSoSanh_(u.email);
+      if (!seen[key]) { seen[key] = true; finalList.push(u); }
+    });
     if (!finalList.some(function (u) { return u.vaiTro === "ADMIN"; })) {
       throw new Error("Phải giữ lại ít nhất 1 tài khoản ADMIN, không thể xóa hết (nếu không sẽ không còn ai quản trị được hệ thống).");
     }

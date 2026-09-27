@@ -19,7 +19,7 @@ function setupPhieuCan(env, rows) {
 
 describe('HT_chotSoNam() - chốt sổ năm, chuyển phiếu đã "OK" sang sheet lưu trữ', () => {
   test('CHỈ ADMIN mới chốt sổ được', () => {
-    const env = createGasEnv({ email: 'ai-do@gmail.com' });
+    const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
     setupPhieuCan(env, [makeRow({ 1: new Date(2024, 0, 1), 24: 'OK' })]);
     const res = env.call('HT_chotSoNam', 2024);
     expect(res.status).toBe('error');
@@ -132,7 +132,7 @@ describe('HT_layThongKeNamPhieuCan() - thống kê theo năm để Admin quyết
   });
 
   test('nhân viên thường không xem được', () => {
-    const env = createGasEnv({ email: 'nv@gmail.com' });
+    const env = createGasEnv({ email: 'nv@gmail.com', vaiTro: 'NHANVIEN' });
     setupPhieuCan(env, []);
     expect(env.call('HT_layThongKeNamPhieuCan').status).toBe('error');
   });

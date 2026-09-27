@@ -322,9 +322,18 @@ function makeFakeUtilities() {
         .replace('mm', pad(d.getMinutes()))
         .replace('ss', pad(d.getSeconds()));
     },
-    newBlob: (bytes, mimeType, name) => ({ bytes, mimeType, name }),
+    newBlob: (bytes, mimeType, name) => ({
+      bytes, mimeType, name,
+      getDataAsString: () => Buffer.from(typeof bytes === 'string' ? Buffer.from(bytes, 'utf8') : bytes).toString('utf8'),
+      getBytes: () => (typeof bytes === 'string' ? Array.from(Buffer.from(bytes, 'utf8')) : bytes),
+    }),
     base64Decode: (str) => Buffer.from(str, 'base64'),
     base64Encode: (bytes) => Buffer.from(bytes).toString('base64'),
+    base64EncodeWebSafe: (x) => Buffer.from(typeof x === 'string' ? Buffer.from(x, 'utf8') : x).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+    base64DecodeWebSafe: (str) => Array.from(Buffer.from(String(str).replace(/-/g, '+').replace(/_/g, '/'), 'base64')),
+    computeHmacSha256Signature: (value, key) => Array.from(require('crypto').createHmac('sha256', key).update(value).digest()),
+    getUuid: () => require('crypto').randomUUID(),
+    sleep: () => {},
   };
 }
 
@@ -386,15 +395,21 @@ function makeFakeHtmlService() {
     createHtmlOutput: (html) => ({
       __html: html,
       setTitle() { return this; },
+      setXFrameOptionsMode() { return this; },
       addMetaTag() { return this; },
     }),
-    createTemplateFromFile: () => ({
-      evaluate: () => ({
-        setTitle() { return this; },
-        addMetaTag() { return this; },
-        setXFrameOptionsMode() { return this; },
-      }),
-    }),
+    createTemplateFromFile: (ten) => {
+      const t = {
+        __ten: ten,
+        evaluate: () => ({
+          __template: t,
+          setTitle() { return this; },
+          addMetaTag() { return this; },
+          setXFrameOptionsMode(m) { this.__xFrame = m; return this; },
+        }),
+      };
+      return t;
+    },
     XFrameOptionsMode: { ALLOWALL: 'ALLOWALL' },
   };
 }

@@ -35,6 +35,8 @@ const vm = require('vm');
 
 const mocks = require('./gasMocks');
 
+const ADMIN_GOC = 'saoluucvhak@gmail.com';
+
 const CONFIG_SRC = fs.readFileSync(path.join(__dirname, '..', 'Config.gs'), 'utf8');
 const CODE_SRC = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
 const BUNDLE_SRC = CONFIG_SRC + '\n;\n' + CODE_SRC;
@@ -49,10 +51,19 @@ function createGasEnv(opts) {
   // cùng 1 kịch bản test, ĐÚNG như PropertiesService/Sheets/Session thật.
   const propertiesService = mocks.makeFakePropertiesService();
   const spreadsheetApp = mocks.makeFakeSpreadsheetApp();
-  const session = mocks.makeFakeSession(opts.email || '');
+  // Mặc định đăng nhập bằng Admin gốc (đa số test kiểm tra nghiệp vụ); test phân quyền truyền email riêng hoặc ''.
+  const session = mocks.makeFakeSession(opts.email === undefined ? ADMIN_GOC : opts.email);
   const driveApp = mocks.makeFakeDriveApp();
   const cacheService = mocks.makeFakeCacheService();
   const lockService = mocks.makeFakeLockService(); // khóa toàn cục dùng chung - xem gasMocks
+  const phienTheoEmail = {};
+  // ScriptApp tối thiểu: danh sách trigger của dự án (test thêm/bớt qua env.scriptApp.__triggers).
+  const scriptApp = {
+    __triggers: [],
+    getProjectTriggers() { return this.__triggers.map((t) => ({ getUniqueId: () => t.uid, getHandlerFunction: () => t.ham })); },
+    getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/TEST/exec' }),
+    getOAuthToken: () => 'token-test',
+  };
 
   function loadFreshContext() {
     const sandbox = {
@@ -64,6 +75,7 @@ function createGasEnv(opts) {
       LockService: lockService,
       Session: session,
       CacheService: cacheService,
+      ScriptApp: scriptApp,
       HtmlService: mocks.makeFakeHtmlService(),
       // "Drive" = Advanced Drive Service (Drive.Files.remove...) - chỉ cần đủ để không throw undefined.
       Drive: { Files: { remove: () => {} } },
@@ -79,7 +91,7 @@ function createGasEnv(opts) {
     return context;
   }
 
-  return {
+  const env = {
     /** Context "mẫu" 1 lần - chỉ dùng để kiểm tra sự tồn tại của hàm (smoke test), KHÔNG dùng để suy luận state xuyên suốt nhiều lần gọi. */
     context: loadFreshContext(),
     propertiesService,
@@ -87,6 +99,8 @@ function createGasEnv(opts) {
     session,
     driveApp,
     cacheService,
+    scriptApp,
+    mocks,
     lockService,
     /**
      * Gọi 1 hàm global trong Code.gs/Config.gs - NẠP LẠI TOÀN BỘ SCRIPT TỪ ĐẦU
@@ -95,12 +109,36 @@ function createGasEnv(opts) {
      * xuyên suốt vì đó là các dịch vụ ngoài, không bị nạp lại.
      */
     call(fnName, ...args) {
+      const ma = this.maPhien(); // tạo phiên TRƯỚC khi nạp context của lần gọi (giữ đúng realm Date)
       const context = loadFreshContext();
       const fn = context[fnName];
       if (typeof fn !== 'function') {
         throw new Error('Hàm "' + fnName + '" không tồn tại (hoặc không phải function declaration) trong Code.gs/Config.gs.');
       }
+      // Hàm công khai (mở đầu bằng yeuCauPhien_()) được gọi ĐÚNG như giao diện
+      // thật: qua cổng API(maPhien, tenHam, thamSo) với phiên của email hiện tại
+      // (session.__setEmail). Chưa có email = chưa đăng nhập (mã phiên rỗng).
+      if (String(fn).indexOf('yeuCauPhien_()') !== -1) {
+        if (vm.runInContext('HAM_API_', context)[fnName] === true) return context.API(ma, fnName, args);
+      }
+      // Hàm nội bộ (không mở cho giao diện) - chạy như đang ở GIỮA 1 lượt API() đã xác thực.
+      this.__datPhienNoiBo(context, ma);
       return fn(...args);
+    },
+    __datPhienNoiBo(context, ma) {
+      if (!ma) return;
+      try { context.PHIEN_HIEN_TAI_ = context.xacThucPhien_(ma); } catch (e) { /* phiên đã bị thu hồi */ }
+    },
+    /** Mã phiên đăng nhập (qua Cổng) của email đang đặt trong session mock - tạo 1 lần/email. */
+    maPhien(email) {
+      const e = email === undefined ? session.getActiveUser().getEmail() : email;
+      if (!e) return '';
+      if (!phienTheoEmail[e]) phienTheoEmail[e] = loadFreshContext().taoPhien_(e);
+      return phienTheoEmail[e];
+    },
+    /** Gọi thẳng API() với mã phiên tùy ý (test cổng phân quyền). */
+    callApi(maPhien, fnName, ...args) {
+      return loadFreshContext().API(maPhien, fnName, args);
     },
     /**
      * Tạo 1 Date object bằng ĐÚNG constructor Date của 1 vm context mới - bắt
@@ -124,9 +162,11 @@ function createGasEnv(opts) {
      * cho riêng loại test danh tính-object này).
      */
     callWithOwnDate(fnName, dateArgs) {
+      const ma = this.maPhien();
       const context = loadFreshContext();
       context.__dateArgs = dateArgs;
       const date = vm.runInContext('new Date(...__dateArgs)', context);
+      this.__datPhienNoiBo(context, ma);
       const fn = context[fnName];
       if (typeof fn !== 'function') {
         throw new Error('Hàm "' + fnName + '" không tồn tại trong Code.gs/Config.gs.');
@@ -134,6 +174,14 @@ function createGasEnv(opts) {
       return { date, result: fn(date) };
     },
   };
+  // opts.vaiTro: đăng ký sẵn email này vào danh sách quyền (do Admin gốc lưu)
+  // trước khi đăng nhập bằng nó - dùng cho test "Nhân viên/Chỉ xem bị chặn".
+  if (opts.vaiTro) {
+    session.__setEmail(ADMIN_GOC);
+    env.call('HT_luuDanhSachQuyen', [{ email: ADMIN_GOC, vaiTro: 'ADMIN' }, { email: opts.email, vaiTro: opts.vaiTro }]);
+    session.__setEmail(opts.email);
+  }
+  return env;
 }
 
-module.exports = { createGasEnv };
+module.exports = { createGasEnv, ADMIN_GOC };
