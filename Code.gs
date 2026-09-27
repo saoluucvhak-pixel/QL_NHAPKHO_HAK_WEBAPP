@@ -292,6 +292,7 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
 
     const _rf = REGION_FORMAT();
     const rowsThemMoi = [];
+    const dongGhiDe = [];
 
     rowsMoiNK.forEach(row => {
       const key = String(row[21] || "").trim();
@@ -300,14 +301,16 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
         // TRÙNG Mã chứng từ đã có sẵn trong Draft -> GHI ĐÈ đúng dòng đó (không tạo dòng trùng)
         const dongThat = mapDongCu.get(key);
         sheet.getRange(dongThat, 1, 1, row.length).setValues([row]);
-        sheet.getRange(dongThat, 2, 1, 1).setNumberFormat(_rf.DATE_FMT);
-        sheet.getRange(dongThat, 3, 1, 1).setNumberFormat(_rf.TIME_FMT);
-        sheet.getRange(dongThat, 4, 1, 1).setNumberFormat(_rf.DATE_FMT);
-        sheet.getRange(dongThat, 5, 1, 1).setNumberFormat(_rf.TIME_FMT);
+        dongGhiDe.push(dongThat);
       } else {
         rowsThemMoi.push(row);
       }
     });
+    // PERF-06: định dạng Ngày/Giờ các dòng ghi đè gom vào 2 lệnh RangeList (trước: 4 lệnh/dòng).
+    if (dongGhiDe.length > 0) {
+      sheet.getRangeList([].concat.apply([], dongGhiDe.map(function (r) { return ["B" + r, "D" + r]; }))).setNumberFormat(_rf.DATE_FMT);
+      sheet.getRangeList([].concat.apply([], dongGhiDe.map(function (r) { return ["C" + r, "E" + r]; }))).setNumberFormat(_rf.TIME_FMT);
+    }
 
     if (rowsThemMoi.length > 0) {
       const startRow = sheet.getLastRow() + 1;
@@ -321,6 +324,29 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
   } catch (e) {
     logAudit_('DRAFT_CHUATT', 'ERROR', e.toString());
   }
+}
+
+// PERF-05: ghi các phiếu cập nhật khi re-import - mỗi khối dòng liền nhau 1 lệnh
+// setValues (cột B..S) + định dạng Ngày/Giờ/Số gom vào 3 lệnh RangeList cho cả
+// lượt import (trước đây 8 lệnh ghi riêng lẻ cho MỖI phiếu).
+function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf) {
+  if (capNhatTheoDong.size === 0) return;
+  const dongs = Array.from(capNhatTheoDong.keys()).sort(function (a, b) { return a - b; });
+  const vungNgay = [], vungGio = [], vungSo = [];
+  let i = 0;
+  while (i < dongs.length) {
+    let j = i;
+    while (j + 1 < dongs.length && dongs[j + 1] === dongs[j] + 1) j++;
+    const tu = dongs[i], den = dongs[j];
+    sheet.getRange(tu, 2, den - tu + 1, 18).setValues(dongs.slice(i, j + 1).map(function (r) { return capNhatTheoDong.get(r); }));
+    vungNgay.push("B" + tu + ":B" + den, "D" + tu + ":D" + den);
+    vungGio.push("C" + tu + ":C" + den, "E" + tu + ":E" + den);
+    vungSo.push("H" + tu + ":J" + den);
+    i = j + 1;
+  }
+  sheet.getRangeList(vungNgay).setNumberFormat(rf.DATE_FMT);
+  sheet.getRangeList(vungGio).setNumberFormat(rf.TIME_FMT);
+  sheet.getRangeList(vungSo).setNumberFormat("#,##0");
 }
 
 function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
@@ -350,13 +376,14 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       const existingData = dataSheet.getRange(2, 1, lastRow - 1, 25).getValues();
       existingData.forEach((row, index) => {
         const keyMaCT = String(row[21] || "").trim();
-        if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim() });
+        if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim(), row: row });
       });
     }
     // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): xem giải thích ở step1_PreviewDraft.
     LT_bosungMaChungTuDaLuuTru_(duplicateMap);
 
     let countNew = 0, countUpdate = 0, countSkip = 0; const batchNew = [];
+    const capNhatTheoDong = new Map(); // PERF-05: rowNum -> 18 giá trị cột B..S, ghi gộp sau vòng lặp
     // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
     // đã tồn tại lẫn nhánh ghi dòng mới bên dưới), tránh gọi PropertiesService lặp lại.
     const _rfLoop = REGION_FORMAT();
@@ -427,24 +454,15 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
         // cập nhật - từ 13 lệnh xuống còn 7 lệnh) - GIỮ NGUYÊN 100% giá trị và
         // định dạng ghi vào từng cột, chỉ đổi CÁCH gộp lệnh gọi.
         // Cột B..F (Ngày/Giờ cân 1, Ngày/Giờ cân 2, Số xe) - 1 lệnh ghi giá trị duy nhất.
-        dataSheet.getRange(info.rowNum, 2, 1, 5).setValues([[
+        // PERF-05: chỉ GOM giá trị (ghi 1 lần sau vòng lặp). Các cột G, M, P, R
+        // KHÔNG thuộc diện cập nhật được ghi lại đúng giá trị vừa đọc (trong khóa).
+        const cu = info.row;
+        capNhatTheoDong.set(info.rowNum, [
           dateC ? toDateOnly_(dateC) : "", dateC ? toTimeOnly_(dateC) : "",
           dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : "",
-          valF_Dich
-        ]]);
-        // Cột B..E cần ĐỊNH DẠNG khác nhau xen kẽ (Ngày/Giờ/Ngày/Giờ) - setNumberFormats
-        // (số nhiều) nhận mảng 2 chiều, gán được nhiều định dạng khác nhau trong 1 lệnh
-        // duy nhất (khác setNumberFormat số ít chỉ nhận 1 định dạng áp cho cả vùng).
-        dataSheet.getRange(info.rowNum, 2, 1, 4).setNumberFormats([[
-          _rfLoop.DATE_FMT, _rfLoop.TIME_FMT, _rfLoop.DATE_FMT, _rfLoop.TIME_FMT
-        ]]);
-        dataSheet.getRange(info.rowNum, 8, 1, 3).setValues([[item.klCan1, item.klCan2, item.klHangGoc]]);
-        dataSheet.getRange(info.rowNum, 8, 1, 3).setNumberFormat("#,##0");
-        // Cột K..L (Khách hàng ghép mã + Khách hàng) liền nhau - gộp 1 lệnh.
-        dataSheet.getRange(info.rowNum, 11, 1, 2).setValues([[valK_Dich, valL_Dich]]);
-        dataSheet.getRange(info.rowNum, 14, 1, 2).setValues([[valN_Dich, valO_Dich]]);
-        dataSheet.getRange(info.rowNum, 17).setValue(valQ_Dich);
-        dataSheet.getRange(info.rowNum, 19).setValue(now);
+          valF_Dich, cu[6], item.klCan1, item.klCan2, item.klHangGoc,
+          valK_Dich, valL_Dich, cu[12], valN_Dich, valO_Dich, cu[15], valQ_Dich, cu[17], now
+        ]);
         countUpdate++; continue;
       }
 
@@ -469,6 +487,8 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       duplicateMap.set(uniqueKeyMaCT, { status: "", batchIndex: batchNew.length - 1 });
       countNew++;
     }
+
+    ghiCapNhatPhieuCanGop_(dataSheet, capNhatTheoDong, _rfLoop);
 
     if (batchNew.length > 0) {
       const startRow = dataSheet.getLastRow() + 1;
@@ -699,13 +719,15 @@ function LT_layDanhSachNamDaLuuTru_(ss) {
 // toDate dạng "yyyy-MM-dd" hoặc rỗng). Nếu KHÔNG lọc ngày (cả 2 đều rỗng), trả
 // về TOÀN BỘ các năm đã từng lưu trữ - an toàn, không bỏ sót năm nào khi người
 // dùng không giới hạn ngày (đồng nghĩa muốn xem/kiểm tra hết lịch sử).
+// PERF-03: chỉ trả về năm THỰC SỰ có sheet lưu trữ (1 lần getSheets()) thay vì
+// dò getSheetByName từng năm từ 2000 khi "Từ ngày" để trống - kết quả đọc y hệt.
 function LT_capNamCanDoc_(ss, fromDate, toDate) {
-  if (!fromDate && !toDate) return LT_layDanhSachNamDaLuuTru_(ss);
+  const namDaLuuTru = LT_layDanhSachNamDaLuuTru_(ss);
+  if (!fromDate && !toDate) return namDaLuuTru;
   const namTu = fromDate ? new Date(fromDate).getFullYear() : 2000;
   const namDen = toDate ? new Date(toDate).getFullYear() : new Date().getFullYear();
-  const nams = [];
-  for (let n = namTu; n <= namDen; n++) nams.push(n);
-  return nams;
+  return namDaLuuTru.filter(function (n) { return n >= namTu && n <= namDen; })
+    .sort(function (a, b) { return a - b; });
 }
 
 // Đọc dữ liệu PhieuCan_DN GỘP CẢ sheet đang hoạt động LẪN các sheet lưu trữ
@@ -807,6 +829,23 @@ function HT_layThongKeNamPhieuCan() {
 // sau khi có thêm phiếu của năm đó vừa được chốt "OK"). Phiếu CHƯA "OK" của
 // đúng năm đó KHÔNG bị đụng tới - dù bấm nhầm năm hiện tại cũng không mất/khóa
 // nhầm dữ liệu đang hoạt động, vì chỉ dòng đã "OK" mới đủ điều kiện di chuyển.
+// STUCK-01: nếu lần chốt sổ trước bị ngắt (timeout Sheets / quá 6 phút) SAU khi
+// đã chép sang lưu trữ nhưng CHƯA xóa xong khỏi sheet chính, phiếu nằm ở CẢ 2
+// nơi -> báo cáo cộng trùng. Bỏ các dòng có Mã chứng từ (cột V) đã có sẵn trong
+// lưu trữ để lần chạy lại chỉ xóa nốt khỏi sheet chính -> tự hết trùng.
+function LT_locDongChuaLuuTru_(sheetLuuTru, dongCanChuyen) {
+  const daCo = new Set();
+  if (sheetLuuTru.getLastRow() > 1) {
+    sheetLuuTru.getRange(2, 22, sheetLuuTru.getLastRow() - 1, 1).getValues().forEach(function (r) {
+      const k = String(r[0] || "").trim(); if (k) daCo.add(k);
+    });
+  }
+  return dongCanChuyen.filter(function (d) {
+    const k = String(d.values[21] || "").trim();
+    return !k || !daCo.has(k);
+  });
+}
+
 function HT_chotSoNam(nam) {
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
@@ -850,16 +889,22 @@ function HT_chotSoNam(nam) {
       sheetLuuTru.setFrozenRows(1);
     }
 
+    // STUCK-01: lần chốt trước bị ngắt giữa chừng -> chỉ xóa nốt, không chép trùng.
+    const dongCanGhi = LT_locDongChuaLuuTru_(sheetLuuTru, dongCanChuyen);
+
     // Ghi thêm vào CUỐI sheet lưu trữ (append, không ghi đè dữ liệu đã lưu trữ từ lần chốt sổ trước).
-    const startRowLuuTru = sheetLuuTru.getLastRow() + 1;
-    sheetLuuTru.getRange(startRowLuuTru, 1, dongCanChuyen.length, LT_SO_COT_DAY_DU)
-      .setValues(dongCanChuyen.map(function (d) { return d.values; }));
-    // Giữ đúng định dạng Ngày/Giờ như sheet gốc (tránh Sheets tự đoán lại định dạng).
-    const _rfLT = REGION_FORMAT();
-    sheetLuuTru.getRange(startRowLuuTru, 2, dongCanChuyen.length, 1).setNumberFormat(_rfLT.DATE_FMT);
-    sheetLuuTru.getRange(startRowLuuTru, 3, dongCanChuyen.length, 1).setNumberFormat(_rfLT.TIME_FMT);
-    sheetLuuTru.getRange(startRowLuuTru, 4, dongCanChuyen.length, 1).setNumberFormat(_rfLT.DATE_FMT);
-    sheetLuuTru.getRange(startRowLuuTru, 5, dongCanChuyen.length, 1).setNumberFormat(_rfLT.TIME_FMT);
+    if (dongCanGhi.length > 0) {
+      const startRowLuuTru = sheetLuuTru.getLastRow() + 1;
+      sheetLuuTru.getRange(startRowLuuTru, 1, dongCanGhi.length, LT_SO_COT_DAY_DU)
+        .setValues(dongCanGhi.map(function (d) { return d.values; }));
+      // Giữ đúng định dạng Ngày/Giờ như sheet gốc (tránh Sheets tự đoán lại định dạng).
+      const _rfLT = REGION_FORMAT();
+      sheetLuuTru.getRange(startRowLuuTru, 2, dongCanGhi.length, 1).setNumberFormat(_rfLT.DATE_FMT);
+      sheetLuuTru.getRange(startRowLuuTru, 3, dongCanGhi.length, 1).setNumberFormat(_rfLT.TIME_FMT);
+      sheetLuuTru.getRange(startRowLuuTru, 4, dongCanGhi.length, 1).setNumberFormat(_rfLT.DATE_FMT);
+      sheetLuuTru.getRange(startRowLuuTru, 5, dongCanGhi.length, 1).setNumberFormat(_rfLT.TIME_FMT);
+    }
+    const soDaCoSan = dongCanChuyen.length - dongCanGhi.length;
 
     // XÓA đúng các dòng đã chuyển khỏi sheet đang hoạt động.
     xoaCacDong_(sheet, dongCanChuyen.map(function (d) { return d.rowNum; }));
@@ -867,7 +912,9 @@ function HT_chotSoNam(nam) {
     logAudit_("CHOT_SO_NAM", "OK", "Đã chuyển " + dongCanChuyen.length + " phiếu năm " + nam + " sang sheet lưu trữ " + tenSheetLuuTru + ".");
     return {
       status: "success",
-      message: "✅ Đã chuyển " + dongCanChuyen.length + " phiếu của năm " + nam + " sang sheet lưu trữ \"" + tenSheetLuuTru + "\". Sheet chính hiện còn " + (sheet.getLastRow() - 1) + " dòng dữ liệu."
+      message: "✅ Đã chuyển " + dongCanChuyen.length + " phiếu của năm " + nam + " sang sheet lưu trữ \"" + tenSheetLuuTru + "\"." +
+        (soDaCoSan > 0 ? " (" + soDaCoSan + " phiếu đã có sẵn trong lưu trữ từ lần chốt sổ trước bị gián đoạn - chỉ xóa khỏi sheet chính, không chép trùng.)" : "") +
+        " Sheet chính hiện còn " + (sheet.getLastRow() - 1) + " dòng dữ liệu."
     };
   } catch (e) {
     logAudit_("CHOT_SO_NAM", "ERROR", e.toString());
@@ -980,7 +1027,12 @@ function copyDataWithFinalLookup(fromDate, toDate) {
 }
 
 // FIX #2: bản CÓ KHÓA — dùng khi gọi ĐỘC LẬP (menu thủ công, trigger theo giờ...).
-function runCalculatePrice() {
+// FIX (TRIGGER-01): trigger theo giờ gọi hàm này KHÔNG có phiên đăng nhập -> trước
+// đây yeuCauPhien_() làm trigger lỗi mọi lần chạy. Nay nhận diện đúng lượt chạy
+// của trigger THẬT của dự án (triggerUid khớp ScriptApp.getProjectTriggers(),
+// giống TRIGGER_saoLuuHangDem) - gọi từ trình duyệt vẫn bắt buộc đăng nhập.
+function runCalculatePrice(e) {
+  if (laLuotChayTriggerThat_(e)) PHIEN_HIEN_TAI_ = PHIEN_HE_THONG_TRIGGER_();
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
   try {
@@ -1074,24 +1126,27 @@ function runCalculatePrice_core() {
 
     // Gom các dòng cần ghi thành từng KHỐI LIÊN TIẾP (rowNum liền nhau) - ghi 1
     // lượt setValues() cho cả khối thay vì từng dòng riêng lẻ.
+    // PERF-04: X,Y,Z liền nhau -> ghi chung 1 lệnh; định dạng "#,##0" của cột X/Z
+    // gom vào 1 RangeList duy nhất sau vòng lặp. Cùng ô, cùng giá trị, cùng định
+    // dạng như trước - chỉ giảm từ 6 xuống 2 lệnh ghi cho mỗi khối dòng.
+    const vungDinhDang = [];
     let idx = 0;
     while (idx < capNhat.length) {
       let end = idx;
       while (end + 1 < capNhat.length && capNhat[end + 1].rowNum === capNhat[end].rowNum + 1) end++;
       const startRow = capNhat[idx].rowNum;
       const soDong = end - idx + 1;
-      const cotT = []; const cotX = []; const cotY = []; const cotZ = [];
+      const cotT = []; const cotXYZ = [];
       for (let k = idx; k <= end; k++) {
-        cotT.push([capNhat[k].gia]); cotX.push([capNhat[k].hieuSo]); cotY.push([capNhat[k].trangThai]); cotZ.push([capNhat[k].thanhTien]);
+        cotT.push([capNhat[k].gia]); cotXYZ.push([capNhat[k].hieuSo, capNhat[k].trangThai, capNhat[k].thanhTien]);
       }
       sheet.getRange(startRow, 20, soDong, 1).setValues(cotT);
-      sheet.getRange(startRow, 24, soDong, 1).setValues(cotX);
-      sheet.getRange(startRow, 25, soDong, 1).setValues(cotY);
-      sheet.getRange(startRow, 26, soDong, 1).setValues(cotZ);
-      sheet.getRange(startRow, 24, soDong, 1).setNumberFormat("#,##0");
-      sheet.getRange(startRow, 26, soDong, 1).setNumberFormat("#,##0");
+      sheet.getRange(startRow, 24, soDong, 3).setValues(cotXYZ);
+      const endRow = startRow + soDong - 1;
+      vungDinhDang.push("X" + startRow + ":X" + endRow, "Z" + startRow + ":Z" + endRow);
       idx = end + 1;
     }
+    if (vungDinhDang.length > 0) sheet.getRangeList(vungDinhDang).setNumberFormat("#,##0");
 
     return {
       status: "success",
@@ -1115,17 +1170,66 @@ function runCalculatePrice_core() {
 // cáo (đã tự gộp lưu trữ) thực ra vẫn tìm thấy nếu gõ đúng. Hàm này chỉ chạy 1
 // lần mỗi lần tải trang (không phải hot path) nên chấp nhận quét thêm tất cả
 // năm đã lưu trữ để danh sách luôn đầy đủ.
+// PERF-01: đọc đúng cột F..Q (12 cột, thay vì A..Q) - chỉ số trong mỗi dòng:
+// 0=F Số xe, 6=L Khách hàng, 8=N Đại lý, 9=O Nguồn gốc, 11=Q Mã ĐG.
+function FO_gomGiaTriLoc_(rows) {
+  const kq = { xe: new Set(), kh: new Set(), dl: new Set(), ng: new Set(), madg: new Set() };
+  rows.forEach(function (row) {
+    const xe = String(row[0] || "").trim(); if (xe) kq.xe.add(xe);
+    const kh = String(row[6] || "").trim(); if (kh) kq.kh.add(kh);
+    const dl = String(row[8] || "").trim(); if (dl) kq.dl.add(dl);
+    const ng = String(row[9] || "").trim(); if (ng) kq.ng.add(ng);
+    const madg = String(row[11] || "").trim(); if (madg) kq.madg.add(madg);
+  });
+  return { xe: Array.from(kq.xe), kh: Array.from(kq.kh), dl: Array.from(kq.dl), ng: Array.from(kq.ng), madg: Array.from(kq.madg) };
+}
+
+// PERF-01: sheet lưu trữ năm đã chốt sổ gần như không đổi, nên cache danh sách
+// giá trị lọc của từng năm. Khóa cache gồm cả số dòng (getLastRow) - chốt sổ
+// thêm phiếu vào năm đó làm đổi số dòng -> tự đọc lại. Riêng trường hợp sửa tay
+// trực tiếp 1 ô trong sheet lưu trữ (không đổi số dòng) sẽ cập nhật chậm tối đa
+// 6 giờ (thời hạn cache). Lỗi CacheService -> tự đọc thẳng Sheet như cũ.
+function FO_giaTriLocNamLuuTru_(sheetNam, nam) {
+  const lastRow = sheetNam.getLastRow();
+  if (lastRow <= 1) return null;
+  const key = "FO_LUUTRU_" + nam + "_" + lastRow;
+  let cache = null;
+  try {
+    cache = CacheService.getScriptCache();
+    const daLuu = cache.get(key);
+    if (daLuu) return JSON.parse(daLuu);
+  } catch (e) { cache = null; }
+  const kq = FO_gomGiaTriLoc_(sheetNam.getRange(2, 6, lastRow - 1, 12).getValues());
+  if (cache) {
+    try {
+      const json = JSON.stringify(kq);
+      if (json.length < 90000) cache.put(key, json, 21600);
+    } catch (e) { /* vượt giới hạn cache - lần sau đọc lại Sheet */ }
+  }
+  return kq;
+}
+
 function getFilterOptions() {
   yeuCauPhien_();
   try {
     let xeSet = new Set(); let khSet = new Set(); let daiLySet = new Set(); let nguonGocSet = new Set(); let maDonGiaSet = new Set();
-    const data = LT_docPhieuCanGopLuuTru_(null, null, 17); // A..Q (cần tới cột Q=Mã ĐG, index16) - gộp cả lưu trữ
-    data.forEach(row => {
-      const xe = String(row[5] || "").trim(); if (xe) xeSet.add(xe);
-      const kh = String(row[11] || "").trim(); if (kh) khSet.add(kh); // Cột L
-      const dl = String(row[13] || "").trim(); if (dl) daiLySet.add(dl); // Cột N - ĐL (Đại lý)
-      const ng = String(row[14] || "").trim(); if (ng) nguonGocSet.add(ng); // Cột O - NG (Nguồn gốc)
-      const madg = String(row[16] || "").trim(); if (madg) maDonGiaSet.add(madg); // Cột Q - Mã ĐG
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheetChinh = ss.getSheetByName(CONFIG.DATA_SHEET);
+    const lastRowChinh = sheetChinh.getLastRow();
+    const cacNguon = [];
+    if (lastRowChinh > 1) cacNguon.push(FO_gomGiaTriLoc_(sheetChinh.getRange(2, 6, lastRowChinh - 1, 12).getValues()));
+    // Gộp cả lưu trữ - xem ghi chú FIX PHẦN 1C ở trên
+    LT_layDanhSachNamDaLuuTru_(ss).forEach(function (nam) {
+      const sheetNam = ss.getSheetByName(LT_tenSheetLuuTru_(nam));
+      const kq = sheetNam ? FO_giaTriLocNamLuuTru_(sheetNam, nam) : null;
+      if (kq) cacNguon.push(kq);
+    });
+    cacNguon.forEach(function (g) {
+      g.xe.forEach(function (v) { xeSet.add(v); });
+      g.kh.forEach(function (v) { khSet.add(v); });
+      g.dl.forEach(function (v) { daiLySet.add(v); });
+      g.ng.forEach(function (v) { nguonGocSet.add(v); });
+      g.madg.forEach(function (v) { maDonGiaSet.add(v); });
     });
     let ncSet = new Set();
     try {
@@ -1273,6 +1377,17 @@ function getBaoCaoTongHop(filters) {
 // lại logic đọc/lọc phiếu cân từ đầu - dữ liệu "Hôm nay"/"Tháng này" luôn khớp
 // 100% với báo cáo tổng hợp thật (không có 2 nguồn tính khác nhau). KHÔNG giới
 // hạn Admin - đây chỉ là xem số liệu tổng hợp, giống các báo cáo khác.
+// PERF-02: tổng "Hôm nay" lọc từ dữ liệu tháng đã đọc (ngày dạng yyyy-MM-dd, giờ GMT+7).
+function DB_tongHopMotNgay_(dataThang, ngayStr) {
+  const ngayHienThi = Utilities.formatDate(new Date(ngayStr + "T12:00:00+07:00"), "GMT+7", "dd/MM/yyyy");
+  const tong = { soLuong: 0, tongKL: 0, tongTien: 0 };
+  dataThang.forEach(function (r) {
+    if (r.ngayCan1 !== ngayHienThi) return;
+    tong.soLuong += 1; tong.tongKL += r.klHang; tong.tongTien += r.thanhTien;
+  });
+  return tong;
+}
+
 function HT_layDashboard() {
   yeuCauPhien_();
   try {
@@ -1280,12 +1395,13 @@ function HT_layDashboard() {
     const d = new Date();
     const dauThangStr = Utilities.formatDate(new Date(d.getFullYear(), d.getMonth(), 1), "GMT+7", "yyyy-MM-dd");
 
-    const bcHomNay = getBaoCaoTongHop({ fromDate: homNayStr, toDate: homNayStr });
-    if (bcHomNay.status !== "success") throw new Error(bcHomNay.message);
+    // PERF-02: chỉ đọc Sheet 1 lần (tháng này) rồi lọc ra "Hôm nay" trong bộ nhớ,
+    // thay vì gọi getBaoCaoTongHop 2 lần (đọc trọn sheet đang hoạt động 2 lần).
     const bcThangNay = getBaoCaoTongHop({ fromDate: dauThangStr, toDate: homNayStr });
     if (bcThangNay.status !== "success") throw new Error(bcThangNay.message);
 
     const dataThang = bcThangNay.data;
+    const bcHomNay = { summary: DB_tongHopMotNgay_(dataThang, homNayStr) };
 
     // Top 5 khách hàng theo doanh số mua (thành tiền) tháng này - gộp trong bộ
     // nhớ tạm từ dữ liệu đã đọc ở trên, KHÔNG đọc lại Sheet lần nữa.
@@ -1964,6 +2080,12 @@ function createSimpleMap_(s,k,v) { const d=s.getDataRange().getValues(); let m={
 // (không chặn thao tác) nếu phát hiện tiêu đề đã đổi khác so với chuẩn đã lưu.
 // Nếu thay đổi cột là CHỦ Ý (admin thêm/sửa cột hợp lệ), gọi
 // HT_datLaiChuanHeaderSheet_ (bên dưới) để "chốt lại" chuẩn mới, tắt cảnh báo.
+// Nối các cảnh báo (bỏ chuỗi rỗng) vào sau thông báo thành công: "msg | cảnh báo 1 | cảnh báo 2".
+function noiCanhBao_(thongBao, dsCanhBao) {
+  const ds = [].concat(dsCanhBao || []).filter(Boolean);
+  return ds.length ? thongBao + " | " + ds.join(" | ") : thongBao;
+}
+
 function kiemTraLechHeaderSheet_(sheet, tenGoiSheet, soCotCanTheoDoi) {
   try {
     if (!sheet || sheet.getLastRow() < 1) return "";
@@ -2011,6 +2133,15 @@ function HT_xacNhanCauTrucSheetHienTai() {
     const ssXH = XH_ss_();
     HT_datLaiChuanHeaderSheet_("NL_PC_XH", ssXH.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH));
     HT_datLaiChuanHeaderSheet_("NL_DH_XB", ssXH.getSheetByName(XUATHANG_CONFIG.SHEET_DHXB));
+    const ssBG = BG_ss_();
+    HT_datLaiChuanHeaderSheet_("Baogia_DN", ssBG.getSheetByName(BAOGIA_CONFIG.SRC_SHEET));
+    HT_datLaiChuanHeaderSheet_("QL_BaoGia", ssBG.getSheetByName(BAOGIA_CONFIG.QL_SHEET));
+    HT_datLaiChuanHeaderSheet_("Ma_BaoGia", ssBG.getSheetByName(BAOGIA_CONFIG.MA_SHEET));
+    HT_datLaiChuanHeaderSheet_("Ma_KL", ssBG.getSheetByName(BAOGIA_CONFIG.MAKL_SHEET));
+    const ssKD = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
+    ["SHEET_GIAODICH", "SHEET_CAUHINH", "SHEET_NHAPDOKHO", "SHEET_DANHMUCKHO"].forEach(function (k) {
+      HT_datLaiChuanHeaderSheet_(KHODAM_CONFIG[k], ssKD.getSheetByName(KHODAM_CONFIG[k]));
+    });
     logAudit_("CAUHINH_XACNHAN_HEADER", "OK", "Admin đã xác nhận lại chuẩn cấu trúc cột hiện tại.");
     return { status: "success", message: "✅ Đã xác nhận cấu trúc cột hiện tại làm chuẩn mới. Cảnh báo lệch cột sẽ tắt cho đến lần thay đổi tiếp theo." };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -2127,7 +2258,8 @@ function BG_addMaBaoGia(fields) {
 
     const stt = BG_nextMaBaoGiaCode_(sheet, lastRow);
     sheet.getRange(lastRow + 1, 1, 1, 7).setValues([[stt, maBaoGia, daiLyMa, nguonGocMa, hinhAnh, noiDung, maDLNG]]);
-    return { status: "success", message: "Đã thêm mã báo giá " + maBaoGia + " vào danh mục.", maBaoGia: maBaoGia };
+    const _canhBaoHeader = kiemTraLechHeaderSheet_(sheet, "Ma_BaoGia", 7); // BUG-002
+    return { status: "success", message: "Đã thêm mã báo giá " + maBaoGia + " vào danh mục." + (_canhBaoHeader ? " | " + _canhBaoHeader : ""), maBaoGia: maBaoGia };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2218,7 +2350,8 @@ function BG_addMaKL(fields) {
     }
     // Lưu KL_Min/KL_Max theo đúng quy ước hiện có trong sheet Ma_KL: đơn vị Kg
     sheet.getRange(lastRow + 1, 1, 1, 4).setValues([[new Date(), maKL, klMinTan * 1000, klMaxTan * 1000]]);
-    return { status: "success", message: "Đã thêm mã khối lượng " + maKL, maKL: maKL };
+    const _canhBaoHeader = kiemTraLechHeaderSheet_(sheet, "Ma_KL", 4); // BUG-002
+    return { status: "success", message: "Đã thêm mã khối lượng " + maKL + (_canhBaoHeader ? " | " + _canhBaoHeader : ""), maKL: maKL };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2450,7 +2583,8 @@ function BG_updateBaogiaRow(payload) {
       gia                      // Cột E - Đơn giá
     ]]);
 
-    return { status: "success", message: "Đã cập nhật báo giá " + idBgct + "." };
+    const _canhBaoHeader = kiemTraLechHeaderSheet_(sheet, "Baogia_DN", 8); // BUG-002
+    return { status: "success", message: "Đã cập nhật báo giá " + idBgct + "." + (_canhBaoHeader ? " | " + _canhBaoHeader : "") };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -2667,7 +2801,8 @@ function BG_createQuote(payload) {
     });
     srcSheet.getRange(srcSheet.getLastRow() + 1, 1, rowsToAppend.length, 8).setValues(rowsToAppend);
 
-    return { status: "success", message: "Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá.", soBaoGia: soBaoGiaMoi };
+    const _canhBaoHeader = [kiemTraLechHeaderSheet_(qlSheet, "QL_BaoGia", 5), kiemTraLechHeaderSheet_(srcSheet, "Baogia_DN", 8)]; // BUG-002
+    return { status: "success", message: noiCanhBao_("Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá.", _canhBaoHeader), soBaoGia: soBaoGiaMoi };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
@@ -4201,8 +4336,12 @@ function processFormData(action, data) {
   yeuCauPhien_();
   kiemTraVaTaoTieuDeSheets();
   var lock = LockService.getScriptLock();
+  // STUCK-02: khóa bị người khác giữ quá lâu -> báo "đang bận" dễ hiểu (trước đây
+  // hiện nguyên văn lỗi tiếng Anh "Lock timeout...") như mọi hàm ghi khác.
+  try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
+    return "❌ Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây.";
+  }
   try {
-    lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
     var ketQua;
     if (action === "Danhmuckho") ketQua = xuLyDanhMucKho(data);
     else if (action === "Thongsokho") ketQua = xuLyKyVetBai(data);
@@ -4212,6 +4351,11 @@ function processFormData(action, data) {
     else if (action === "HoanthanhTuDong") ketQua = KD_taoPhieuDieuChinhTuDong(data);
     else if (action === "Baocaotonkho") ketQua = layBaoCaoTonKho(data);
     else if (action === "BaocaoKyVetBai") ketQua = layBaoCaoTheoKyVetBai(data);
+    // BUG-002: chỉ CẢNH BÁO (không chặn) nếu cột sheet Kho Dăm bị chèn/xóa/đổi thủ công
+    if (typeof ketQua === "string" && ketQua.indexOf("❌") !== 0) {
+      var canhBaoHeaderKD = KD_canhBaoLechHeader_(action);
+      if (canhBaoHeaderKD) ketQua += " | " + canhBaoHeaderKD;
+    }
     // Ghi audit cho các hành động THAY ĐỔI dữ liệu (bỏ qua các hành động chỉ ĐỌC báo cáo)
     if (["Danhmuckho","Thongsokho","Nhapdokho","Nhapkho","Xuatkho","Hoanthanhdonhang","HoanthanhTuDong"].indexOf(action) !== -1) {
       var thanhCong = !(typeof ketQua === "string" && ketQua.indexOf("❌") === 0);
@@ -4224,6 +4368,21 @@ function processFormData(action, data) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// BUG-002: sheet Kho Dăm mà mỗi hành động ghi vào, kèm số cột hệ thống dùng theo vị trí.
+var KD_SHEET_THEO_HANH_DONG_ = {
+  Danhmuckho: ["SHEET_DANHMUCKHO", 5], Thongsokho: ["SHEET_CAUHINH", 4], Nhapdokho: ["SHEET_NHAPDOKHO", 5],
+  Nhapkho: ["SHEET_GIAODICH", 14], Xuatkho: ["SHEET_GIAODICH", 14],
+  Hoanthanhdonhang: ["SHEET_GIAODICH", 14], HoanthanhTuDong: ["SHEET_GIAODICH", 14]
+};
+function KD_canhBaoLechHeader_(action) {
+  var m = KD_SHEET_THEO_HANH_DONG_[action];
+  if (!m) return "";
+  try {
+    var ten = KHODAM_CONFIG[m[0]];
+    return kiemTraLechHeaderSheet_(SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID).getSheetByName(ten), ten, m[1]);
+  } catch (e) { return ""; }
 }
 
 /*********************************************************
@@ -5073,6 +5232,16 @@ function SL_thucHienSaoLuu_(nguon) {
 // "_" cuối) nhưng KHÔNG nằm trong HAM_API_ và chỉ chạy khi mã trigger gửi kèm
 // khớp đúng trigger đã cài - gọi thẳng qua google.script.run không có/không
 // đoán được mã này nên bị bỏ qua.
+function laLuotChayTriggerThat_(e) {
+  const uid = (e && typeof e === "object" && e.triggerUid) ? String(e.triggerUid) : "";
+  if (!uid) return false;
+  try { return ScriptApp.getProjectTriggers().some(function (t) { return t.getUniqueId() === uid; }); } catch (err) { return false; }
+}
+
+function PHIEN_HE_THONG_TRIGGER_() {
+  return { email: "trigger-tu-dong", vaiTro: "HE_THONG", coQuyen: true, laAdmin: false, laChiXem: false };
+}
+
 function TRIGGER_saoLuuHangDem(e) {
   const uid = (e && e.triggerUid) ? String(e.triggerUid) : "";
   if (!uid || !SL_timTrigger_().some(function (t) { return t.getUniqueId() === uid; })) return;
