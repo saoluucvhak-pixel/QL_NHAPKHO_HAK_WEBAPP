@@ -33,18 +33,17 @@ describe('BUG-BG-01: tạo/sửa/xóa báo giá -> tính giá dùng NGAY bảng 
     expect(donGiaPhieu(env)).toBe(2000);
   });
 
-  test('sửa giá 1 dòng (chưa áp dụng) -> giá mới; xóa dòng đó -> quay về giá trước', () => {
+  test('sửa giá 1 dòng (chưa áp dụng) -> bảng giá tính giá cập nhật ngay; xóa dòng đó -> bỏ khỏi bảng giá', () => {
     const env = createGasEnv();
     const bg = nenBaoGia(env);
-    env.call('BG_createQuote', { ngayBaoGia: '2026-09-01', hieuLuc: '2026-09-25T00:00', groups: [{ maList: ['DL1_NG1_Y'], klCode: '0_1000', gia: 2000 }] });
+    env.call('BG_createQuote', { ngayBaoGia: '2026-09-01', hieuLuc: '2026-12-01T00:00', groups: [{ maList: ['DL1_NG1_Y'], klCode: '0_1000', gia: 2000 }] });
     const id = bg.getSheetByName('Baogia_DN').__data[2][6];
-    // chuyển ngày hiệu lực về trước ngày cân -> phiếu 20/09 dùng giá này
-    expect(env.call('BG_updateBaogiaRow', { idBgct: id, maList: ['DL1_NG1_Y'], klCode: '0_1000', gia: 3000, hieuLuc: '2026-09-10T00:00' }).status).toBe('success');
-    expect(donGiaPhieu(env)).toBe(3000);
-    // phiếu chưa "OK" nên báo giá này vẫn... đã có phiếu áp dụng -> không xóa được; bỏ áp dụng bằng cách dời ngày cân
-    env.spreadsheetApp.openById(PHIEUCAN_ID).getSheetByName('PhieuCan_DN').__data[1][1] = new Date(2026, 8, 5);
+    const giaTrongSave = () => bg.getSheetByName('Baogia_DN_SAVE').__data.filter((r) => r[0] === id).map((r) => r[6]);
+    expect(giaTrongSave()).toEqual([2000]);
+    expect(env.call('BG_updateBaogiaRow', { idBgct: id, maList: ['DL1_NG1_Y'], klCode: '0_1000', gia: 3000, hieuLuc: '2026-12-01T00:00' }).status).toBe('success');
+    expect(giaTrongSave()).toEqual([3000]);
     expect(env.call('BG_deleteBaogiaRow', id).status).toBe('success');
-    env.spreadsheetApp.openById(PHIEUCAN_ID).getSheetByName('PhieuCan_DN').__data[1][1] = new Date(2026, 8, 20);
+    expect(giaTrongSave()).toEqual([]);
     expect(donGiaPhieu(env)).toBe(1000);
   });
 
@@ -145,5 +144,57 @@ describe('PERF-BG: kết quả Sửa/Xóa/Đã áp dụng đúng như quét toà
     const ds = env.call('BG_getQuoteListWithStatus').data.find((x) => x.soBaoGia === 'BGA');
     expect(ds.deletable).toBe(true);
     expect(env.call('BG_deleteQuote', 'BGA').status).toBe('success');
+  });
+});
+
+describe('Sửa 1 dòng báo giá: chặn nếu SAU KHI SỬA dòng này phủ lên phiếu cân đã có', () => {
+  // Nền: báo giá BG1 (DL1_NG1_Y từ 01/01/2026) + phiếu cân DL1_NG1_Y ngày 20/09/2026.
+  // Thêm: báo giá BG2 mã DL2_NG2_Y từ 01/01/2026 + phiếu cân DL2 ngày 15/09/2026;
+  // dòng cần sửa X: mã DL3_NG3_Y hiệu lực 01/12/2026 (chưa phiếu nào dùng -> sửa được).
+  function nen() {
+    const env = createGasEnv();
+    const bg = nenBaoGia(env);
+    const t0 = new Date(2026, 0, 1), t12 = new Date(2026, 11, 1);
+    bg.getSheetByName('Baogia_DN').__data.push(
+      [t0, t0, 'DL2_NG2_Y', '0_1000', 1500, 'a', 'ID2', 'BG2'],
+      [t12, t12, 'DL3_NG3_Y', '0_1000', 900, 'a', 'X', 'BG3']);
+    const r = new Array(27).fill(''); r[1] = new Date(2026, 8, 15); r[16] = 'DL2_NG2_Y'; r[21] = '2/2026/NK';
+    env.spreadsheetApp.openById(PHIEUCAN_ID).getSheetByName('PhieuCan_DN').__data.push(r);
+    return { env, src: bg.getSheetByName('Baogia_DN') };
+  }
+  const sua = (env, o) => env.call('BG_updateBaogiaRow', Object.assign({ idBgct: 'X', maList: ['DL3_NG3_Y'], klCode: '0_1000', gia: 900, hieuLuc: '2026-12-01T00:00' }, o));
+
+  test('thêm mã mới đang có phiếu cân trong khoảng hiệu lực mới -> chặn, báo rõ mã + số phiếu + ngày, không ghi', () => {
+    const { env, src } = nen();
+    const truoc = JSON.stringify(src.__data);
+    const res = sua(env, { maList: ['DL3_NG3_Y', 'DL2_NG2_Y'], hieuLuc: '2026-09-01T00:00' });
+    expect(res.status).toBe('error');
+    expect(res.message).toMatch(/^Không thể sửa: sau khi sửa, mã "DL2_NG2_Y" .* sẽ áp dụng cho 1 phiếu cân đã có \(ngày cân 15\/09\/2026\)/);
+    expect(JSON.stringify(src.__data)).toBe(truoc);
+  });
+
+  test('dời ngày hiệu lực sớm hơn làm phủ lên phiếu cân của báo giá trước -> chặn', () => {
+    const { env } = nen();
+    const res = sua(env, { maList: ['DL1_NG1_Y'], hieuLuc: '2026-12-01T00:00' });
+    expect(res.status).toBe('success'); // DL1 từ 01/12: chưa phiếu nào -> được
+    const res2 = sua(env, { maList: ['DL1_NG1_Y'], hieuLuc: '2026-09-10T00:00' }); // phủ phiếu DL1 20/09
+    expect(res2.status).toBe('error');
+    expect(res2.message).toMatch(/mã "DL1_NG1_Y".*1 phiếu cân đã có \(ngày cân 20\/09\/2026\)/);
+  });
+
+  test('sửa hợp lệ (đổi giá, thêm mã chưa có phiếu, dời ngày không phủ phiếu nào) -> vẫn lưu được', () => {
+    const { env, src } = nen();
+    const res = sua(env, { maList: ['DL3_NG3_Y', 'DL4_NG4_Y'], gia: 950, hieuLuc: '2026-10-01T00:00' });
+    expect(res.status).toBe('success');
+    const d = src.__data.find((r) => r[6] === 'X');
+    expect([d[2], d[4]]).toEqual(['DL3_NG3_Y , DL4_NG4_Y', 950]);
+  });
+
+  test('phiếu cân ở sheet lưu trữ năm cũ cũng được tính khi kiểm tra sau khi sửa', () => {
+    const { env } = nen();
+    const r = new Array(27).fill(''); r[1] = new Date(2025, 5, 1); r[16] = 'DL5_NG5_Y'; r[21] = '7/2025/NK';
+    env.spreadsheetApp.openById(PHIEUCAN_ID).__setSheet('PhieuCan_DN_2025', [new Array(27).fill('H'), r]);
+    const res = sua(env, { maList: ['DL5_NG5_Y'], hieuLuc: '2025-01-01T00:00' });
+    expect(res.message).toMatch(/mã "DL5_NG5_Y".*1 phiếu cân đã có \(ngày cân 01\/06\/2025\)/);
   });
 });
