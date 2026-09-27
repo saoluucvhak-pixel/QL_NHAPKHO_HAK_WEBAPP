@@ -672,7 +672,14 @@ function ND_chuyenDanhSachCu_(sh) {
 }
 
 /** Toàn bộ người dùng trong sheet (kể cả đã Khóa): [{email, hoTen, vaiTro, trangThai, quyenDrive}]. */
+// PERF-API-01: xacThucPhien_ đọc sẵn bản cache danh sách người dùng cùng lượt với
+// phiên (1 lệnh CacheService.getAll thay vì 2 lệnh get) và để ở đây cho DS_QUYEN_.
+let ND_CACHE_DOC_SAN_ = null;
 function DS_QUYEN_() {
+  if (ND_CACHE_DOC_SAN_) {
+    const docSan = ND_CACHE_DOC_SAN_; ND_CACHE_DOC_SAN_ = null;
+    try { return JSON.parse(docSan); } catch (e) { /* đọc lại bình thường */ }
+  }
   const cache = CacheService.getScriptCache();
   try { const raw = cache.get(ND_CACHE_KEY_); if (raw) return JSON.parse(raw); } catch (e) { /* đọc lại sheet */ }
   // Chỉ ĐỌC: chưa có sheet thì không tạo (trừ khi cần chuyển danh sách cũ sang).
@@ -876,11 +883,17 @@ function taoPhien_(email) {
   return ma;
 }
 
+const PHIEN_GIA_HAN_SAU_MS_ = 10 * 60 * 1000;    // gia hạn trượt tối đa 1 lần / 10 phút
 function xacThucPhien_(maPhien) {
   const ma = String(maPhien || "");
   if (!/^[a-f0-9]{64}$/.test(ma)) throw new Error(MA_LOI_PHIEN_ + "Chưa đăng nhập.");
   const cache = CacheService.getScriptCache();
-  const raw = cache.get("phien_" + ma);
+  let raw = null;
+  try {
+    const got = cache.getAll(["phien_" + ma, ND_CACHE_KEY_]) || {};
+    raw = got["phien_" + ma] || null;
+    ND_CACHE_DOC_SAN_ = got[ND_CACHE_KEY_] || null;
+  } catch (e) { raw = cache.get("phien_" + ma); }
   if (!raw) throw new Error(MA_LOI_PHIEN_ + "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
   let phien;
   try { phien = JSON.parse(raw); } catch (e) { cache.remove("phien_" + ma); throw new Error(MA_LOI_PHIEN_ + "Phiên đăng nhập không hợp lệ."); }
@@ -891,11 +904,19 @@ function xacThucPhien_(maPhien) {
   // Kiểm tra lại danh sách quyền MỖI lần gọi: Admin xóa ai khỏi danh sách thì
   // người đó bị chặn ngay từ thao tác kế tiếp, không phải chờ phiên hết hạn.
   const nd = timNguoiDungTheoEmail_(phien.email);
+  ND_CACHE_DOC_SAN_ = null; // chỉ dùng cho đúng lần tra cứu trên
   if (!nd.coQuyen) {
     cache.remove("phien_" + ma);
     throw new Error(MA_LOI_PHIEN_ + "Tài khoản " + nd.email + (nd.biKhoa ? " đã bị khóa." : " không còn trong danh sách được cấp quyền."));
   }
-  cache.put("phien_" + ma, raw, PHIEN_CACHE_GIAY_); // gia hạn trượt khi còn thao tác
+  // Gia hạn trượt khi còn thao tác. PERF-API-01: chỉ ghi lại cache khi lần gia hạn
+  // trước đã quá 10 phút (hết hạn khi không thao tác: 5 giờ 50 phút - 6 giờ,
+  // thay vì đúng 6 giờ) - bớt 1 lệnh CacheService ở hầu hết các lời gọi.
+  const giaHanLuc = Number(phien.giaHanLuc || phien.taoLuc || 0);
+  if (Date.now() - giaHanLuc > PHIEN_GIA_HAN_SAU_MS_) {
+    phien.giaHanLuc = Date.now();
+    cache.put("phien_" + ma, JSON.stringify(phien), PHIEN_CACHE_GIAY_);
+  }
   return nd;
 }
 

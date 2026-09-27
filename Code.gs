@@ -46,6 +46,54 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// PERF-FMT-01: định dạng ngày giờ theo múi giờ CỐ ĐỊNH GMT+7 bằng số học thuần
+// JavaScript - kết quả giống hệt Utilities.formatDate(d, "GMT+7", mau) cho các mẫu
+// yyyy MM dd HH mm ss (+ ký tự phân cách, chữ trong ngoặc đơn như 'T') nhưng
+// KHÔNG phải gọi sang dịch vụ Utilities. Báo cáo tổng hợp cả năm từng gọi
+// formatDate ~400.000 lần (4 lần/phiếu). Mẫu khác / ngày không hợp lệ / không
+// phải Date -> dùng Utilities.formatDate như cũ (giữ nguyên cách báo lỗi).
+// CHỈ dùng cho "GMT+7" (không có giờ mùa hè, không đổi theo lịch sử) - KHÔNG
+// dùng thay cho Session.getScriptTimeZone() (Asia/Ho_Chi_Minh năm 1899 lệch
+// +7:06:40, là mốc của ô chỉ có giờ trong Sheets).
+const DD_GMT7_MAU_ = {};
+function dinhDangGMT7_(d, mau) {
+  let phan = DD_GMT7_MAU_[mau];
+  if (phan === undefined) {
+    phan = [];
+    const re = /yyyy|MM|dd|HH|mm|ss|'([^']*)'|[A-Za-z]|[^A-Za-z']+/g;
+    let m;
+    while ((m = re.exec(mau)) !== null) {
+      const t = m[0];
+      if (/^(yyyy|MM|dd|HH|mm|ss)$/.test(t)) phan.push({ k: t });
+      else if (m[1] !== undefined) phan.push({ c: m[1] });
+      else if (/^[A-Za-z]$/.test(t)) { phan = null; break; }   // mẫu chưa hỗ trợ
+      else phan.push({ c: t });
+    }
+    DD_GMT7_MAU_[mau] = phan;
+  }
+  if (!phan || !(d instanceof Date)) return Utilities.formatDate(d, "GMT+7", mau);
+  const t = d.getTime();
+  if (isNaN(t)) return Utilities.formatDate(d, "GMT+7", mau);
+  const x = new Date(t + 7 * 3600000);
+  const nam = x.getUTCFullYear();
+  if (nam < 1000 || nam > 9999) return Utilities.formatDate(d, "GMT+7", mau);
+  const hai = function (v) { return v < 10 ? "0" + v : String(v); };
+  let kq = "";
+  for (let i = 0; i < phan.length; i++) {
+    const p = phan[i];
+    if (p.c !== undefined) { kq += p.c; continue; }
+    switch (p.k) {
+      case "yyyy": kq += nam; break;
+      case "MM": kq += hai(x.getUTCMonth() + 1); break;
+      case "dd": kq += hai(x.getUTCDate()); break;
+      case "HH": kq += hai(x.getUTCHours()); break;
+      case "mm": kq += hai(x.getUTCMinutes()); break;
+      case "ss": kq += hai(x.getUTCSeconds()); break;
+    }
+  }
+  return kq;
+}
+
 /*********************************************************
  * PHẦN 1: TIẾN TRÌNH IMPORT & ĐỐI SOÁT KIỂM TRA DATA FILE
  *********************************************************/
@@ -179,10 +227,10 @@ function step1_PreviewDraft_(fileDataList) {
               // cũ khiến ngày 05/01/2026 (5 tháng 1) hiển thị thành "01/05/2026", làm
               // người dùng tưởng nhầm là ngày 1 tháng 5 (bị đảo ngày/tháng), dù dữ liệu
               // gốc ghi vào PhieuCan_DN vẫn luôn đúng.
-              ngayCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
-              gioCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "HH:mm:ss") : "",
-              ngayCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
-              gioCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "HH:mm:ss") : "",
+              ngayCan1: dateC ? dinhDangGMT7_(dateC, "dd/MM/yyyy") : "Lỗi định dạng ngày",
+              gioCan1: dateC ? dinhDangGMT7_(dateC, "HH:mm:ss") : "",
+              ngayCan2: dateD ? dinhDangGMT7_(dateD, "dd/MM/yyyy") : "Lỗi định dạng ngày",
+              gioCan2: dateD ? dinhDangGMT7_(dateD, "HH:mm:ss") : "",
               soXe: valF_Dich, klCan1: previewCan1, klCan2: previewCan2, klHangGoc: previewHang,
               // FIX #21: TRƯỚC ĐÂY gửi nguyên "rawRowData: r" (CẢ DÒNG THÔ từ file
               // Excel) qua lại giữa client<->server - nếu BẤT KỲ ô nào trong dòng
@@ -349,7 +397,7 @@ function KS_thongBaoDNTTDangKhoaSo_() {
       try { co = JSON.parse(ds[i].getValue() || "{}"); } catch (e) { co = {}; }
       const batDau = Number(co.batDau) || 0;
       if (Date.now() - batDau < CO_KHOA_SO_HET_HAN_MS_) {
-        return "⏳ ĐNTT đang Khóa sổ năm " + (co.nam || "") + " (bắt đầu lúc " + Utilities.formatDate(new Date(batDau), "GMT+7", "HH:mm")
+        return "⏳ ĐNTT đang Khóa sổ năm " + (co.nam || "") + " (bắt đầu lúc " + dinhDangGMT7_(new Date(batDau), "HH:mm")
           + ") - tạm dừng ghi phiếu cân để tránh ghi nhầm dòng. Vui lòng thử lại sau vài phút.";
       }
     }
@@ -377,6 +425,58 @@ function PC_kiemTraDongConDung_(sheet, mongDoi) {
     const i = r - tu;
     if (PC_chuKy_(cotA[i][0], cotV[i][0]) !== ck) throw new Error(TB_PHIEU_CAN_DA_DOI_);
   });
+}
+
+// Chia danh sách số dòng (tăng dần, không trùng) thành các cụm [tu, den] - 2
+// dòng cách nhau <= khoangCach thì chung 1 cụm. Dùng để ĐỌC đúng vùng cần thay
+// vì cả đoạn từ dòng nhỏ nhất tới dòng lớn nhất (phiếu rải rác khắp sheet).
+function nhomDongTheoCum_(dsDongTang, khoangCach) {
+  const cum = [];
+  dsDongTang.forEach(function (r) {
+    const cuoi = cum[cum.length - 1];
+    if (cuoi && r - cuoi[1] <= khoangCach) cuoi[1] = r; else cum.push([r, r]);
+  });
+  return cum;
+}
+
+// Đọc cột [cot..cot+soCot-1] của các dòng trong dsDong -> Map(dòng -> mảng giá trị).
+// Ít cụm thì đọc từng cụm; quá nhiều cụm (phiếu rải đều khắp sheet) thì 1 lệnh
+// đọc cả đoạn cho đỡ số lượt gọi.
+function docCacDong_(sheet, dsDong, cot, soCot) {
+  const kq = new Map();
+  if (!dsDong.length) return kq;
+  const tang = Array.from(new Set(dsDong)).sort(function (a, b) { return a - b; });
+  let cum = nhomDongTheoCum_(tang, 300);
+  if (cum.length > 25) cum = [[tang[0], tang[tang.length - 1]]];
+  cum.forEach(function (c) {
+    const gt = sheet.getRange(c[0], cot, c[1] - c[0] + 1, soCot).getValues();
+    for (let r = c[0]; r <= c[1]; r++) kq.set(r, gt[r - c[0]]);
+  });
+  return kq;
+}
+
+// PERF-TG-02: ghi NHIỀU vùng rời rạc của 1 sheet bằng 1 lệnh Sheets API
+// (values.batchUpdate, RAW = không hiểu thành công thức) khi dịch vụ nâng cao
+// "Sheets" đã bật trong appsscript.json. Tính giá 2.000 phiếu rải rác trước đây
+// là ~4.000 lệnh setValues. Chỉ dùng cho giá trị SỐ/CHỮ (không có Date). Không
+// có dịch vụ / API lỗi -> ghi từng vùng bằng SpreadsheetApp như cũ.
+// vung = [{hang, cot, giaTri: [[...], ...]}]
+function a1Cot_(n) { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function ghiNhieuVung_(ss, sheet, vung) {
+  if (!vung.length) return;
+  if (vung.length > 3 && typeof Sheets !== "undefined" && Sheets && Sheets.Spreadsheets && Sheets.Spreadsheets.Values) {
+    try {
+      const tien = "'" + sheet.getName().replace(/'/g, "''") + "'!";
+      const data = vung.map(function (v) {
+        const soDong = v.giaTri.length, soCot = v.giaTri[0].length;
+        return { range: tien + a1Cot_(v.cot) + v.hang + ":" + a1Cot_(v.cot + soCot - 1) + (v.hang + soDong - 1), values: v.giaTri };
+      });
+      SpreadsheetApp.flush(); // ghi xong mọi lệnh SpreadsheetApp đang chờ trước khi gọi API trực tiếp
+      Sheets.Spreadsheets.Values.batchUpdate({ valueInputOption: "RAW", data: data }, ss.getId());
+      return;
+    } catch (e) { /* dùng cách ghi từng vùng bên dưới */ }
+  }
+  vung.forEach(function (v) { sheet.getRange(v.hang, v.cot, v.giaTri.length, v.giaTri[0].length).setValues(v.giaTri); });
 }
 
 // PERF-05: ghi các phiếu cập nhật khi re-import - mỗi khối dòng liền nhau 1 lệnh
@@ -863,7 +963,7 @@ function downloadMisaExcel_() {
     if (lastRow <= 1) return { status: "error", message: "Bảng dữ liệu MISA trống! Vui lòng bấm tạo data trước." };
 
     const data = sheet.getRange(1, 1, lastRow, 31).getValues();
-    const tempSS = SpreadsheetApp.create("Misa_Export_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"));
+    const tempSS = SpreadsheetApp.create("Misa_Export_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"));
     const tempSheet = tempSS.getSheets()[0];
 
     tempSheet.getRange(1, 10, data.length, 2).setNumberFormat("@");
@@ -1007,13 +1107,24 @@ function TG_docBaoGia_() {
   return rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
 }
 
+// PERF-TG-01: nhóm báo giá theo Mã ĐG 1 lần (giữ nguyên thứ tự dòng trong mỗi
+// nhóm) - trước đây MỖI phiếu lọc lại toàn bộ bảng báo giá (phiếu × dòng báo giá).
+function TG_baoGiaTheoMa_(dataBG) {
+  if (!dataBG.__theoMa) {
+    const m = new Map();
+    dataBG.forEach(function (bg) { let l = m.get(bg.keyQ); if (!l) { l = []; m.set(bg.keyQ, l); } l.push(bg); });
+    Object.defineProperty(dataBG, "__theoMa", { value: m, enumerable: false });
+  }
+  return dataBG.__theoMa;
+}
+
 // Giá của 1 phiếu (dòng A..Z) theo báo giá: DUY NHẤT 1 công thức, dùng chung cho
 // engine tính giá và cho "Sửa phiếu" ở Tra cứu (tính giá TRƯỚC khi quyết định lưu).
 function TG_tinhGiaDong_(r, dataBG) {
   const valQ = String(r[16] || "").trim().toUpperCase(); const rVal = parseFloat(r[17]) || 0; const klJ = parseFloat(r[9]) || 0; const klSoSanh = klJ / 1000;
   const dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
   const ts = dt.getTime(); let giaFound = 0;
-  if (valQ !== "" && klSoSanh > 0) { const listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (const bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
+  if (valQ !== "" && klSoSanh > 0) { const listCungMa = TG_baoGiaTheoMa_(dataBG).get(valQ) || []; if (listCungMa.length > 0) { for (const bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
   const hieuSo = Math.round(giaFound + rVal);
   const thanhTienRaw = Math.round(klSoSanh * hieuSo);
   const thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000;
@@ -1064,6 +1175,18 @@ function runCalculatePrice_core_(chonDong) {
     const chuKyMongDoi = new Map();
     capNhat.forEach(function (c) { chuKyMongDoi.set(c.rowNum, PC_chuKyDong_(data[c.rowNum - 2])); });
     PC_kiemTraDongConDung_(sheet, chuKyMongDoi);
+    // BUG-TG-01: cột Y đọc từ ĐẦU lượt; trong lúc đọc báo giá + tính toán, ĐNTT (dự
+    // án khác, khóa riêng) có thể vừa đóng thanh toán phiếu (ghi "OK"). Ghi tiếp sẽ
+    // đè "OK" thành "Test giá" -> phiếu đã thanh toán bị mở lại. Đọc lại cột Y ngay
+    // trước khi ghi và bỏ qua phiếu vừa thành "OK".
+    const yHienTai = docCacDong_(sheet, capNhat.map(function (c) { return c.rowNum; }), 25, 1);
+    const truocLoc = capNhat.length;
+    for (let k = capNhat.length - 1; k >= 0; k--) {
+      const y = yHienTai.get(capNhat[k].rowNum);
+      if (y && String(y[0] || "").trim() === "OK") capNhat.splice(k, 1);
+    }
+    const soVuaOK = truocLoc - capNhat.length;
+    const vungGhi = [];
     const vungDinhDang = [];
     let idx = 0;
     while (idx < capNhat.length) {
@@ -1075,18 +1198,19 @@ function runCalculatePrice_core_(chonDong) {
       for (let k = idx; k <= end; k++) {
         cotT.push([capNhat[k].gia]); cotXYZ.push([capNhat[k].hieuSo, capNhat[k].trangThai, capNhat[k].thanhTien]);
       }
-      sheet.getRange(startRow, 20, soDong, 1).setValues(cotT);
-      sheet.getRange(startRow, 24, soDong, 3).setValues(cotXYZ);
+      vungGhi.push({ hang: startRow, cot: 20, giaTri: cotT }, { hang: startRow, cot: 24, giaTri: cotXYZ });
       const endRow = startRow + soDong - 1;
       vungDinhDang.push("X" + startRow + ":X" + endRow, "Z" + startRow + ":Z" + endRow);
       idx = end + 1;
     }
+    ghiNhieuVung_(ss, sheet, vungGhi);
     if (vungDinhDang.length > 0) sheet.getRangeList(vungDinhDang).setNumberFormat("#,##0");
 
     return {
       status: "success",
       message: capNhat.length > 0
         ? "Đã tính giá cho " + capNhat.length + " phiếu chưa chốt."
+          + (soVuaOK ? " Bỏ qua " + soVuaOK + " phiếu vừa được đóng thanh toán (OK) trong lúc tính." : "")
         : "Không có phiếu nào cần tính lại giá (tất cả đã chốt OK).",
       soPhieu: capNhat.length,
       soLoiBaoGia: capNhat.filter(function (c) { return c.trangThai !== "Test giá"; }).length,
@@ -1280,10 +1404,10 @@ function getBaoCaoTongHop_(filters) {
       result.push({
         maChungTu: String(row[21] || "").trim(),
         soPhieu: row[0],
-        ngayCan1: Utilities.formatDate(ngayCan1, "GMT+7", "dd/MM/yyyy"),
-        gioCan1: (row[2] instanceof Date) ? Utilities.formatDate(row[2], "GMT+7", "HH:mm:ss") : "",
-        ngayCan2: (row[3] instanceof Date) ? Utilities.formatDate(row[3], "GMT+7", "dd/MM/yyyy") : "",
-        gioCan2: (row[4] instanceof Date) ? Utilities.formatDate(row[4], "GMT+7", "HH:mm:ss") : "",
+        ngayCan1: dinhDangGMT7_(ngayCan1, "dd/MM/yyyy"),
+        gioCan1: (row[2] instanceof Date) ? dinhDangGMT7_(row[2], "HH:mm:ss") : "",
+        ngayCan2: (row[3] instanceof Date) ? dinhDangGMT7_(row[3], "dd/MM/yyyy") : "",
+        gioCan2: (row[4] instanceof Date) ? dinhDangGMT7_(row[4], "HH:mm:ss") : "",
         soXe: xe,
         soXe2: String(row[6] || "").trim(), // Cột G - Biển số 2 (xe kéo/rơ-moóc, nếu có)
         khachHang: khachHang,
@@ -1315,7 +1439,7 @@ function getBaoCaoTongHop_(filters) {
 // hạn Admin - đây chỉ là xem số liệu tổng hợp, giống các báo cáo khác.
 // PERF-02: tổng "Hôm nay" lọc từ dữ liệu tháng đã đọc (ngày dạng yyyy-MM-dd, giờ GMT+7).
 function DB_tongHopMotNgay_(dataThang, ngayStr) {
-  const ngayHienThi = Utilities.formatDate(new Date(ngayStr + "T12:00:00+07:00"), "GMT+7", "dd/MM/yyyy");
+  const ngayHienThi = dinhDangGMT7_(new Date(ngayStr + "T12:00:00+07:00"), "dd/MM/yyyy");
   const tong = { soLuong: 0, tongKL: 0, tongTien: 0 };
   dataThang.forEach(function (r) {
     if (r.ngayCan1 !== ngayHienThi) return;
@@ -1326,9 +1450,9 @@ function DB_tongHopMotNgay_(dataThang, ngayStr) {
 
 function HT_layDashboard_() {
   try {
-    const homNayStr = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
+    const homNayStr = dinhDangGMT7_(new Date(), "yyyy-MM-dd");
     const d = new Date();
-    const dauThangStr = Utilities.formatDate(new Date(d.getFullYear(), d.getMonth(), 1), "GMT+7", "yyyy-MM-dd");
+    const dauThangStr = dinhDangGMT7_(new Date(d.getFullYear(), d.getMonth(), 1), "yyyy-MM-dd");
 
     // PERF-02: chỉ đọc Sheet 1 lần (tháng này) rồi lọc ra "Hôm nay" trong bộ nhớ,
     // thay vì gọi getBaoCaoTongHop 2 lần (đọc trọn sheet đang hoạt động 2 lần).
@@ -1393,7 +1517,7 @@ function HT_layDashboard_() {
         canChuY: canChuY,
         chuaLapDntt: chuaLapDntt,
         thongKeGia: thongKeGia,
-        capNhatLuc: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy HH:mm:ss")
+        capNhatLuc: dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss")
       }
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -1511,7 +1635,7 @@ function getBaoCaoDonGia_(filters) {
 
       result.push({
         maChungTu: String(row[21] || "").trim(),
-        ngayCan1: Utilities.formatDate(ngayCan1, "GMT+7", "dd/MM/yyyy"),
+        ngayCan1: dinhDangGMT7_(ngayCan1, "dd/MM/yyyy"),
         soXe: xe,
         khachHang: khachHang,
         daiLy: daiLy,
@@ -1540,7 +1664,7 @@ function exportBaoCaoDonGiaExcel_(filters) {
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày Cân", "Số Xe", "Khách Hàng", "Đại Lý", "Nguồn Gốc", "Mã Đơn Giá", "Mã KL", "KL Hàng (kg)", "Giá Gốc (ĐG_AD)", "Điều Chỉnh", "Đơn Giá Áp Dụng", "Diễn Giải Đơn Giá", "Trạng Thái Giá", "Thành Tiền"];
     const rows = rep.data.map(r => [r.maChungTu, r.ngayCan1, r.soXe, r.khachHang, r.daiLy, r.nguonGoc, r.maDonGia, r.maKL, r.klHang, r.giaGoc, r.dieuChinh, r.donGiaApDung, r.dienGiai, r.trangThaiGia, r.thanhTien]);
-    const tempSS = createTempSheetForExport_("BaoCao_DonGia_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [9, 10, 11, 12, 15]);
+    const tempSS = createTempSheetForExport_("BaoCao_DonGia_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [9, 10, 11, 12, 15]);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo tổng hợp cân theo báo giá, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { logAudit_('EXPORT_EXCEL', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
@@ -1553,7 +1677,7 @@ function exportBaoCaoDonGiaPDF_(filters) {
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày Cân", "Số Xe", "Khách Hàng", "Đại Lý", "Nguồn Gốc", "Mã ĐG", "Mã KL", "Giá Gốc", "Điều Chỉnh", "Đơn Giá AD", "Diễn Giải", "Trạng Thái", "Thành Tiền"];
     const rows = rep.data.map(r => [r.maChungTu, r.ngayCan1, r.soXe, r.khachHang, r.daiLy, r.nguonGoc, r.maDonGia, r.maKL, r.giaGoc, r.dieuChinh, r.donGiaApDung, r.dienGiai, r.trangThaiGia, r.thanhTien]);
-    const tempSS = createTempSheetForExport_("BaoCao_DonGia_PDF_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [8, 9, 10, 13]);
+    const tempSS = createTempSheetForExport_("BaoCao_DonGia_PDF_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [8, 9, 10, 13]);
     logAudit_('EXPORT_PDF', 'OK', 'Xuất PDF báo cáo tổng hợp cân theo báo giá, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "pdf", false) };
   } catch (e) { logAudit_('EXPORT_PDF', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
@@ -1604,7 +1728,7 @@ function getBaoCaoMisa_(filters) {
 
       result.push({
         maChungTu: maChungTu,
-        ngay: Utilities.formatDate(ngay, "GMT+7", "dd/MM/yyyy"),
+        ngay: dinhDangGMT7_(ngay, "dd/MM/yyyy"),
         ngayRaw: ngay.toISOString(), // dùng khi xuất Excel/PDF để ghi Date thật + áp MISA_FORMAT
         soXe: xe,
         khoiLuong: khoiLuong,
@@ -1668,7 +1792,7 @@ function exportBaoCaoTongHopExcel_(filters) {
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Số Phiếu", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "Số Xe", "Biển Số 2", "Khách Hàng", "KL Cân 1 (kg)", "KL Cân 2 (kg)", "KL Hàng (kg)", "Đơn Giá", "Thành Tiền", "Trạng Thái Giá", "Trạng Thái Thanh Toán"];
     const rows = rep.data.map(r => [r.maChungTu, r.soPhieu, r.ngayCan1, r.gioCan1, r.ngayCan2, r.gioCan2, r.soXe, r.soXe2, r.khachHang, r.klCan1, r.klCan2, r.klHang, r.donGia, r.thanhTien, r.trangThaiGia, r.trangThaiThanhToan]);
-    const tempSS = createTempSheetForExport_("BaoCao_TongHopCan_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [10, 11, 12, 13, 14]);
+    const tempSS = createTempSheetForExport_("BaoCao_TongHopCan_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [10, 11, 12, 13, 14]);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo tổng hợp cân, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { logAudit_('EXPORT_EXCEL', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
@@ -1681,7 +1805,7 @@ function exportBaoCaoTongHopPDF_(filters) {
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Số Phiếu", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "Số Xe", "Biển Số 2", "Khách Hàng", "KL Cân1(kg)", "KL Cân2(kg)", "KL Hàng(kg)", "Đơn Giá", "Thành Tiền", "Trạng Thái TT"];
     const rows = rep.data.map(r => [r.maChungTu, r.soPhieu, r.ngayCan1, r.gioCan1, r.ngayCan2, r.gioCan2, r.soXe, r.soXe2, r.khachHang, r.klCan1, r.klCan2, r.klHang, r.donGia, r.thanhTien, r.trangThaiThanhToan]);
-    const tempSS = createTempSheetForExport_("BaoCao_TongHopCan_PDF_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [10, 11, 12, 13, 14]);
+    const tempSS = createTempSheetForExport_("BaoCao_TongHopCan_PDF_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [10, 11, 12, 13, 14]);
     logAudit_('EXPORT_PDF', 'OK', 'Xuất PDF báo cáo tổng hợp cân, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "pdf", false) }; // landscape cho bảng nhiều cột
   } catch (e) { logAudit_('EXPORT_PDF', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
@@ -1696,7 +1820,7 @@ function exportBaoCaoMisaExcel_(filters) {
     // Ghi Date object THẬT (không phải chuỗi "dd/MM/yyyy" đã format sẵn cho UI)
     // để cột Ngày trong file xuất KHÔNG bị Google Sheets để dạng Text tùy Locale.
     const rows = rep.data.map(r => [r.maChungTu, new Date(r.ngayRaw), r.soXe, r.khoiLuong, r.donGia, r.thanhTien, r.tenNCC, r.trangThaiThanhToan]);
-    const tempSS = createTempSheetForExport_("BaoCao_Misa_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5, 6]);
+    const tempSS = createTempSheetForExport_("BaoCao_Misa_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [4, 5, 6]);
     tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo Misa, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
@@ -1710,7 +1834,7 @@ function exportBaoCaoMisaPDF_(filters) {
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày", "Số Xe", "KL(Tấn)", "Đơn Giá", "Thành Tiền", "Tên NCC", "Trạng Thái TT"];
     const rows = rep.data.map(r => [r.maChungTu, new Date(r.ngayRaw), r.soXe, r.khoiLuong, r.donGia, r.thanhTien, r.tenNCC, r.trangThaiThanhToan]);
-    const tempSS = createTempSheetForExport_("BaoCao_Misa_PDF_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5, 6]);
+    const tempSS = createTempSheetForExport_("BaoCao_Misa_PDF_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [4, 5, 6]);
     tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_PDF', 'OK', 'Xuất PDF báo cáo Misa, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "pdf", true) };
@@ -1792,8 +1916,8 @@ function exportPhieuCanPDF_(maChungTu) {
 
     const ngayCan1 = found[1] instanceof Date ? found[1] : null;
     const ngayCan2 = found[3] instanceof Date ? found[3] : null;
-    const gioCan1 = found[2] instanceof Date ? Utilities.formatDate(found[2], "GMT+7", "HH:mm:ss") : "";
-    const gioCan2 = found[4] instanceof Date ? Utilities.formatDate(found[4], "GMT+7", "HH:mm:ss") : "";
+    const gioCan1 = found[2] instanceof Date ? dinhDangGMT7_(found[2], "HH:mm:ss") : "";
+    const gioCan2 = found[4] instanceof Date ? dinhDangGMT7_(found[4], "HH:mm:ss") : "";
     const soXe2 = String(found[6] || "").trim();
     const idDntt = String(found[26] || "").trim();
     const klHang = parseFloat(found[9]) || 0;
@@ -1807,13 +1931,13 @@ function exportPhieuCanPDF_(maChungTu) {
 
     sh.getRange(r, 1, 1, NUM_COLS).merge().setValue("PHIẾU NHẬP KHO").setFontWeight("bold").setFontSize(16).setHorizontalAlignment("center"); r++;
     sh.getRange(r, 1, 1, NUM_COLS).merge()
-      .setValue("Ngày " + Utilities.formatDate(ngayLap, "GMT+7", "dd") + " tháng " + Utilities.formatDate(ngayLap, "GMT+7", "MM") + " năm " + Utilities.formatDate(ngayLap, "GMT+7", "yyyy"))
+      .setValue("Ngày " + dinhDangGMT7_(ngayLap, "dd") + " tháng " + dinhDangGMT7_(ngayLap, "MM") + " năm " + dinhDangGMT7_(ngayLap, "yyyy"))
       .setFontStyle("italic").setHorizontalAlignment("center"); r += 2;
 
     const thongTin = [
       ["Số phiếu cân", found[0], "Mã chứng từ", maChungTu],
       ["Khách hàng giao hàng", found[11], "Số xe", found[5] + (soXe2 ? " / " + soXe2 : "")],
-      ["Thời gian cân lần 1", (ngayCan1 ? Utilities.formatDate(ngayCan1, "GMT+7", "dd/MM/yyyy") : "") + " " + gioCan1, "Thời gian cân lần 2", (ngayCan2 ? Utilities.formatDate(ngayCan2, "GMT+7", "dd/MM/yyyy") : "") + " " + gioCan2],
+      ["Thời gian cân lần 1", (ngayCan1 ? dinhDangGMT7_(ngayCan1, "dd/MM/yyyy") : "") + " " + gioCan1, "Thời gian cân lần 2", (ngayCan2 ? dinhDangGMT7_(ngayCan2, "dd/MM/yyyy") : "") + " " + gioCan2],
       ["Nhập tại kho", "Kho nguyên liệu " + COMPANY_NAME, "Trạng thái ĐNTT", idDntt || "Chưa lập ĐNTT"]
     ];
     thongTin.forEach(row => {
@@ -2100,7 +2224,7 @@ function taoFileMauXuatHang_() {
 // Helper dùng chung: tạo 1 Google Sheet mẫu (dòng 1 = ghi chú, dòng 2 = tiêu đề,
 // dòng 3 = ví dụ), lưu vào FOLDER_DONE, trả về link tải xuống dạng .xlsx.
 function taoFileMau_(tenFile, headers, dongViDu, ghiChu) {
-  const tempSS = SpreadsheetApp.create(tenFile + "_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"));
+  const tempSS = SpreadsheetApp.create(tenFile + "_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"));
   const sh = tempSS.getSheets()[0];
   sh.getRange(1, 1, 1, headers.length).merge().setValue(ghiChu).setWrap(true).setFontStyle("italic").setFontColor("#B3261E");
   sh.getRange(2, 1, 1, headers.length).setValues([headers]).setFontWeight("bold").setBackground("#1B4332").setFontColor("#FFFFFF");
@@ -2229,7 +2353,7 @@ function BG_getMaKLList_() {
     const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
     const result = data
       .map(r => ({
-        timestamp: (r[0] instanceof Date) ? Utilities.formatDate(r[0], "GMT+7", "dd/MM/yyyy HH:mm") : "",
+        timestamp: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy HH:mm") : "",
         maKL: r[1], klMinKg: parseFloat(r[2]) || 0, klMaxKg: parseFloat(r[3]) || 0
       }))
       .filter(r => String(r.maKL || "").trim() !== "");
@@ -2301,9 +2425,9 @@ function BG_getQuoteList_() {
     const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
     const result = data
       .map(r => ({
-        ngayBaoGia: (r[0] instanceof Date) ? Utilities.formatDate(r[0], "GMT+7", "dd/MM/yyyy") : "",
+        ngayBaoGia: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy") : "",
         soBaoGia: r[1],
-        hieuLuc: (r[3] instanceof Date) ? Utilities.formatDate(r[3], "GMT+7", "dd/MM/yyyy HH:mm") : "",
+        hieuLuc: (r[3] instanceof Date) ? dinhDangGMT7_(r[3], "dd/MM/yyyy HH:mm") : "",
         idTam: r[4] || ""
       }))
       .filter(r => String(r.soBaoGia || "").trim() !== "");
@@ -2355,7 +2479,7 @@ function BG_getPhieuCanByMaDG_(tuTS) {
   const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
   const dsSheet = [ss.getSheetByName(CONFIG.DATA_SHEET)];
   const namTu = (typeof tuTS === "number" && isFinite(tuTS))
-    ? parseInt(Utilities.formatDate(new Date(tuTS - 86400000), "GMT+7", "yyyy"), 10) : -Infinity;
+    ? parseInt(dinhDangGMT7_(new Date(tuTS - 86400000), "yyyy"), 10) : -Infinity;
   LT_layDanhSachNamDaLuuTru_(ss).forEach(function (nam) {
     if (nam >= namTu) dsSheet.push(ss.getSheetByName(LT_tenSheetLuuTru_(nam)));
   });
@@ -2483,7 +2607,7 @@ function BG_getBaogiaRowByHash_(idBgct) {
       maList: maList,
       klCode: klCode,
       gia: gia,
-      hieuLuc: (hieuLuc instanceof Date) ? Utilities.formatDate(hieuLuc, "GMT+7", "yyyy-MM-dd'T'HH:mm") : "",
+      hieuLuc: (hieuLuc instanceof Date) ? dinhDangGMT7_(hieuLuc, "yyyy-MM-dd'T'HH:mm") : "",
       soBaoGia: String(found[7] || "").trim(),
       editable: editCheck.editable,
       reason: editCheck.reason
@@ -2561,7 +2685,7 @@ function BG_kiemTraSauKhiSua_(sheet, rowIndex, idBgct, giaTriMoi) {
   cacDong.forEach(function (r) { tuSomNhat = Math.min(tuSomNhat, r[1].getTime()); });
   const byMa = BG_getPhieuCanByMaDG_(tuSomNhat);
   const canDuoi = function (ds, x) { let lo = 0, hi = ds.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ds[m] < x) lo = m + 1; else hi = m; } return lo; };
-  const ngay = function (ts) { return Utilities.formatDate(new Date(ts), "GMT+7", "dd/MM/yyyy"); };
+  const ngay = function (ts) { return dinhDangGMT7_(new Date(ts), "dd/MM/yyyy"); };
   for (const r of cacDong) {
     const ds = byMa[r[3]] || [];
     const tu = canDuoi(ds, r[1].getTime()), den = canDuoi(ds, r[2].getTime());
@@ -2682,8 +2806,8 @@ function BG_getQuoteListWithStatus_() {
       }
       return {
         soBaoGia: soBaoGia,
-        ngayBaoGia: (r[0] instanceof Date) ? Utilities.formatDate(r[0], "GMT+7", "dd/MM/yyyy") : "",
-        hieuLuc: (r[3] instanceof Date) ? Utilities.formatDate(r[3], "GMT+7", "dd/MM/yyyy HH:mm") : "",
+        ngayBaoGia: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy") : "",
+        hieuLuc: (r[3] instanceof Date) ? dinhDangGMT7_(r[3], "dd/MM/yyyy HH:mm") : "",
         idTam: r[4] || "",
         soNhom: groups.length,
         deletable: deletable,
@@ -2762,7 +2886,7 @@ function BG_createQuote_(payload) {
     const srcSheet = ss.getSheetByName(BAOGIA_CONFIG.SRC_SHEET);
 
     // Sinh Số báo giá dạng YYYYMMDD-NNN, NNN tăng dần riêng theo từng ngày
-    const datePrefix = Utilities.formatDate(ngayBaoGiaDate, "GMT+7", "yyyyMMdd");
+    const datePrefix = dinhDangGMT7_(ngayBaoGiaDate, "yyyyMMdd");
     const qlLastRow = qlSheet.getLastRow();
     let maxSeq = 0;
     if (qlLastRow > 1) {
@@ -2916,8 +3040,8 @@ function BG_coreLogicProcessor_(blockedIDs, srcDataGiaLap) {
       displayData.push({
         id: row[0], ma: row[3], gia: row[6], dienGiai: row[12],
         klMin: row[4], klMax: row[5],
-        tuNgay: Utilities.formatDate(row[1], "GMT+7", "dd/MM/yyyy"),
-        denNgay: Utilities.formatDate(row[2], "GMT+7", "dd/MM/yyyy"),
+        tuNgay: dinhDangGMT7_(row[1], "dd/MM/yyyy"),
+        denNgay: dinhDangGMT7_(row[2], "dd/MM/yyyy"),
         ngayTS: tN, trangThai: status
       });
     }
@@ -4527,10 +4651,10 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
             previewRows.push({
               isError: isError, errorMsg: errorMsg.trim(), typeImport: typeImport, uniqueKey: currentMaChungTu,
               soPhieu: spRaw,
-              ngayCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "dd/MM/yyyy") : "Lỗi định dạng ngày",
-              gioCan1: dateC ? Utilities.formatDate(dateC, "GMT+7", "HH:mm:ss") : "",
-              ngayCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy") : (cotMap.ngayCan2 !== undefined ? "Lỗi định dạng ngày" : ""),
-              gioCan2: dateD ? Utilities.formatDate(dateD, "GMT+7", "HH:mm:ss") : "",
+              ngayCan1: dateC ? dinhDangGMT7_(dateC, "dd/MM/yyyy") : "Lỗi định dạng ngày",
+              gioCan1: dateC ? dinhDangGMT7_(dateC, "HH:mm:ss") : "",
+              ngayCan2: dateD ? dinhDangGMT7_(dateD, "dd/MM/yyyy") : (cotMap.ngayCan2 !== undefined ? "Lỗi định dạng ngày" : ""),
+              gioCan2: dateD ? dinhDangGMT7_(dateD, "HH:mm:ss") : "",
               bienSo: cotMap.bienSo !== undefined ? String(r[cotMap.bienSo] || "").trim() : "",
               canLan1: cotMap.canLan1 !== undefined ? (parseFloat(r[cotMap.canLan1]) || 0) : 0,
               canLan2: cotMap.canLan2 !== undefined ? (parseFloat(r[cotMap.canLan2]) || 0) : 0,
@@ -4632,8 +4756,8 @@ function XH_step1_ConfirmImport_(confirmedDataList) {
       const dateC = item.rawDateC ? new Date(item.rawDateC) : null;
       const dateD = item.rawDateD ? new Date(item.rawDateD) : null;
       const ngayXuat = item.rawNgayXuat ? new Date(item.rawNgayXuat) : null;
-      const ngayCan1Str = dateC ? Utilities.formatDate(dateC, "GMT+7", "dd/MM/yyyy HH:mm:ss") : "";
-      const ngayCan2Str = dateD ? Utilities.formatDate(dateD, "GMT+7", "dd/MM/yyyy HH:mm:ss") : "";
+      const ngayCan1Str = dateC ? dinhDangGMT7_(dateC, "dd/MM/yyyy HH:mm:ss") : "";
+      const ngayCan2Str = dateD ? dinhDangGMT7_(dateD, "dd/MM/yyyy HH:mm:ss") : "";
       const klTan = parseFloat(item.khoiLuongTan) || ((parseFloat(item.klHang) || 0) / 1000);
 
       // Khớp đúng 17 cột của NL_PC_XH (A..Q): cột O = Số TKHQ (không đổi), cột P
@@ -4798,11 +4922,11 @@ function XH_getDonHangList_() {
     // thật (Sheets có thể tự auto-detect chuỗi "yyyy-MM-dd" thành Date) hay vẫn
     // là chuỗi text thuần - trước đây 2 cột này được lấy về đúng nhưng KHÔNG
     // được hiển thị ở bảng danh sách, gây cảm giác "biến mất".
-    const layNgayHienThi = v => (v instanceof Date && !isNaN(v.getTime())) ? Utilities.formatDate(v, "GMT+7", "dd/MM/yyyy") : String(v || "").trim();
+    const layNgayHienThi = v => (v instanceof Date && !isNaN(v.getTime())) ? dinhDangGMT7_(v, "dd/MM/yyyy") : String(v || "").trim();
     const result = data.map((r, idx) => ({
       rowIndex: idx + 2, // dòng thật trên sheet, dùng để Sửa/Xóa chính xác
       stt: r[0],
-      ngayDonHang: (r[1] instanceof Date) ? Utilities.formatDate(r[1], "GMT+7", "dd/MM/yyyy") : "",
+      ngayDonHang: (r[1] instanceof Date) ? dinhDangGMT7_(r[1], "dd/MM/yyyy") : "",
       soTKHQ: r[2], tau: r[3], khachHang: r[4], diaChiKH: r[5], tenHangHoa: r[6],
       donGiaUSD: parseFloat(r[7]) || 0, klMT: parseFloat(r[8]) || 0, klBDMT: parseFloat(r[9]) || 0,
       doKho: parseFloat(r[10]) || 0, doKhoNhaMay: parseFloat(r[11]) || 0,
@@ -4841,10 +4965,10 @@ function XH_getDonHangByRow_(rowIndex, sttKyVong) {
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
     const row = sheet.getRange(r, 1, 1, 16).getValues()[0];
-    const layNgayInput = v => (v instanceof Date && !isNaN(v.getTime())) ? Utilities.formatDate(v, "GMT+7", "yyyy-MM-dd") : String(v || "").trim();
+    const layNgayInput = v => (v instanceof Date && !isNaN(v.getTime())) ? dinhDangGMT7_(v, "yyyy-MM-dd") : String(v || "").trim();
     return {
       status: "success", rowIndex: r, stt: row[0],
-      ngayDonHang: (row[1] instanceof Date) ? Utilities.formatDate(row[1], "GMT+7", "yyyy-MM-dd") : "",
+      ngayDonHang: (row[1] instanceof Date) ? dinhDangGMT7_(row[1], "yyyy-MM-dd") : "",
       soTKHQ: row[2], tau: row[3], khachHang: row[4], diaChiKH: row[5], tenHangHoa: row[6],
       donGiaUSD: parseFloat(row[7]) || 0, klMT: parseFloat(row[8]) || 0,
       doKho: (parseFloat(row[10]) || 0) * 100, // trả về dạng % cho khớp ô nhập
@@ -4962,7 +5086,7 @@ function XH_locBaoCaoXuatQuaCan_(filters) {
 
     ketQua.matched.push({
       soPhieu: row[0],
-      ngayGioCan1: Utilities.formatDate(ngayCanObj, "GMT+7", "dd/MM/yyyy HH:mm:ss"),
+      ngayGioCan1: dinhDangGMT7_(ngayCanObj, "dd/MM/yyyy HH:mm:ss"),
       bienSo: soXe,
       canLan1: parseFloat(row[4]) || 0,
       canLan2: parseFloat(row[5]) || 0,
@@ -5015,7 +5139,7 @@ function XH_exportBaoCaoXuatQuaCanExcel_(filters) {
     if (loc.matched.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Số Phiếu", "Ngày Giờ Cân 1", "Số Xe", "KL Hàng (Kg)", "Khối Lượng (Tấn)", "Đơn Vị Vận Chuyển", "Tên Tài Xế", "Số TKHQ", "Kho Xuất", "Kho Nhập"];
     const rows = loc.matched.map(r => [r.soPhieu, r.ngayGioCan1, r.bienSo, r.klHang, r.khoiLuongTan, r.donViVanChuyen, r.tenTaiXe, r.soTKHQ, r.khoXuat, r.khoNhap]);
-    const tempSS = createTempSheetForExport_("BaoCao_XuatQuaCan_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5]);
+    const tempSS = createTempSheetForExport_("BaoCao_XuatQuaCan_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [4, 5]);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo xuất qua cân, ' + loc.matched.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -5027,7 +5151,7 @@ function XH_exportBaoCaoXuatQuaCanPDF_(filters) {
     if (loc.matched.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Số Phiếu", "Ngày Giờ Cân 1", "Số Xe", "KL Hàng(Kg)", "KL(Tấn)", "Đơn Vị Vận Chuyển", "Tên Tài Xế", "Số TKHQ", "Kho Xuất", "Kho Nhập"];
     const rows = loc.matched.map(r => [r.soPhieu, r.ngayGioCan1, r.bienSo, r.klHang, r.khoiLuongTan, r.donViVanChuyen, r.tenTaiXe, r.soTKHQ, r.khoXuat, r.khoNhap]);
-    const tempSS = createTempSheetForExport_("BaoCao_XuatQuaCan_PDF_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5]);
+    const tempSS = createTempSheetForExport_("BaoCao_XuatQuaCan_PDF_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [4, 5]);
     logAudit_('EXPORT_PDF', 'OK', 'Xuất PDF báo cáo xuất qua cân, ' + loc.matched.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "pdf", false) };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -5058,7 +5182,7 @@ function XH_locBaoCaoXuatMisa_(filters) {
     const thanhTienUSD = klBDMT * donGia;
 
     result.push({
-      ngayDonHang: Utilities.formatDate(ngay, "GMT+7", "dd/MM/yyyy"), ngayTS: ngay.getTime(), ngayRaw: ngay.toISOString(),
+      ngayDonHang: dinhDangGMT7_(ngay, "dd/MM/yyyy"), ngayTS: ngay.getTime(), ngayRaw: ngay.toISOString(),
       soTKHQ: row[2], tau: row[3], khachHang: row[4], tenHangHoa: row[6],
       donGiaUSD: donGia, klMT: klMT, klBDMT: klBDMT, thanhTienUSD: thanhTienUSD, khoXuat: row[15] || ""
     });
@@ -5082,7 +5206,7 @@ function XH_exportBaoCaoXuatMisaExcel_(filters) {
     if (list.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Ngày Đơn Hàng", "Số TKHQ", "Tàu", "Khách Hàng", "Tên Hàng Hóa", "Đơn Giá (USD)", "KL_MT", "KL_BDMT", "Thành Tiền (USD)", "Kho Xuất"];
     const rows = list.map(r => [new Date(r.ngayRaw), r.soTKHQ, r.tau, r.khachHang, r.tenHangHoa, r.donGiaUSD, r.klMT, r.klBDMT, r.thanhTienUSD, r.khoXuat]);
-    const tempSS = createTempSheetForExport_("BaoCao_XuatMisa_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [6, 7, 8, 9]);
+    const tempSS = createTempSheetForExport_("BaoCao_XuatMisa_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), headers, rows, [6, 7, 8, 9]);
     tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo xuất kết xuất Misa, ' + list.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
@@ -5339,7 +5463,7 @@ function HT_xuatNhatKyExcel_(boLoc) {
     const kq = NK_loc_(boLoc);
     if (kq.dong.length === 0) return { status: "error", message: "Không có dòng nhật ký nào phù hợp bộ lọc." };
     const rows = kq.dong.map(function (d) { return [d.t, d.hanhDong, d.trangThai, d.noiDung, d.email]; });
-    const tempSS = createTempSheetForExport_("NhatKy_HoatDong_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), NK_TIEU_DE_, rows, []);
+    const tempSS = createTempSheetForExport_("NhatKy_HoatDong_" + dinhDangGMT7_(new Date(), "ddMM_HHmm"), NK_TIEU_DE_, rows, []);
     tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat("dd/MM/yyyy HH:mm:ss");
     logAudit_("EXPORT_EXCEL", "OK", "Xuất nhật ký hoạt động, " + rows.length + " dòng.");
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
@@ -5364,8 +5488,20 @@ const TC_TIEU_DE_XUAT_ = ["Số phiếu", "Ngày giờ cân 1", "Ngày giờ câ
   "Khối lượng (M3)", "NGƯỜI CÂN", "SỐ TKHQ", "Kho xuất", "Kho nhập"];
 
 // Chữ thường, bỏ dấu tiếng Việt - gõ "nguyen van a" vẫn khớp "Nguyễn Văn A".
+// PERF-TC-02: tìm theo từ khóa gọi hàm này cho ~10 cột × mọi dòng (hàng trăm
+// nghìn lần) mà Khách hàng/Đại lý/Nguồn gốc lặp lại rất nhiều -> nhớ kết quả
+// theo giá trị trong lượt thực thi; chuỗi không dấu (số phiếu, biển số, mã...)
+// bỏ qua bước normalize tốn kém. Kết quả giống hệt cách cũ.
+const TC_BO_NHO_CHUAN_HOA_ = new Map();
 function TC_chuanHoa_(s) {
-  return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").trim();
+  const x = String(s == null ? "" : s);
+  if (!/[^\x00-\x7f]/.test(x)) return x.toLowerCase().trim();
+  let kq = TC_BO_NHO_CHUAN_HOA_.get(x);
+  if (kq === undefined) {
+    kq = x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").trim();
+    if (TC_BO_NHO_CHUAN_HOA_.size < 50000) TC_BO_NHO_CHUAN_HOA_.set(x, kq);
+  }
+  return kq;
 }
 
 function TC_khopTuKhoa_(row, cacCot, tuKhoa) {
@@ -5387,20 +5523,35 @@ function TC_khoangNgay_(boLoc) {
 function TC_giaTriHienThi_(v) {
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return "";
-    if (v.getFullYear() < 1901) return Utilities.formatDate(v, "GMT+7", "HH:mm:ss"); // ô chỉ có giờ
-    const gio = Utilities.formatDate(v, "GMT+7", "HH:mm:ss");
-    return Utilities.formatDate(v, "GMT+7", "dd/MM/yyyy") + (gio === "00:00:00" ? "" : " " + gio);
+    if (v.getFullYear() < 1901) return dinhDangGMT7_(v, "HH:mm:ss"); // ô chỉ có giờ
+    const gio = dinhDangGMT7_(v, "HH:mm:ss");
+    return dinhDangGMT7_(v, "dd/MM/yyyy") + (gio === "00:00:00" ? "" : " " + gio);
   }
   if (typeof v === "number" || typeof v === "boolean") return v;
   return String(v == null ? "" : v);
+}
+
+// PERF-TC-01: cùng kết quả với TC_ngayGioNhap_ nhưng tính bằng số học (múi giờ
+// cố định GMT+7, không có giờ mùa hè) thay cho 3 lượt Utilities.formatDate mỗi
+// dòng - Tra cứu không lọc từng gọi formatDate ~480.000 lần cho 160.000 phiếu.
+// Trả về mốc thời gian (ms) hoặc null.
+const TC_LECH_GMT7_MS_ = 7 * 3600000, TC_MOT_NGAY_MS_ = 86400000;
+function TC_tsNgayGioNhap_(ngay, gio) {
+  if (!(ngay instanceof Date)) return null;
+  const tNgay = ngay.getTime();
+  if (isNaN(tNgay)) return null;
+  if (!(gio instanceof Date) || isNaN(gio.getTime())) return tNgay;
+  const dauNgay = Math.floor((tNgay + TC_LECH_GMT7_MS_) / TC_MOT_NGAY_MS_) * TC_MOT_NGAY_MS_ - TC_LECH_GMT7_MS_;
+  const giayTrongNgay = Math.floor((((gio.getTime() + TC_LECH_GMT7_MS_) % TC_MOT_NGAY_MS_) + TC_MOT_NGAY_MS_) % TC_MOT_NGAY_MS_ / 1000);
+  return dauNgay + giayTrongNgay * 1000;
 }
 
 // Ghép "Ngày cân" (Date) + "Giờ cân" (Date chỉ có giờ) của phiếu nhập -> Date đầy đủ.
 function TC_ngayGioNhap_(ngay, gio) {
   if (!(ngay instanceof Date) || isNaN(ngay.getTime())) return null;
   if (!(gio instanceof Date) || isNaN(gio.getTime())) return ngay;
-  const hms = Utilities.formatDate(gio, "GMT+7", "HH:mm:ss");
-  return new Date(Utilities.formatDate(ngay, "GMT+7", "yyyy-MM-dd") + "T" + hms + "+07:00");
+  const hms = dinhDangGMT7_(gio, "HH:mm:ss");
+  return new Date(dinhDangGMT7_(ngay, "yyyy-MM-dd") + "T" + hms + "+07:00");
 }
 
 // Các nguồn dữ liệu phiếu nhập cần quét theo khoảng ngày: sheet đang hoạt động
@@ -5430,55 +5581,56 @@ function TC_dongNhapKhopBoLoc_(row, tuKhoa, kn) {
 }
 
 // boLoc = {tuKhoa, tuNgay, denNgay} (ngày dạng yyyy-MM-dd, có thể để trống)
+// PERF-TC-01: lượt 1 chỉ lọc + cộng tổng + lấy mốc thời gian để sắp xếp; chỉ
+// 500 dòng được trả về mới dựng đối tượng hiển thị (định dạng ngày giờ...).
 function TC_traCuuPhieuNhap_(boLoc) {
   try {
     boLoc = boLoc || {};
     const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
     const kn = TC_khoangNgay_(boLoc);
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const ketQua = []; let tongKL = 0; let tongTien = 0; let soChuaChot = 0;
+    const khop = []; let tongKL = 0; let tongTien = 0; let soChuaChot = 0;
     TC_nguonPhieuNhap_(ss, boLoc.tuNgay, boLoc.denNgay).forEach(function (n) {
       const lastRow = n.sheet.getLastRow();
       if (lastRow <= 1) return;
       const dangTheoDoi = n.sheet.getName() === CONFIG.DATA_SHEET;
       n.sheet.getRange(2, 1, lastRow - 1, 27).getValues().forEach(function (row) {
         if (!TC_dongNhapKhopBoLoc_(row, tuKhoa, kn)) return;
-        const maCT = String(row[21] || "").trim();
-        const t = TC_ngayGioNhap_(row[1], row[2]);
-        const trangThaiGia = String(row[24] || "").trim();
-        const choSua = dangTheoDoi && trangThaiGia !== "OK";
+        const choSua = dangTheoDoi && String(row[24] || "").trim() !== "OK";
         if (choSua) soChuaChot++;
-        const klHang = parseFloat(row[9]) || 0;
-        const thanhTien = parseFloat(row[25]) || 0;
-        const idDntt = String(row[26] || "").trim();
-        tongKL += klHang; tongTien += thanhTien;
-        ketQua.push({
-          maChungTu: maCT,
-          soPhieu: String(row[0] == null ? "" : row[0]),
-          ngayGioCan1: t ? Utilities.formatDate(t, "GMT+7", "dd/MM/yyyy HH:mm") : "",
-          soXe: String(row[5] || "").trim(),
-          khachHang: String(row[11] || "").trim(),
-          daiLy: String(row[13] || "").trim(),
-          nguonGoc: String(row[14] || "").trim(),
-          hinhAnh: TC_hinhAnhCuaDong_(row),
-          klHang: klHang,
-          donGia: parseFloat(row[23]) || 0,
-          thanhTien: thanhTien,
-          trangThaiGia: trangThaiGia,
-          trangThaiThanhToan: idDntt || "Chưa lập ĐNTT",
-          noiLuu: n.nhan,
-          choSua: choSua,
-          ts: t ? t.getTime() : 0
-        });
+        tongKL += parseFloat(row[9]) || 0; tongTien += parseFloat(row[25]) || 0;
+        khop.push({ row: row, ts: TC_tsNgayGioNhap_(row[1], row[2]), nhan: n.nhan, choSua: choSua });
       });
     });
-    ketQua.sort(function (a, b) { return b.ts - a.ts; }); // mới nhất trước
+    khop.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); // mới nhất trước (ổn định như cũ)
+    const data = khop.slice(0, TC_GIOI_HAN_KET_QUA_).map(function (k) {
+      const row = k.row;
+      const idDntt = String(row[26] || "").trim();
+      return {
+        maChungTu: String(row[21] || "").trim(),
+        soPhieu: String(row[0] == null ? "" : row[0]),
+        ngayGioCan1: k.ts !== null ? dinhDangGMT7_(new Date(k.ts), "dd/MM/yyyy HH:mm") : "",
+        soXe: String(row[5] || "").trim(),
+        khachHang: String(row[11] || "").trim(),
+        daiLy: String(row[13] || "").trim(),
+        nguonGoc: String(row[14] || "").trim(),
+        hinhAnh: TC_hinhAnhCuaDong_(row),
+        klHang: parseFloat(row[9]) || 0,
+        donGia: parseFloat(row[23]) || 0,
+        thanhTien: parseFloat(row[25]) || 0,
+        trangThaiGia: String(row[24] || "").trim(),
+        trangThaiThanhToan: idDntt || "Chưa lập ĐNTT",
+        noiLuu: k.nhan,
+        choSua: k.choSua,
+        ts: k.ts !== null ? k.ts : 0
+      };
+    });
     return {
       status: "success",
-      data: ketQua.slice(0, TC_GIOI_HAN_KET_QUA_),
-      tongSoDong: ketQua.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
+      data: data,
+      tongSoDong: khop.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
       soChuaChot: soChuaChot, // phiếu chưa "OK" ở sheet đang theo dõi - sửa/tính lại giá được
-      summary: { soLuong: ketQua.length, tongKL: tongKL, tongTien: tongTien }
+      summary: { soLuong: khop.length, tongKL: tongKL, tongTien: tongTien }
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -5577,24 +5729,29 @@ function TC_traCuuPhieuXuat_(boLoc) {
         const klHang = parseFloat(row[6]) || 0;
         const tan = parseFloat(row[9]) || 0;
         tongKL += klHang; tongTan += tan;
-        ketQua.push({
-          soPhieu: soPhieu,
-          ngayGioCan1: coNgay ? Utilities.formatDate(t, "GMT+7", "dd/MM/yyyy HH:mm") : String(row[1] || ""),
-          bienSo: String(row[3] || "").trim(),
-          klHang: klHang, khoiLuongTan: tan,
-          donViVanChuyen: String(row[7] || "").trim(),
-          tenTaiXe: String(row[8] || "").trim(),
-          soTKHQ: String(row[14] || "").trim(),
-          khoXuat: String(row[15] || "").trim(),
-          khoNhap: String(row[16] || "").trim(),
-          ts: coNgay ? t.getTime() : 0
-        });
+        ketQua.push({ row: row, soPhieu: soPhieu, t: coNgay ? t : null, ts: coNgay ? t.getTime() : 0 });
       });
     }
     ketQua.sort(function (a, b) { return b.ts - a.ts; });
+    // PERF-TC-01: chỉ định dạng 500 dòng trả về (trước: mọi dòng khớp).
+    const data = ketQua.slice(0, TC_GIOI_HAN_KET_QUA_).map(function (k) {
+      const row = k.row;
+      return {
+        soPhieu: k.soPhieu,
+        ngayGioCan1: k.t ? dinhDangGMT7_(k.t, "dd/MM/yyyy HH:mm") : String(row[1] || ""),
+        bienSo: String(row[3] || "").trim(),
+        klHang: parseFloat(row[6]) || 0, khoiLuongTan: parseFloat(row[9]) || 0,
+        donViVanChuyen: String(row[7] || "").trim(),
+        tenTaiXe: String(row[8] || "").trim(),
+        soTKHQ: String(row[14] || "").trim(),
+        khoXuat: String(row[15] || "").trim(),
+        khoNhap: String(row[16] || "").trim(),
+        ts: k.ts
+      };
+    });
     return {
       status: "success",
-      data: ketQua.slice(0, TC_GIOI_HAN_KET_QUA_),
+      data: data,
       tongSoDong: ketQua.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
       summary: { soLuong: ketQua.length, tongKLHang: tongKL, tongTan: tongTan }
     };
@@ -5709,13 +5866,15 @@ function TC_dongBoDraftChuaTT_(sheetPC, ketQua) {
       if (k && dongPC.has(k) && !dongDraft.has(k)) dongDraft.set(k, i + 2);
     });
     if (dongDraft.size === 0) return 0;
-    let tu = Infinity, den = 0;
-    dongDraft.forEach(function (x, k) { const r = dongPC.get(k); if (r < tu) tu = r; if (r > den) den = r; });
-    const khoi = sheetPC.getRange(tu, 1, den - tu + 1, 26).getValues();
+    // PERF-TC-03: đọc đúng các dòng phiếu cần chép (theo cụm) thay vì cả đoạn từ
+    // dòng nhỏ nhất tới dòng lớn nhất (phiếu rải rác -> hàng triệu ô thừa).
+    const dongCanDoc = [];
+    dongDraft.forEach(function (x, k) { dongCanDoc.push(dongPC.get(k)); });
+    const khoi = docCacDong_(sheetPC, dongCanDoc, 1, 26);
     const giuChu = function (v) { return typeof v === "string" && v !== "" ? "'" + v.replace(/^'+/, "") : v; };
     const ghi = [];
     dongDraft.forEach(function (dong, k) {
-      const x = khoi[dongPC.get(k) - tu].slice();
+      const x = khoi.get(dongPC.get(k)).slice();
       if (String(x[21] || "").trim() !== k) return; // dòng PhieuCan vừa đổi vị trí -> bỏ qua an toàn
       x[0] = giuChu(x[0]); x[22] = giuChu(x[22]);
       ghi.push({ dong: dong, row: x });
@@ -5785,7 +5944,7 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
       kq = TG_tinhGiaDong_(moi, TG_docBaoGia_());
       if (kq.trangThai !== "Test giá") {
         const klTan = (parseFloat(cu[9]) || 0) / 1000;
-        const ngay = cu[1] instanceof Date ? Utilities.formatDate(cu[1], "GMT+7", "dd/MM/yyyy") : String(cu[1] || "");
+        const ngay = cu[1] instanceof Date ? dinhDangGMT7_(cu[1], "dd/MM/yyyy") : String(cu[1] || "");
         throw new Error("CHƯA LƯU: không tính được giá cho Mã ĐG " + moi[16] + " (khối lượng " + klTan.toLocaleString("vi-VN")
           + " tấn, ngày cân " + ngay + ") - chưa có báo giá hiệu lực khớp. Kiểm tra lại Đại lý / Nguồn gốc / Hình ảnh, hoặc nhập báo giá cho mã này trước.");
       }
