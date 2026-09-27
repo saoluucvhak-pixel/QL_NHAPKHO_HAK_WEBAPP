@@ -936,6 +936,12 @@ function taoApiRoutes_() {
     exportBaoCaoDonGiaPDF: r(exportBaoCaoDonGiaPDF_, X),
     exportPhieuCanPDF: r(exportPhieuCanPDF_, X),
 
+    // --- Tra cứu phiếu cân nhập/xuất + chi tiết (chỉ đọc) ---
+    TC_traCuuPhieuNhap: r(TC_traCuuPhieuNhap_, X),
+    TC_chiTietPhieuNhap: r(TC_chiTietPhieuNhap_, X),
+    TC_traCuuPhieuXuat: r(TC_traCuuPhieuXuat_, X),
+    TC_chiTietPhieuXuat: r(TC_chiTietPhieuXuat_, X),
+
     // --- Báo cáo xuất hàng (xem, xuất file) ---
     XH_getBaoCaoXuatQuaCan: r(XH_getBaoCaoXuatQuaCan_, X),
     XH_getBaoCaoXuatMisa: r(XH_getBaoCaoXuatMisa_, X),

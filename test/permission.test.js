@@ -149,7 +149,8 @@ const MONG_DOI = {
     'XH_getDonHangList', 'XH_getDonHangByRow', 'XH_getKhoXuatList', 'XH_tinhDoKhoNhaMay',
     'BG_getQuoteList', 'BG_getQuoteListWithStatus', 'BG_getQuoteDetail', 'BG_showAllData', 'BG_getBaogiaRowByHash',
     'BG_getMaBaoGiaList', 'BG_getMaKLList', 'BG_exportFileSmart', 'BG_updateHieuLuc',
-    'layBaoCaoTonKho', 'layDanhSachDanhMucKho', 'layDanhSachDoKhoTheoBoLoc', 'layDanhSachKyVetBai'],
+    'layBaoCaoTonKho', 'layDanhSachDanhMucKho', 'layDanhSachDoKhoTheoBoLoc', 'layDanhSachKyVetBai',
+    'TC_traCuuPhieuNhap', 'TC_chiTietPhieuNhap', 'TC_traCuuPhieuXuat', 'TC_chiTietPhieuXuat'],
 };
 const QUYEN_CUA_VAI_TRO = { CHIXEM: ['XEM'], NHANVIEN: ['XEM', 'NGHIEP_VU'], TONG_HOP: ['XEM', 'NGHIEP_VU', 'HE_THONG'], ADMIN: ['XEM', 'NGHIEP_VU', 'HE_THONG', 'QUAN_TRI'] };
 
