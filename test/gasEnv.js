@@ -80,6 +80,29 @@ function createGasEnv(opts) {
       // "Drive" = Advanced Drive Service (Drive.Files.remove...) - chỉ cần đủ để không throw undefined.
       Drive: { Files: { remove: () => {} } },
     };
+    // opts.sheetsApi: giả lập dịch vụ nâng cao "Sheets" (values.batchUpdate, dùng
+    // trong ghiNhieuVung_). 'ghi' = ghi thẳng vào sheet giả; 'khongThay' = ghi nhận
+    // lệnh nhưng SpreadsheetApp KHÔNG thấy giá trị mới (tình huống xấu nhất khi đọc
+    // lại ngay sau lệnh API). Mỗi lệnh được lưu ở env.sheetsApiCalls.
+    if (opts.sheetsApi) {
+      sandbox.Sheets = { Spreadsheets: { Values: { batchUpdate: (req, id) => {
+        env.sheetsApiCalls.push({ id, req });
+        if (opts.sheetsApi !== 'ghi') return {};
+        const ss = spreadsheetApp.__byId.get(id);
+        const cotSo = (a) => a.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+        req.data.forEach((d) => {
+          const m = d.range.match(/^'(.*)'!([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+          const sh = ss.__sheetsMap ? ss.__sheetsMap.get(m[1].replace(/''/g, "'")) : null;
+          const data = (sh || ss.getSheetByName(m[1].replace(/''/g, "'"))).__data;
+          d.values.forEach((row, i) => row.forEach((v, j) => {
+            const r = Number(m[3]) - 1 + i, c = cotSo(m[2]) - 1 + j;
+            while (data.length <= r) data.push([]);
+            data[r][c] = v;
+          }));
+        });
+        return {};
+      } } } };
+    }
     const context = vm.createContext(sandbox);
     vm.runInContext(BUNDLE_SRC, context, { filename: 'gas-bundle.js' });
     // FIX (đa-realm Date): xem ghi chú chi tiết ở đầu gasMocks.js - đăng ký
@@ -92,6 +115,7 @@ function createGasEnv(opts) {
   }
 
   const env = {
+    sheetsApiCalls: [],
     /** Context "mẫu" 1 lần - chỉ dùng để kiểm tra sự tồn tại của hàm (smoke test), KHÔNG dùng để suy luận state xuyên suốt nhiều lần gọi. */
     context: loadFreshContext(),
     propertiesService,

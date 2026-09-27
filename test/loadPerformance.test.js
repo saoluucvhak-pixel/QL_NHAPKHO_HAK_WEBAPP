@@ -62,7 +62,9 @@ describe('Tải 100.000 phiếu cân (10.000 đang hoạt động + 4 năm lưu 
     napDuLieuLon(e3, { soDongNong: 10000, tiLeChuaChot: 0.02 }); // 200 dòng chờ, rải rác
     const r = doLuong(e3, 'runCalculatePrice_core');
     expect(r.res.status).toBe('success');
-    expect(r.tongLoiGoi).toBeLessThanOrEqual(200 * 4 + 20);
+    // +1: BUG-TG-01 đọc lại cột Y ngay trước khi ghi (không đè "OK" ĐNTT vừa ghi).
+    // Có dịch vụ Sheets thì phần ghi còn 1 lệnh - xem test/sheetsApiVaGio.test.js.
+    expect(r.tongLoiGoi).toBeLessThanOrEqual(200 * 4 + 20 + 1);
   });
 
   test('CẢNH BÁO (chưa sửa - cần quyết định nghiệp vụ): báo cáo KHÔNG lọc ngày trả về toàn bộ lịch sử', () => {

@@ -55,3 +55,13 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 ## BUG-BG-03 — Sửa dòng báo giá có thể đổi giá phiếu cân đang dùng báo giá khác (đã chặn)
 - Trước đây chỉ kiểm tra "đã có phiếu cân áp dụng" theo mã và khoảng hiệu lực CŨ. Thêm mã mới, dời ngày hiệu lực sớm hơn hoặc đổi mã khối lượng có thể làm dòng báo giá phủ lên phiếu cân đang tính theo báo giá khác.
 - Sửa: `BG_kiemTraSauKhiSua_` xem trước hiệu lực SAU KHI SỬA (`BG_coreLogicProcessor_` trên dữ liệu giả lập), có phiếu cân (mọi năm, kể cả lưu trữ) trong khoảng mới -> không cho sửa, báo mã + số phiếu + ngày cân. Test: `test/baoGiaToiUu.test.js`.
+
+## GIO-01 — Giờ cân hiển thị lệch vài phút ở Báo cáo / In phiếu / Tra cứu (đã sửa)
+- Ô "chỉ có giờ" là Date ngày 30/12/1899; năm đó Asia/Ho_Chi_Minh còn giờ địa phương cũ (+7:06:xx) nên định dạng "GMT+7" cố định lệch vài phút (08:30:15 -> 08:23:45).
+- Sửa: `gioCuaO_` lấy giờ/phút/giây theo múi giờ script (như engine tính giá và `toTimeOnly_`). Test: `test/sheetsApiVaGio.test.js` (Jest chạy theo `Asia/Ho_Chi_Minh` - `jest.config.js`).
+
+## DRAFT-02 — Draft Chưa TT có thể thiếu giá khi giá ghi qua Sheets API (đã chặn)
+- Giá ghi gộp qua `Sheets.Spreadsheets.Values.batchUpdate` (PERF-TG-02); bản sao Draft đọc lại dòng bằng SpreadsheetApp ngay sau đó. Nay ghép thẳng kết quả vừa tính (`ghepKetQuaGia_`, `TC_dongBoDraftChuaTT_`) - không phụ thuộc việc đọc lại.
+
+## SCOPE-01 — Thiếu quyền userinfo.email (đã sửa)
+- `appsscript.json` liệt kê cố định oauthScopes nhưng thiếu `userinfo.email` -> `Session.getActiveUser/getEffectiveUser` không trả email, chủ script không "vào thẳng" được. Đã thêm.

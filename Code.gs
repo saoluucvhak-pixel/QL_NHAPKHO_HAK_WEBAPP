@@ -94,6 +94,17 @@ function dinhDangGMT7_(d, mau) {
   return kq;
 }
 
+// FIX (GIO-01): ô "chỉ có giờ" (Giờ cân 1/2) trong Sheets là Date ngày 30/12/1899.
+// Năm đó múi giờ Asia/Ho_Chi_Minh còn là giờ địa phương cũ (lệch +7:06:xx), nên
+// định dạng bằng "GMT+7" cố định (dinhDangGMT7_/Utilities.formatDate "GMT+7") bị
+// lệch vài phút so với ô trên sheet (VD 08:30:15 hiện thành 08:23:45). Lấy giờ/
+// phút/giây theo MÚI GIỜ CỦA SCRIPT (getHours...) - đúng cách toTimeOnly_ ghi ô và
+// engine tính giá (TG_tinhGiaDong_) đọc giờ -> khớp giờ hiển thị trên sheet.
+function gioCuaO_(d) {
+  const hai = function (v) { return v < 10 ? "0" + v : String(v); };
+  return hai(d.getHours()) + ":" + hai(d.getMinutes()) + ":" + hai(d.getSeconds());
+}
+
 /*********************************************************
  * PHẦN 1: TIẾN TRÌNH IMPORT & ĐỐI SOÁT KIỂM TRA DATA FILE
  *********************************************************/
@@ -479,6 +490,20 @@ function ghiNhieuVung_(ss, sheet, vung) {
   vung.forEach(function (v) { sheet.getRange(v.hang, v.cot, v.giaTri.length, v.giaTri[0].length).setValues(v.giaTri); });
 }
 
+// DRAFT-02: ghép kết quả tính giá (T, X, Y, Z) vào các dòng A..Z bắt đầu ở dòng
+// sheet "dongDau" (dsDong[i] = dòng dongDau + i). ketQua = [{rowNum, gia, hieuSo, trangThai, thanhTien}].
+function ghepKetQuaGia_(dsDong, dongDau, ketQua) {
+  if (!ketQua || !ketQua.length) return;
+  const theoDong = new Map();
+  ketQua.forEach(function (k) { if (k.hieuSo !== undefined) theoDong.set(k.rowNum, k); });
+  dsDong.forEach(function (r, i) {
+    const k = theoDong.get(dongDau + i);
+    if (!k) return;
+    while (r.length < 26) r.push("");
+    r[19] = k.gia; r[23] = k.hieuSo; r[24] = k.trangThai; r[25] = k.thanhTien;
+  });
+}
+
 // PERF-05: ghi các phiếu cập nhật khi re-import - mỗi khối dòng liền nhau 1 lệnh
 // setValues (cột B..S) + định dạng Ngày/Giờ/Số gom vào 3 lệnh RangeList cho cả
 // lượt import (trước đây 8 lệnh ghi riêng lẻ cho MỖI phiếu).
@@ -671,12 +696,13 @@ function step1_ConfirmImport_(confirmedDataList, luuDraftChuaTT) {
     // Input trung gian nữa).
 
     let priceMsg = "";
+    let priceResult = null;
     if (countNew > 0 || countUpdate > 0) {
       // FIX #2: gọi thẳng bản "_core" KHÔNG khóa, vì ta đang giữ khóa của
       // step1_ConfirmImport rồi. Nếu gọi runCalculatePrice() (bản có khóa)
       // ở đây sẽ bị TREO VĨNH VIỄN (deadlock) vì cùng 1 lượt thực thi lại tự
       // chờ khóa mà chính nó đang giữ.
-      const priceResult = runCalculatePrice_core_();
+      priceResult = runCalculatePrice_core_(undefined, !!luuDraftChuaTT);
       priceMsg = " | " + priceResult.message;
     }
 
@@ -690,7 +716,11 @@ function step1_ConfirmImport_(confirmedDataList, luuDraftChuaTT) {
     if (luuDraftChuaTT && batchNew.length > 0) {
       const docLai = dataSheet.getRange(startRowMoi, 1, batchNew.length, 26).getValues();
       const dungDong = docLai.every(function (r, i) { return String(r[21] || "").trim() === String(batchNew[i][21] || "").trim(); });
-      ghiVaoDraftChuaTT_(dungDong ? docLai : batchNew);
+      const dongDraft = dungDong ? docLai : batchNew;
+      // DRAFT-02: giá có thể vừa ghi qua Sheets API (ghiNhieuVung_) - không trông vào
+      // việc đọc lại bằng SpreadsheetApp thấy ngay; ghép thẳng kết quả vừa tính vào.
+      ghepKetQuaGia_(dongDraft, startRowMoi, priceResult && priceResult.ketQua);
+      ghiVaoDraftChuaTT_(dongDraft);
     }
     const draftMsg = luuDraftChuaTT ? ` | Đã lưu ${batchNew.length} phiếu vào Draft Chưa Thanh Toán` : "";
     const finalMsg = `Mới: ${countNew}, Cập nhật: ${countUpdate}, Bỏ qua: ${countSkip}${priceMsg}${draftMsg}`;
@@ -1135,7 +1165,9 @@ function TG_tinhGiaDong_(r, dataBG) {
 // chonDong (tùy chọn): hàm (dòng A..Z) -> true/false để CHỈ tính lại một phần các
 // phiếu chưa "OK" (Tra cứu: 1 phiếu vừa sửa, hoặc các phiếu khớp bộ lọc). Không
 // truyền = tính mọi phiếu chưa "OK" như trước. Phiếu "OK" luôn được bỏ qua.
-function runCalculatePrice_core_(chonDong) {
+// traKetQua: trả kèm danh sách kết quả tính (ketQua) cả khi không truyền chonDong
+// - để luồng import ghép giá vào bản sao Draft Chưa TT (xem DRAFT-02).
+function runCalculatePrice_core_(chonDong, traKetQua) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = sheet.getLastRow();
@@ -1214,7 +1246,7 @@ function runCalculatePrice_core_(chonDong) {
         : "Không có phiếu nào cần tính lại giá (tất cả đã chốt OK).",
       soPhieu: capNhat.length,
       soLoiBaoGia: capNhat.filter(function (c) { return c.trangThai !== "Test giá"; }).length,
-      ketQua: chonDong ? capNhat : undefined
+      ketQua: (chonDong || traKetQua) ? capNhat : undefined
     };
   } catch (e) { return { status: "error", message: "Lỗi: " + e.toString() }; }
 }
@@ -1405,9 +1437,9 @@ function getBaoCaoTongHop_(filters) {
         maChungTu: String(row[21] || "").trim(),
         soPhieu: row[0],
         ngayCan1: dinhDangGMT7_(ngayCan1, "dd/MM/yyyy"),
-        gioCan1: (row[2] instanceof Date) ? dinhDangGMT7_(row[2], "HH:mm:ss") : "",
+        gioCan1: (row[2] instanceof Date) ? gioCuaO_(row[2]) : "",
         ngayCan2: (row[3] instanceof Date) ? dinhDangGMT7_(row[3], "dd/MM/yyyy") : "",
-        gioCan2: (row[4] instanceof Date) ? dinhDangGMT7_(row[4], "HH:mm:ss") : "",
+        gioCan2: (row[4] instanceof Date) ? gioCuaO_(row[4]) : "",
         soXe: xe,
         soXe2: String(row[6] || "").trim(), // Cột G - Biển số 2 (xe kéo/rơ-moóc, nếu có)
         khachHang: khachHang,
@@ -1916,8 +1948,8 @@ function exportPhieuCanPDF_(maChungTu) {
 
     const ngayCan1 = found[1] instanceof Date ? found[1] : null;
     const ngayCan2 = found[3] instanceof Date ? found[3] : null;
-    const gioCan1 = found[2] instanceof Date ? dinhDangGMT7_(found[2], "HH:mm:ss") : "";
-    const gioCan2 = found[4] instanceof Date ? dinhDangGMT7_(found[4], "HH:mm:ss") : "";
+    const gioCan1 = found[2] instanceof Date ? gioCuaO_(found[2]) : "";
+    const gioCan2 = found[4] instanceof Date ? gioCuaO_(found[4]) : "";
     const soXe2 = String(found[6] || "").trim();
     const idDntt = String(found[26] || "").trim();
     const klHang = parseFloat(found[9]) || 0;
@@ -5523,7 +5555,7 @@ function TC_khoangNgay_(boLoc) {
 function TC_giaTriHienThi_(v) {
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return "";
-    if (v.getFullYear() < 1901) return dinhDangGMT7_(v, "HH:mm:ss"); // ô chỉ có giờ
+    if (v.getFullYear() < 1901) return gioCuaO_(v); // ô chỉ có giờ (GIO-01)
     const gio = dinhDangGMT7_(v, "HH:mm:ss");
     return dinhDangGMT7_(v, "dd/MM/yyyy") + (gio === "00:00:00" ? "" : " " + gio);
   }
@@ -5542,7 +5574,8 @@ function TC_tsNgayGioNhap_(ngay, gio) {
   if (isNaN(tNgay)) return null;
   if (!(gio instanceof Date) || isNaN(gio.getTime())) return tNgay;
   const dauNgay = Math.floor((tNgay + TC_LECH_GMT7_MS_) / TC_MOT_NGAY_MS_) * TC_MOT_NGAY_MS_ - TC_LECH_GMT7_MS_;
-  const giayTrongNgay = Math.floor((((gio.getTime() + TC_LECH_GMT7_MS_) % TC_MOT_NGAY_MS_) + TC_MOT_NGAY_MS_) % TC_MOT_NGAY_MS_ / 1000);
+  // GIO-01: giờ trong ngày theo múi giờ script (xem gioCuaO_), không cộng cố định +7.
+  const giayTrongNgay = gio.getHours() * 3600 + gio.getMinutes() * 60 + gio.getSeconds();
   return dauNgay + giayTrongNgay * 1000;
 }
 
@@ -5550,7 +5583,7 @@ function TC_tsNgayGioNhap_(ngay, gio) {
 function TC_ngayGioNhap_(ngay, gio) {
   if (!(ngay instanceof Date) || isNaN(ngay.getTime())) return null;
   if (!(gio instanceof Date) || isNaN(gio.getTime())) return ngay;
-  const hms = dinhDangGMT7_(gio, "HH:mm:ss");
+  const hms = gioCuaO_(gio); // GIO-01
   return new Date(dinhDangGMT7_(ngay, "yyyy-MM-dd") + "T" + hms + "+07:00");
 }
 
@@ -5872,10 +5905,14 @@ function TC_dongBoDraftChuaTT_(sheetPC, ketQua) {
     dongDraft.forEach(function (x, k) { dongCanDoc.push(dongPC.get(k)); });
     const khoi = docCacDong_(sheetPC, dongCanDoc, 1, 26);
     const giuChu = function (v) { return typeof v === "string" && v !== "" ? "'" + v.replace(/^'+/, "") : v; };
+    const giaTheoMa = new Map(); // DRAFT-02: giá vừa tính (có thể đã ghi qua Sheets API)
+    ketQua.forEach(function (k) { if (k.maCT && k.hieuSo !== undefined) giaTheoMa.set(k.maCT, k); });
     const ghi = [];
     dongDraft.forEach(function (dong, k) {
       const x = khoi.get(dongPC.get(k)).slice();
       if (String(x[21] || "").trim() !== k) return; // dòng PhieuCan vừa đổi vị trí -> bỏ qua an toàn
+      const g = giaTheoMa.get(k);
+      if (g) { x[19] = g.gia; x[23] = g.hieuSo; x[24] = g.trangThai; x[25] = g.thanhTien; }
       x[0] = giuChu(x[0]); x[22] = giuChu(x[22]);
       ghi.push({ dong: dong, row: x });
     });

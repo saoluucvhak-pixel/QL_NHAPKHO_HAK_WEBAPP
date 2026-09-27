@@ -273,6 +273,7 @@ function makeFakeSpreadsheetApp() {
       const ss = makeFakeSpreadsheet('generated_' + name);
       return ss;
     },
+    flush() {}, // ghi ngay mọi lệnh đang chờ - bộ giả lập ghi tức thì nên không cần làm gì
     __byId: byId,
     DeveloperMetadataVisibility: { DOCUMENT: 'DOCUMENT', PROJECT: 'PROJECT' },
   };
