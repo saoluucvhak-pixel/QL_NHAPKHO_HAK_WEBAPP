@@ -57,8 +57,7 @@ function doGet(e) {
 // (fileDataList) và xử lý gộp tất cả trong 1 lần gọi, khôi phục đúng khả năng
 // import nhiều file cùng lúc (và cả việc phát hiện trùng Số Chứng Từ GIỮA các
 // file trong cùng lượt, đúng như comment "seenInThisBatch" bên dưới mô tả).
-function step1_PreviewDraft(fileDataList) {
-  yeuCauPhien_();
+function step1_PreviewDraft_(fileDataList) {
   try {
     const danhSachFile = (Array.isArray(fileDataList) ? fileDataList : [fileDataList]).filter(f => f && f.base64);
     if (danhSachFile.length === 0) return { status: "error", message: "Không có file để xử lý." };
@@ -124,8 +123,8 @@ function step1_PreviewDraft(fileDataList) {
             let hGocValue = parseSoTheoLocale_(r[7]);
             if (!r[7] || isNaN(hGocValue) || hGocValue === 0) continue;
 
-            let dateC = toDateObj(r[2]);
-            let dateD = toDateObj(r[3]);
+            let dateC = toDateObj_(r[2]);
+            let dateD = toDateObj_(r[3]);
 
             let now = new Date();
             let nam = (dateC) ? dateC.getFullYear() : now.getFullYear();
@@ -290,7 +289,7 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
       });
     }
 
-    const _rf = REGION_FORMAT();
+    const _rf = REGION_FORMAT_();
     const rowsThemMoi = [];
     const dongGhiDe = [];
     // Giữ dạng chữ cho Số phiếu (A) và Số CT (W) giống cách ĐNTT ghi bản sao
@@ -400,8 +399,7 @@ function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf, chuKyMongDoi) {
   sheet.getRangeList(vungSo).setNumberFormat("#,##0");
 }
 
-function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
-  yeuCauPhien_();
+function step1_ConfirmImport_(confirmedDataList, luuDraftChuaTT) {
   // FIX #2: khóa toàn bộ quá trình xác nhận ghi dữ liệu. Nếu 2 người dùng bấm
   // "Xác nhận" gần như đồng thời, nếu không khóa thì cả hai sẽ đọc cùng
   // getLastRow() và ghi đè lên CÙNG một dải hàng, làm mất dữ liệu của một bên.
@@ -440,7 +438,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
     const chuKyDongCapNhat = new Map(); // CONCUR-01: rowNum -> Số phiếu|Mã CT lúc đọc
     // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
     // đã tồn tại lẫn nhánh ghi dòng mới bên dưới), tránh gọi PropertiesService lặp lại.
-    const _rfLoop = REGION_FORMAT();
+    const _rfLoop = REGION_FORMAT_();
 
     for (let item of confirmedDataList) {
       if (item.isError) continue;
@@ -449,8 +447,8 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       // lên (Số phiếu, Số xe, Khách hàng, Đại lý, Nguồn gốc) - TRƯỚC ĐÂY chỉ áp
       // dụng cho module Kho Dăm, khiến 1 ô bắt đầu bằng "=" trong file gốc có
       // thể trở thành công thức sống ngay trong sổ sách PhieuCan_DN.
-      const valA_Dich = sanitize(item.soPhieu); const valF_Dich = sanitize(item.soXe); const uniqueKeyMaCT = item.uniqueKey;
-      let valL_Dich = sanitize(item.khGoc); let valN_Dich = sanitize(String(item.dlGoc || "").toUpperCase()); let valO_Dich = sanitize(String(item.ngGoc || "").toUpperCase());
+      const valA_Dich = sanitize_(item.soPhieu); const valF_Dich = sanitize_(item.soXe); const uniqueKeyMaCT = item.uniqueKey;
+      let valL_Dich = sanitize_(item.khGoc); let valN_Dich = sanitize_(String(item.dlGoc || "").toUpperCase()); let valO_Dich = sanitize_(String(item.ngGoc || "").toUpperCase());
       let valK_Dich = valN_Dich + "_" + valO_Dich; let valQ_Dich = valN_Dich + "_" + valO_Dich + "_Y";
 
       // FIX #22: TRƯỚC ĐÂY dùng "toDateObj(r[2])"/"toDateObj(r[3])" - biến "r"
@@ -555,7 +553,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       // đổi ngay trên giao diện Hệ thống → Cấu hình hệ thống, không cần deploy
       // lại) - gọi 1 LẦN rồi tái sử dụng, tránh đọc PropertiesService lặp lại
       // không cần thiết cho mỗi setNumberFormat.
-      const _rf = REGION_FORMAT();
+      const _rf = REGION_FORMAT_();
       dataSheet.getRange(startRow, 2, batchNew.length, 1).setNumberFormat(_rf.DATE_FMT); // Ngày Cân 1
       dataSheet.getRange(startRow, 3, batchNew.length, 1).setNumberFormat(_rf.TIME_FMT); // Giờ Cân 1
       dataSheet.getRange(startRow, 4, batchNew.length, 1).setNumberFormat(_rf.DATE_FMT); // Ngày Cân 2
@@ -574,7 +572,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       // step1_ConfirmImport rồi. Nếu gọi runCalculatePrice() (bản có khóa)
       // ở đây sẽ bị TREO VĨNH VIỄN (deadlock) vì cùng 1 lượt thực thi lại tự
       // chờ khóa mà chính nó đang giữ.
-      const priceResult = runCalculatePrice_core();
+      const priceResult = runCalculatePrice_core_();
       priceMsg = " | " + priceResult.message;
     }
 
@@ -612,8 +610,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
 // khỏi phải đổi cả chuỗi logic valK_Dich/valQ_Dich, nhưng nhãn hiển thị trên
 // giao diện đã sửa thành "Mã Đại Lý - ĐL" để tránh nhầm lẫn khi nhập liệu thật.
 // "maNG" là Mã Nguồn Gốc (cột O "NG"), tên gọi khớp đúng ý nghĩa.
-function addManualPhieuCan(fields) {
-  yeuCauPhien_();
+function addManualPhieuCan_(fields) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
@@ -675,16 +672,16 @@ function addManualPhieuCan(fields) {
     // nghĩa ở PHẦN 6) cho các trường văn bản tự do gõ tay - TRƯỚC ĐÂY chỉ áp
     // dụng ở module Kho Dăm, khiến ai đó gõ nhầm/cố ý 1 ô bắt đầu bằng "="
     // (VD số điện thoại dạng "=SDT...") có thể trở thành công thức sống.
-    newRow[0] = sanitize(String(fields.soPhieu).trim());
+    newRow[0] = sanitize_(String(fields.soPhieu).trim());
     // FIX #3: Ghi đúng Ngày THUẦN vào cột "Ngày cân X" và Giờ THUẦN vào cột
     // "Giờ cân X", khớp đúng quy ước dữ liệu thật (xem toDateOnly_/toTimeOnly_).
     newRow[1] = toDateOnly_(dateC); newRow[2] = toTimeOnly_(dateC);
     newRow[3] = toDateOnly_(dateD); newRow[4] = toTimeOnly_(dateD);
-    newRow[5] = sanitize(String(fields.soXe).trim());
-    newRow[6] = sanitize(String(fields.soXe2 || "").trim()); // Cột G - Biển số 2 (tùy chọn, cho xe kéo/rơ-moóc)
+    newRow[5] = sanitize_(String(fields.soXe).trim());
+    newRow[6] = sanitize_(String(fields.soXe2 || "").trim()); // Cột G - Biển số 2 (tùy chọn, cho xe kéo/rơ-moóc)
     newRow[7] = klCan1; newRow[8] = klCan2; newRow[9] = klHang;
     newRow[10] = valK_Dich;
-    newRow[11] = sanitize(String(fields.khachHang || "").trim()); // Cột L - Khách hàng
+    newRow[11] = sanitize_(String(fields.khachHang || "").trim()); // Cột L - Khách hàng
     newRow[12] = "GK"; newRow[13] = maKH; newRow[14] = maNG;
     newRow[15] = "Y"; newRow[16] = valQ_Dich; newRow[17] = 0; newRow[18] = now;
     newRow[21] = uniqueKeyMaCT; newRow[22] = uniqueKeyMaCT;
@@ -693,14 +690,14 @@ function addManualPhieuCan(fields) {
     dataSheet.getRange(startRow, 1, 1, NUM_COLUMNS).setValues([newRow]);
     // FIX #14: đồng bộ với step1_ConfirmImport - dùng chung REGION_FORMAT (Config.gs)
     // FIX #15: REGION_FORMAT là hàm đọc động (Config.gs)
-    const _rf2 = REGION_FORMAT();
+    const _rf2 = REGION_FORMAT_();
     dataSheet.getRange(startRow, 2, 1, 1).setNumberFormat(_rf2.DATE_FMT);
     dataSheet.getRange(startRow, 3, 1, 1).setNumberFormat(_rf2.TIME_FMT);
     dataSheet.getRange(startRow, 4, 1, 1).setNumberFormat(_rf2.DATE_FMT);
     dataSheet.getRange(startRow, 5, 1, 1).setNumberFormat(_rf2.TIME_FMT);
 
     // Gọi bản _core (không khóa) vì đang giữ khóa của addManualPhieuCan rồi
-    const priceResult = runCalculatePrice_core();
+    const priceResult = runCalculatePrice_core_();
     const finalMsg = "Đã thêm phiếu cân " + uniqueKeyMaCT + " | " + priceResult.message;
     logAudit_('MANUAL_ENTRY', 'OK', finalMsg);
     return { status: "success", message: finalMsg };
@@ -843,10 +840,9 @@ function LT_bosungMaChungTuDaLuuTru_(duplicateMap) {
  * PHẦN 2: BIỆT LẬP CÁC CHỨC NĂNG XUẤT BÁO CÁO (CHẠY ĐỘC LẬP)
  *********************************************************/
 
-function runCreateMisaData(fromDate, toDate) {
-  yeuCauPhien_();
+function runCreateMisaData_(fromDate, toDate) {
   try {
-    const res = copyDataWithFinalLookup(fromDate, toDate);
+    const res = copyDataWithFinalLookup_(fromDate, toDate);
     if(res.status === "success") {
       return { status: "success", message: "Đã xử lý trích xuất dữ liệu hạch toán MISA thành công!" };
     } else {
@@ -855,8 +851,7 @@ function runCreateMisaData(fromDate, toDate) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function downloadMisaExcel() {
-  yeuCauPhien_();
+function downloadMisaExcel_() {
   try {
     const ssMisa = SpreadsheetApp.openById(CONFIG.MISA_DST_ID);
     const sheet = ssMisa.getSheetByName(CONFIG.MISA_DST_SHEET);
@@ -882,8 +877,7 @@ function downloadMisaExcel() {
 /*********************************************************
  * PHẦN KỸ THUẬT NGẦM CHỐNG TREO & SỬA LỖI ĐỊNH DẠNG NGÀY
  *********************************************************/
-function copyDataWithFinalLookup(fromDate, toDate) {
-  yeuCauPhien_();
+function copyDataWithFinalLookup_(fromDate, toDate) {
   // FIX #2: khóa vì hàm này CLEAR + GHI ĐÈ toàn bộ sheet Update_MiSa_PC.
   // Nếu 2 người cùng bấm "Tạo data Misa" cùng lúc, không khóa có thể dẫn tới
   // xung đột đọc/ghi hoặc một phiên xóa dữ liệu ngay khi phiên kia đang đọc.
@@ -912,9 +906,9 @@ function copyDataWithFinalLookup(fromDate, toDate) {
     // để chỉ mở thêm sheet lưu trữ năm nào thật sự nằm trong khoảng lọc, đồng
     // thời không còn phải bỏ qua dòng tiêu đề (hàm này không trả kèm tiêu đề).
     const sourceData = LT_docPhieuCanGopLuuTru_(fromDate, toDate, LT_SO_COT_DAY_DU); let targetData = [];
-    const _misaDf = MISA_DEFAULTS(); // đọc 1 lần trước vòng lặp, tránh gọi PropertiesService lặp lại mỗi dòng
+    const _misaDf = MISA_DEFAULTS_(); // đọc 1 lần trước vòng lặp, tránh gọi PropertiesService lặp lại mỗi dòng
     for (let i = 0; i < sourceData.length; i++) {
-      let row = sourceData[i]; let ngayPhieu = parseDate(row[1]); if (ngayPhieu && (ngayPhieu < start || ngayPhieu > end)) continue;
+      let row = sourceData[i]; let ngayPhieu = parseDate_(row[1]); if (ngayPhieu && (ngayPhieu < start || ngayPhieu > end)) continue;
       let newRow = new Array(33).fill(""); let soHopDongGoc = String(row[22] || "").trim(); let khoiLuong = (parseFloat(row[9]) || 0) / 1000; let donGia = parseFloat(row[23]) || 0; let thanhTienTuCotZ = parseFloat(row[25]) || 0;
       newRow[0] = row[1]; newRow[1] = row[1]; newRow[2] = soHopDongGoc; newRow[3] = row[5]; newRow[4] = khoiLuong; newRow[5] = donGia; newRow[6] = thanhTienTuCotZ;
       let soHopDongMoi = ""; if (soHopDongGoc && mapDNTT[soHopDongGoc]) { soHopDongMoi = String(mapDNTT[soHopDongGoc].colT).trim(); newRow[9] = '="' + soHopDongMoi + '"'; newRow[8] = mapDNTT[soHopDongGoc].colV || _misaDf.ngayDenHanMacDinh; } else { newRow[8] = _misaDf.ngayDenHanMacDinh; }
@@ -932,7 +926,7 @@ function copyDataWithFinalLookup(fromDate, toDate) {
       newRow[10] = maNCC ? '="' + maNCC + '"' : ""; newRow[11] = tenNCC; targetData.push(newRow);
     }
     if (ssTarget.getLastRow() > 1) ssTarget.getRange(2, 1, ssTarget.getLastRow(), 33).clearContent();
-    if (targetData.length > 0) { const _rf5 = REGION_FORMAT(); ssTarget.getRange(2, 10, targetData.length, 2).setNumberFormat("@"); ssTarget.getRange(2, 1, targetData.length, 33).setValues(targetData); ssTarget.getRange(2, 1, targetData.length, 2).setNumberFormat(_rf5.DATE_FMT); ssTarget.getRange(2, 9, targetData.length, 1).setNumberFormat(_rf5.DATE_FMT); }
+    if (targetData.length > 0) { const _rf5 = REGION_FORMAT_(); ssTarget.getRange(2, 10, targetData.length, 2).setNumberFormat("@"); ssTarget.getRange(2, 1, targetData.length, 33).setValues(targetData); ssTarget.getRange(2, 1, targetData.length, 2).setNumberFormat(_rf5.DATE_FMT); ssTarget.getRange(2, 9, targetData.length, 1).setNumberFormat(_rf5.DATE_FMT); }
     return { status: "success" };
   } catch (e) {
     return { status: "error", message: e.toString() };
@@ -958,7 +952,7 @@ function runCalculatePrice(e) {
   try {
     const _dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
     if (_dnttKhoaSo) return { status: "error", message: _dnttKhoaSo };
-    return runCalculatePrice_core();
+    return runCalculatePrice_core_();
   } finally {
     lock.releaseLock();
   }
@@ -1002,8 +996,7 @@ function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
 // nơi lưu dữ liệu kiêm nơi tính toán; muốn giảm tiếp cả bước ĐỌC này cần một
 // giải pháp lưu trữ khác (VD tách riêng sheet "đang chờ tính giá" khỏi sheet
 // lịch sử đã chốt - xem đề xuất kiến trúc lưu trữ đã trao đổi).
-function runCalculatePrice_core() {
-  yeuCauPhien_();
+function runCalculatePrice_core_() {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = sheet.getLastRow();
@@ -1130,8 +1123,7 @@ function FO_giaTriLocNamLuuTru_(sheetNam, nam) {
   return kq;
 }
 
-function getFilterOptions() {
-  yeuCauPhien_();
+function getFilterOptions_() {
   try {
     let xeSet = new Set(); let khSet = new Set(); let daiLySet = new Set(); let nguonGocSet = new Set(); let maDonGiaSet = new Set();
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
@@ -1209,8 +1201,7 @@ function buildDNTTStatusMap_(fromDate, toDate) {
 }
 
 // filters = {fromDate, toDate, xe, khachHang, trangThai}
-function getBaoCaoTongHop(filters) {
-  yeuCauPhien_();
+function getBaoCaoTongHop_(filters) {
   try {
     filters = filters || {};
     // TỐI ƯU LƯU TRỮ: TRƯỚC ĐÂY luôn đọc NGUYÊN sheet PhieuCan_DN (chỉ chứa dữ
@@ -1309,8 +1300,7 @@ function DB_tongHopMotNgay_(dataThang, ngayStr) {
   return tong;
 }
 
-function HT_layDashboard() {
-  yeuCauPhien_();
+function HT_layDashboard_() {
   try {
     const homNayStr = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
     const d = new Date();
@@ -1318,7 +1308,7 @@ function HT_layDashboard() {
 
     // PERF-02: chỉ đọc Sheet 1 lần (tháng này) rồi lọc ra "Hôm nay" trong bộ nhớ,
     // thay vì gọi getBaoCaoTongHop 2 lần (đọc trọn sheet đang hoạt động 2 lần).
-    const bcThangNay = getBaoCaoTongHop({ fromDate: dauThangStr, toDate: homNayStr });
+    const bcThangNay = getBaoCaoTongHop_({ fromDate: dauThangStr, toDate: homNayStr });
     if (bcThangNay.status !== "success") throw new Error(bcThangNay.message);
 
     const dataThang = bcThangNay.data;
@@ -1432,8 +1422,7 @@ function findMaKLForTan_(bands, klTan) {
 }
 
 // filters = {fromDate, toDate, xe, khachHang, daiLy, nguonGoc, trangThai, maDonGia, maKL}
-function getBaoCaoDonGia(filters) {
-  yeuCauPhien_();
+function getBaoCaoDonGia_(filters) {
   try {
     filters = filters || {};
     // TỐI ƯU LƯU TRỮ: xem giải thích ở getBaoCaoTongHop (PHẦN 4) - gộp thêm
@@ -1520,10 +1509,9 @@ function getBaoCaoDonGia(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function exportBaoCaoDonGiaExcel(filters) {
-  yeuCauPhien_();
+function exportBaoCaoDonGiaExcel_(filters) {
   try {
-    const rep = getBaoCaoDonGia(filters);
+    const rep = getBaoCaoDonGia_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày Cân", "Số Xe", "Khách Hàng", "Đại Lý", "Nguồn Gốc", "Mã Đơn Giá", "Mã KL", "KL Hàng (kg)", "Giá Gốc (ĐG_AD)", "Điều Chỉnh", "Đơn Giá Áp Dụng", "Diễn Giải Đơn Giá", "Trạng Thái Giá", "Thành Tiền"];
@@ -1534,10 +1522,9 @@ function exportBaoCaoDonGiaExcel(filters) {
   } catch (e) { logAudit_('EXPORT_EXCEL', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
 }
 
-function exportBaoCaoDonGiaPDF(filters) {
-  yeuCauPhien_();
+function exportBaoCaoDonGiaPDF_(filters) {
   try {
-    const rep = getBaoCaoDonGia(filters);
+    const rep = getBaoCaoDonGia_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày Cân", "Số Xe", "Khách Hàng", "Đại Lý", "Nguồn Gốc", "Mã ĐG", "Mã KL", "Giá Gốc", "Điều Chỉnh", "Đơn Giá AD", "Diễn Giải", "Trạng Thái", "Thành Tiền"];
@@ -1549,8 +1536,7 @@ function exportBaoCaoDonGiaPDF(filters) {
 }
 
 // filters = {fromDate, toDate, xe, khachHang, trangThai}
-function getBaoCaoMisa(filters) {
-  yeuCauPhien_();
+function getBaoCaoMisa_(filters) {
   try {
     filters = filters || {};
     const ss = SpreadsheetApp.openById(CONFIG.MISA_DST_ID);
@@ -1570,7 +1556,7 @@ function getBaoCaoMisa(filters) {
     let result = []; let tongKL = 0; let tongTien = 0;
 
     data.forEach(row => {
-      const ngay = parseDate(row[0]); // Cột A
+      const ngay = parseDate_(row[0]); // Cột A
       if (!ngay) return;
       if (start && ngay < start) return;
       if (end && ngay > end) return;
@@ -1651,10 +1637,9 @@ function getExportUrl_(tempSS, format, opt_portrait) {
   return base + "?format=xlsx";
 }
 
-function exportBaoCaoTongHopExcel(filters) {
-  yeuCauPhien_();
+function exportBaoCaoTongHopExcel_(filters) {
   try {
-    const rep = getBaoCaoTongHop(filters);
+    const rep = getBaoCaoTongHop_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Số Phiếu", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "Số Xe", "Biển Số 2", "Khách Hàng", "KL Cân 1 (kg)", "KL Cân 2 (kg)", "KL Hàng (kg)", "Đơn Giá", "Thành Tiền", "Trạng Thái Giá", "Trạng Thái Thanh Toán"];
@@ -1665,10 +1650,9 @@ function exportBaoCaoTongHopExcel(filters) {
   } catch (e) { logAudit_('EXPORT_EXCEL', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
 }
 
-function exportBaoCaoTongHopPDF(filters) {
-  yeuCauPhien_();
+function exportBaoCaoTongHopPDF_(filters) {
   try {
-    const rep = getBaoCaoTongHop(filters);
+    const rep = getBaoCaoTongHop_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Số Phiếu", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "Số Xe", "Biển Số 2", "Khách Hàng", "KL Cân1(kg)", "KL Cân2(kg)", "KL Hàng(kg)", "Đơn Giá", "Thành Tiền", "Trạng Thái TT"];
@@ -1679,10 +1663,9 @@ function exportBaoCaoTongHopPDF(filters) {
   } catch (e) { logAudit_('EXPORT_PDF', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
 }
 
-function exportBaoCaoMisaExcel(filters) {
-  yeuCauPhien_();
+function exportBaoCaoMisaExcel_(filters) {
   try {
-    const rep = getBaoCaoMisa(filters);
+    const rep = getBaoCaoMisa_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày", "Số Xe", "Khối Lượng (Tấn)", "Đơn Giá", "Thành Tiền", "Tên NCC", "Trạng Thái Thanh Toán"];
@@ -1690,22 +1673,21 @@ function exportBaoCaoMisaExcel(filters) {
     // để cột Ngày trong file xuất KHÔNG bị Google Sheets để dạng Text tùy Locale.
     const rows = rep.data.map(r => [r.maChungTu, new Date(r.ngayRaw), r.soXe, r.khoiLuong, r.donGia, r.thanhTien, r.tenNCC, r.trangThaiThanhToan]);
     const tempSS = createTempSheetForExport_("BaoCao_Misa_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5, 6]);
-    tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT().DATE_FMT);
+    tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo Misa, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { logAudit_('EXPORT_EXCEL', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
 }
 
-function exportBaoCaoMisaPDF(filters) {
-  yeuCauPhien_();
+function exportBaoCaoMisaPDF_(filters) {
   try {
-    const rep = getBaoCaoMisa(filters);
+    const rep = getBaoCaoMisa_(filters);
     if (rep.status !== "success") return rep;
     if (rep.data.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Mã Chứng Từ", "Ngày", "Số Xe", "KL(Tấn)", "Đơn Giá", "Thành Tiền", "Tên NCC", "Trạng Thái TT"];
     const rows = rep.data.map(r => [r.maChungTu, new Date(r.ngayRaw), r.soXe, r.khoiLuong, r.donGia, r.thanhTien, r.tenNCC, r.trangThaiThanhToan]);
     const tempSS = createTempSheetForExport_("BaoCao_Misa_PDF_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [4, 5, 6]);
-    tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT().DATE_FMT);
+    tempSS.getSheets()[0].getRange(2, 2, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_PDF', 'OK', 'Xuất PDF báo cáo Misa, ' + rep.data.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "pdf", true) };
   } catch (e) { logAudit_('EXPORT_PDF', 'ERROR', e.toString()); return { status: "error", message: e.toString() }; }
@@ -1751,8 +1733,7 @@ function soThanhChu_(so) {
 // In "PHIẾU NHẬP KHO" theo đúng bố cục chứng từ nhập kho thực tế (khác với báo
 // cáo/bảng dữ liệu thô): có tiêu đề công ty, bảng hàng hóa, số tiền bằng chữ,
 // và 4 cột chữ ký (Người giao hàng / Thủ kho / Kế toán / Người lập phiếu).
-function exportPhieuCanPDF(maChungTu) {
-  yeuCauPhien_();
+function exportPhieuCanPDF_(maChungTu) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.DATA_SHEET);
@@ -1864,8 +1845,7 @@ function exportPhieuCanPDF(maChungTu) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function parseDate(v) {
-  yeuCauPhien_();
+function parseDate_(v) {
   if (!v) return null;
   if (v instanceof Date) return v;
   if (typeof v === "number") return new Date(Math.round((v - 25569) * 86400 * 1000));
@@ -1922,8 +1902,7 @@ function convertXlsxToTempSheet_(blob, title) {
 // khi gặp chuỗi ISO sẽ đọc SAI HOÀN TOÀN vị trí ngày/tháng/năm (đã kiểm chứng:
 // có thể lệch tới hàng chục năm). Fix: nhận diện chuỗi ISO trước và dùng
 // new Date() phân giải chuẩn, chỉ dùng regex thủ công cho các chuỗi không phải ISO.
-function toDateObj(val) {
-  yeuCauPhien_();
+function toDateObj_(val) {
   if (val instanceof Date) return val;
   if (typeof val === 'string' && val.trim() !== "") {
     const trimmed = val.trim();
@@ -2045,10 +2024,8 @@ function HT_datLaiChuanHeaderSheet_(tenGoiSheet, sheet) {
   } catch (e) { /* bỏ qua */ }
 }
 
-function HT_xacNhanCauTrucSheetHienTai() {
-  yeuCauPhien_();
+function HT_xacNhanCauTrucSheetHienTai_() {
   try {
-    yeuCauQuyenAdmin_();
     const ssPC = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     HT_datLaiChuanHeaderSheet_("PhieuCan_DN", ssPC.getSheetByName(CONFIG.DATA_SHEET));
     const ssXH = XH_ss_();
@@ -2072,8 +2049,7 @@ function HT_xacNhanCauTrucSheetHienTai() {
 
 // Mẫu Phiếu cân NHẬP (PhieuCan_DN) - đúng theo tiêu đề đã XÁC NHẬN từ file thật
 // "BÁO CÁO XE ĐÃ CÂN" của phần mềm trạm cân (kiểu cân = Nhập).
-function taoFileMauPhieuCan() {
-  yeuCauPhien_();
+function taoFileMauPhieuCan_() {
   try {
     const headers = ["STT", "Số phiếu", "Ngày giờ cân 1", "Ngày giờ cân 2", "Biển số 1", "Cân lần 1", "Cân lần 2", "KL Hàng (KG)", "quy cách", "Khách hàng", "Người cân 1", "Đại lý", "Nguồn gốc", "ĐL"];
     const vd = [1, 7107, "25/07/2026 02:06:28", "25/07/2026 02:59:58", "92A-54957", 27020, 9030, 17990, "Tọa độ 15.762805, 108.150135, Xã Duy Xuyên, TP Đà Nẵng", "NGUYỄN VĂN HOÀNG", "Phạm Đình Giao", "NGÔ DUY THỨC", "ĐL"];
@@ -2088,8 +2064,7 @@ function taoFileMauPhieuCan() {
 // để đối chiếu — nếu tên cột thực tế trên trạm cân khác đi, chỉ cần đổi lại
 // đúng tên tiêu đề trong file bạn tải lên cho khớp là hệ thống vẫn đọc được
 // (import tìm cột theo TÊN, không theo vị trí cố định).
-function taoFileMauXuatHang() {
-  yeuCauPhien_();
+function taoFileMauXuatHang_() {
   try {
     const headers = ["STT", "Số phiếu", "Ngày giờ cân 1", "Ngày giờ cân 2", "Biển số 1", "Cân lần 1", "Cân lần 2", "KL Hàng (KG)", "Đơn vị vận chuyển", "Tên tài xế", "NGƯỜI CÂN", "Kho xuất", "Kho nhập"];
     const vd = [1, "01", "22/01/2025 07:36:52", "22/01/2025 08:02:32", "92C-08727", 14160, 36080, 21920, "Công Ty TNHH Dịch Vụ Và Vận Tải Hùng Hoàng Hoa", "Mr Tâm", "Trần Thị Phương", "Kho Tiên Sa", "Kho Xuất Bán"];
@@ -2132,8 +2107,7 @@ function taoFileMau_(tenFile, headers, dongViDu, ghiChu) {
 function BG_ss_() { return SpreadsheetApp.openById(BAOGIA_CONFIG.SPREADSHEET_ID); }
 
 /* ---------- 5.1 Danh mục mã báo giá (Ma_BaoGia) ---------- */
-function BG_getMaBaoGiaList() {
-  yeuCauPhien_();
+function BG_getMaBaoGiaList_() {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.MA_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2147,8 +2121,7 @@ function BG_getMaBaoGiaList() {
 }
 
 // fields: {daiLyMa, daiLyTen, nguonGocMa, nguonGocTen, hinhAnh:'Y'|'N'}
-function BG_addMaBaoGia(fields) {
-  yeuCauPhien_();
+function BG_addMaBaoGia_(fields) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2202,8 +2175,7 @@ function BG_nextMaBaoGiaCode_(sheet, lastRow) {
   return prefix + String(maxSeq + 1).padStart(3, "0");
 }
 
-function BG_deleteMaBaoGia(maBaoGia) {
-  yeuCauPhien_();
+function BG_deleteMaBaoGia_(maBaoGia) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2225,8 +2197,7 @@ function BG_deleteMaBaoGia(maBaoGia) {
 }
 
 /* ---------- 5.2 Danh mục mã khối lượng (Ma_KL) ---------- */
-function BG_getMaKLList() {
-  yeuCauPhien_();
+function BG_getMaKLList_() {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.MAKL_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2243,8 +2214,7 @@ function BG_getMaKLList() {
 }
 
 // fields: {klMinTan, klMaxTan} - nhập theo đơn vị TẤN cho thân thiện
-function BG_addMaKL(fields) {
-  yeuCauPhien_();
+function BG_addMaKL_(fields) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2277,8 +2247,7 @@ function BG_addMaKL(fields) {
   finally { lock.releaseLock(); }
 }
 
-function BG_deleteMaKL(maKL) {
-  yeuCauPhien_();
+function BG_deleteMaKL_(maKL) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2300,8 +2269,7 @@ function BG_deleteMaKL(maKL) {
 }
 
 /* ---------- 5.3 Danh sách phiếu báo giá (QL_BaoGia) — phục vụ Sao chép ---------- */
-function BG_getQuoteList() {
-  yeuCauPhien_();
+function BG_getQuoteList_() {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.QL_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2321,8 +2289,7 @@ function BG_getQuoteList() {
 }
 
 // Lấy các "nhóm giá" của 1 phiếu báo giá cũ để làm dữ liệu mồi cho chức năng SAO CHÉP
-function BG_getQuoteDetail(soBaoGia) {
-  yeuCauPhien_();
+function BG_getQuoteDetail_(soBaoGia) {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.SRC_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2426,8 +2393,7 @@ function BG_annotateApplied_(finalRows, displayData) {
 }
 
 // Lấy chi tiết 1 dòng báo giá theo ID_BGCT (mã băm), kèm trạng thái có được sửa/xóa hay không
-function BG_getBaogiaRowByHash(idBgct) {
-  yeuCauPhien_();
+function BG_getBaogiaRowByHash_(idBgct) {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.SRC_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2460,8 +2426,7 @@ function BG_getBaogiaRowByHash(idBgct) {
 }
 
 // payload = { idBgct, maList:[...], klCode, gia, hieuLuc:'yyyy-MM-ddTHH:mm' }
-function BG_updateBaogiaRow(payload) {
-  yeuCauPhien_();
+function BG_updateBaogiaRow_(payload) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2510,8 +2475,7 @@ function BG_updateBaogiaRow(payload) {
   finally { lock.releaseLock(); }
 }
 
-function BG_deleteBaogiaRow(idBgct) {
-  yeuCauPhien_();
+function BG_deleteBaogiaRow_(idBgct) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2567,8 +2531,7 @@ function BG_checkQuoteDeletable_(soBaoGia) {
 
 // Trả danh sách TOÀN BỘ phiếu báo giá (đầu phiếu QL_BaoGia) kèm số nhóm giá và
 // trạng thái có được xóa cả phiếu hay không - phục vụ bảng "Danh sách báo giá đã lập".
-function BG_getQuoteListWithStatus() {
-  yeuCauPhien_();
+function BG_getQuoteListWithStatus_() {
   try {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.QL_SHEET);
     const lastRow = sheet.getLastRow();
@@ -2632,8 +2595,7 @@ function BG_getQuoteListWithStatus() {
 // Baogia_DN, VÀ xóa luôn dòng đầu phiếu trong QL_BaoGia. Chỉ cho phép khi
 // TẤT CẢ nhóm giá thuộc phiếu đều editable (BG_checkQuoteDeletable_) - kiểm
 // tra lại ngay trước khi xóa (defense in depth), không tin dữ liệu đã tải sẵn ở client.
-function BG_deleteQuote(soBaoGia) {
-  yeuCauPhien_();
+function BG_deleteQuote_(soBaoGia) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2673,8 +2635,7 @@ function BG_deleteQuote(soBaoGia) {
 // Ghi chú: "Tách báo giá" xử lý hoàn toàn ở phía giao diện (client tách 1 nhóm
 // nhiều mã thành nhiều nhóm 1 mã trước khi gửi) - không cần hàm backend riêng.
 // payload = { ngayBaoGia:'yyyy-MM-dd', hieuLuc:'yyyy-MM-ddTHH:mm', idTam:'', groups:[{maList:[...], klCode, gia}] }
-function BG_createQuote(payload) {
-  yeuCauPhien_();
+function BG_createQuote_(payload) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây." };
@@ -2729,8 +2690,7 @@ function BG_createQuote(payload) {
 }
 
 /* ---------- 5.5 Xử lý hiệu lực & Xem dữ liệu (port nguyên vẹn từ hệ thống Báo giá gốc) ---------- */
-function BG_updateHieuLuc() {
-  yeuCauPhien_();
+function BG_updateHieuLuc_() {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2757,8 +2717,7 @@ function BG_updateHieuLuc() {
   finally { lock.releaseLock(); }
 }
 
-function BG_showAllData() {
-  yeuCauPhien_();
+function BG_showAllData_() {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -2882,8 +2841,7 @@ function BG_layThongKeGiaHieuLuc_() {
   };
 }
 
-function BG_exportFileSmart(dateStr, currentView, filteredIds) {
-  yeuCauPhien_();
+function BG_exportFileSmart_(dateStr, currentView, filteredIds) {
   try {
     const ss = BG_ss_();
     const dataSheet = ss.getSheetByName(currentView === "FINAL" ? BAOGIA_CONFIG.DST_SHEET : BAOGIA_CONFIG.SAVE_SHEET);
@@ -2911,7 +2869,7 @@ function BG_exportFileSmart(dateStr, currentView, filteredIds) {
     sheet.getRange(7, 1, exportData.length, 7).setValues(chongCongThucBang_(exportData)).setBorder(true, true, true, true, true, true);
 
     sheet.getRange(7, 4, exportData.length, 1).setNumberFormat("#,##0");
-    sheet.getRange(7, 5, exportData.length, 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
+    sheet.getRange(7, 5, exportData.length, 2).setNumberFormat(REGION_FORMAT_().DATE_FMT);
     sheet.getRange(7, 3, exportData.length, 1).setWrap(true);
     sheet.setColumnWidth(2, 100); sheet.setColumnWidth(3, 300); sheet.setColumnWidth(4, 110);
 
@@ -2946,8 +2904,7 @@ function BG_exportFileSmart(dateStr, currentView, filteredIds) {
 // ==========================================
 // HÀM BẢO MẬT: Chống chèn mã độc (Injection)
 // ==========================================
-function sanitize(val) {
-  yeuCauPhien_();
+function sanitize_(val) {
   if (typeof val !== 'string') return val;
   var str = val.trim();
   if (/^[=\+\-@]/.test(str)) {
@@ -2956,8 +2913,7 @@ function sanitize(val) {
   return str;
 }
 
-function kiemTraVaTaoTieuDeSheets() {
-  yeuCauPhien_();
+function kiemTraVaTaoTieuDeSheets_() {
   var cache = CacheService.getScriptCache();
   if (cache.get('sheets_ready_v5') === '1') return;
 
@@ -2993,8 +2949,7 @@ function kiemTraVaTaoTieuDeSheets() {
   cache.put('sheets_ready_v5', '1', 21600);
 }
 
-function taiDanhSachKyVetBaiCache() {
-  yeuCauPhien_();
+function taiDanhSachKyVetBaiCache_() {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetCfg = ss.getSheetByName(KHODAM_CONFIG.SHEET_CAUHINH);
   var arrKy = [];
@@ -3029,8 +2984,7 @@ function taiDanhSachKyVetBaiCache() {
   return arrKy;
 }
 
-function kiemTraKhoaKyVetBaiPure(ngayTime, arrKyCache) {
-  yeuCauPhien_();
+function kiemTraKhoaKyVetBaiPure_(ngayTime, arrKyCache) {
   var t = new Date(ngayTime).setHours(0,0,0,0);
   for (var i = 0; i < arrKyCache.length; i++) {
     if (t >= arrKyCache[i].tu && t <= arrKyCache[i].den) return arrKyCache[i].isLocked;
@@ -3038,8 +2992,7 @@ function kiemTraKhoaKyVetBaiPure(ngayTime, arrKyCache) {
   return false;
 }
 
-function layThongSoVaTieuHaoCache(ngay, arrKyCache) {
-  yeuCauPhien_();
+function layThongSoVaTieuHaoCache_(ngay, arrKyCache) {
   var t = new Date(ngay).setHours(0,0,0,0);
   var kq = { dotVetBai: "Mặc định", tieuHao: 0.0315 };
 
@@ -3063,8 +3016,7 @@ function layThongSoVaTieuHaoCache(ngay, arrKyCache) {
   return kq;
 }
 
-function chuanHoaNgay(val) {
-  yeuCauPhien_();
+function chuanHoaNgay_(val) {
   if (!val) return "";
   if (val instanceof Date) return Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
   if (typeof val === 'number') {
@@ -3090,8 +3042,7 @@ function chuanHoaNgay(val) {
 var KICH_THUOC_TRANG = 20;
 
 /** Mốc thời gian (ms, 00:00:00) của đúng ngày này 3 tháng trước — dùng làm mặc định "Từ ngày" khi tải danh sách. */
-function layThoiDiem3ThangTruoc() {
-  yeuCauPhien_();
+function layThoiDiem3ThangTruoc_() {
   var d = new Date();
   d.setMonth(d.getMonth() - 3);
   d.setHours(0, 0, 0, 0);
@@ -3099,15 +3050,13 @@ function layThoiDiem3ThangTruoc() {
 }
 
 /** Chuỗi "yyyy-MM-dd" của đúng ngày này 3 tháng trước — dùng làm giá trị mặc định hiển thị trên input date. */
-function layNgay3ThangTruocStr() {
-  yeuCauPhien_();
+function layNgay3ThangTruocStr_() {
   var d = new Date();
   d.setMonth(d.getMonth() - 3);
   return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
 }
 
-function tinhDoKhoTrungBinhTheoKho(khoName, ngay) {
-  yeuCauPhien_();
+function tinhDoKhoTrungBinhTheoKho_(khoName, ngay) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetGD = ss.getSheetByName(KHODAM_CONFIG.SHEET_GIAODICH);
   if (!sheetGD || sheetGD.getLastRow() <= 1) return 0.45;
@@ -3131,8 +3080,7 @@ function tinhDoKhoTrungBinhTheoKho(khoName, ngay) {
   return (tTuoi > 0 && tKho > 0) ? (tKho / tTuoi) : 0.45;
 }
 
-function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, optionChon) {
-  yeuCauPhien_();
+function xuLyXacDinhDoKho_(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, optionChon) {
   // FIX #8: trước đây điều kiện "val > 0" khiến độ khô=0 bị coi giống hệt "để
   // trống", nên luôn bị ghi đè bằng độ khô tham chiếu/trung bình kho ở phía dưới.
   // Điều này sai với phiếu điều chỉnh Tươi (MT) thuần túy — vốn CHỦ ĐỘNG cần độ
@@ -3151,7 +3099,7 @@ function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, op
   }
 
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
-  var targetDateStr = chuanHoaNgay(ngay);
+  var targetDateStr = chuanHoaNgay_(ngay);
 
   if (loaiPhieu === "NHẬP" && hinhThuc === "TP") {
     var sheetDK = ss.getSheetByName(KHODAM_CONFIG.SHEET_NHAPDOKHO);
@@ -3160,7 +3108,7 @@ function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, op
       var dataDK = sheetDK.getDataRange().getValues();
       for (var i = dataDK.length - 1; i >= 1; i--) {
         if (String(dataDK[i][4]).trim() === "Đã hủy") continue; 
-        if (dataDK[i][0] && chuanHoaNgay(dataDK[i][0]) === targetDateStr) {
+        if (dataDK[i][0] && chuanHoaNgay_(dataDK[i][0]) === targetDateStr) {
           var v = parseFloat(dataDK[i][2]);
           if (!isNaN(v) && v > 0) {
             foundVal = v > 1 ? v / 100 : v;
@@ -3187,14 +3135,14 @@ function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, op
                 minDiff = diff;
                 var v = parseFloat(dataDK[i][2]);
                 closestVal = v > 1 ? v / 100 : v;
-                closestDate = chuanHoaNgay(dataDK[i][0]);
+                closestDate = chuanHoaNgay_(dataDK[i][0]);
               }
             }
           }
           return { doKho: closestVal, dienGiai: "Lấy độ khô ngày trước đó (" + closestDate + ")" };
         }
       } else if (optionChon === "2") {
-        var tb = tinhDoKhoTrungBinhTheoKho(khoLienQuan, ngay);
+        var tb = tinhDoKhoTrungBinhTheoKho_(khoLienQuan, ngay);
         return { doKho: tb, dienGiai: "Độ khô trung bình tháng (" + (tb * 100).toFixed(2) + "%)" };
       }
       return { doKho: 0.45, dienGiai: "Mặc định 45% (Chưa có dữ liệu độ khô ngày " + targetDateStr + ")" };
@@ -3202,15 +3150,14 @@ function xuLyXacDinhDoKho(loaiPhieu, hinhThuc, khoLienQuan, ngay, doKhoInput, op
   }
 
   if (loaiPhieu === "XUẤT" || hinhThuc.indexOf("MUON") === 0 || hinhThuc === "DC" || hinhThuc === "Khác" || hinhThuc === "XB" || hinhThuc === "TC") {
-    var tbKhoXuat = tinhDoKhoTrungBinhTheoKho(khoLienQuan, ngay);
+    var tbKhoXuat = tinhDoKhoTrungBinhTheoKho_(khoLienQuan, ngay);
     return { doKho: tbKhoXuat, dienGiai: "Độ khô trung bình kho xuất [" + khoLienQuan + "] (" + (tbKhoXuat * 100).toFixed(2) + "%)" };
   }
 
   return { doKho: 0.45, dienGiai: "Mặc định 45%" };
 }
 
-function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
-  yeuCauPhien_();
+function xuLyNhapSanPhamSanXuat_(ngayNhap, optionChon) {
   try {
     // FIX: TRƯỚC ĐÂY hard-code thẳng ID Spreadsheet Phiếu Cân ở đây (trùng với
     // CONFIG.SPREADSHEET_ID nhưng KHÔNG tham chiếu qua CONFIG) - khiến tính năng
@@ -3228,16 +3175,16 @@ function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
     var dataCan = sheetCan.getDataRange().getValues();
     if (dataCan.length <= 1) return { status: "success", tongKhoiLuongUot: 0, doKho: 0.45, dotVetBai: "Mặc định", tongGoKeo: 0, dienGiaiDoKho: "Mặc định 45%" };
 
-    var targetDateStr = chuanHoaNgay(ngayNhap);
-    var arrKyCache = taiDanhSachKyVetBaiCache();
-    var thongSo = layThongSoVaTieuHaoCache(ngayNhap, arrKyCache);
+    var targetDateStr = chuanHoaNgay_(ngayNhap);
+    var arrKyCache = taiDanhSachKyVetBaiCache_();
+    var thongSo = layThongSoVaTieuHaoCache_(ngayNhap, arrKyCache);
 
     var tongKhoiLuongGoKeo = 0, colDateIdx = 1, colWeightIdx = 9;
 
     for (var i = 1; i < dataCan.length; i++) {
       var row = dataCan[i];
       if (row[colDateIdx] !== undefined && row[colDateIdx] !== "") {
-        if (chuanHoaNgay(row[colDateIdx]) === targetDateStr) {
+        if (chuanHoaNgay_(row[colDateIdx]) === targetDateStr) {
           tongKhoiLuongGoKeo += parseFloat(row[colWeightIdx]) || 0;
         }
       }
@@ -3252,7 +3199,7 @@ function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
       var dataDK = sheetDK.getDataRange().getValues();
       for (var i = 1; i < dataDK.length; i++) {
         if (String(dataDK[i][4]).trim() === "Đã hủy") continue;
-        if (dataDK[i][0] && chuanHoaNgay(dataDK[i][0]) === targetDateStr) {
+        if (dataDK[i][0] && chuanHoaNgay_(dataDK[i][0]) === targetDateStr) {
           hasExactDateDK = true; break;
         }
       }
@@ -3267,7 +3214,7 @@ function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
       };
     }
 
-    var refDK = xuLyXacDinhDoKho("NHẬP", "TP", "", ngayNhap, 0, optionChon);
+    var refDK = xuLyXacDinhDoKho_("NHẬP", "TP", "", ngayNhap, 0, optionChon);
     return {
       status: "success", ngayNhap: ngayNhap, dotVetBai: thongSo.dotVetBai, tieuHao: thongSo.tieuHao,
       tongGoKeo: tongKhoiLuongGoKeo, tongKhoiLuongUot: khoiLuongDamTuoi, doKho: refDK.doKho,
@@ -3278,13 +3225,12 @@ function xuLyNhapSanPhamSanXuat(ngayNhap, optionChon) {
   }
 }
 
-function layDanhSachTenKho() {
-  yeuCauPhien_();
+function layDanhSachTenKho_() {
   var cache = CacheService.getScriptCache();
   var cachedKho = cache.get('danh_sach_ten_kho');
   if (cachedKho) { try { return JSON.parse(cachedKho); } catch(e) {} }
 
-  kiemTraVaTaoTieuDeSheets();
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetDM = ss.getSheetByName(KHODAM_CONFIG.SHEET_DANHMUCKHO);
   var khoList = [];
@@ -3299,12 +3245,11 @@ function layDanhSachTenKho() {
   return khoList;
 }
 
-function xoaCacheKho() { yeuCauPhien_(); CacheService.getScriptCache().remove('danh_sach_ten_kho'); }
+function xoaCacheKho_() { CacheService.getScriptCache().remove('danh_sach_ten_kho'); }
 
-function getDataForGiaoDichForm(loai, tab, tuNgayStr, denNgayStr, trang) {
-  yeuCauPhien_();
-  var khoList = layDanhSachTenKho();
-  var ketQuaPhieu = layDanhSachGiaoDichTheoBoLoc(loai, tab, tuNgayStr, denNgayStr, trang);
+function getDataForGiaoDichForm_(loai, tab, tuNgayStr, denNgayStr, trang) {
+  var khoList = layDanhSachTenKho_();
+  var ketQuaPhieu = layDanhSachGiaoDichTheoBoLoc_(loai, tab, tuNgayStr, denNgayStr, trang);
   return {
     khoList: khoList,
     danhSach: ketQuaPhieu.list,
@@ -3321,13 +3266,12 @@ function getDataForGiaoDichForm(loai, tab, tuNgayStr, denNgayStr, trang) {
  * Mặc định khoảng thời gian: 3 tháng gần nhất tính từ hiện tại (nếu không truyền tuNgay/denNgay).
  * @param {number} [trang] - Số trang cần lấy (bắt đầu từ 1). Mặc định: 1.
  */
-function layDanhSachGiaoDichTheoBoLoc(loaiPhieu, tabPhieu, tuNgay, denNgay, trang) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layDanhSachGiaoDichTheoBoLoc_(loaiPhieu, tabPhieu, tuNgay, denNgay, trang) {
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetGD = ss.getSheetByName(KHODAM_CONFIG.SHEET_GIAODICH);
 
-  var tuNgayStr = tuNgay || layNgay3ThangTruocStr();
+  var tuNgayStr = tuNgay || layNgay3ThangTruocStr_();
   var denNgayStr = denNgay || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   var soTrang = parseInt(trang, 10);
   if (isNaN(soTrang) || soTrang < 1) soTrang = 1;
@@ -3337,9 +3281,9 @@ function layDanhSachGiaoDichTheoBoLoc(loaiPhieu, tabPhieu, tuNgay, denNgay, tran
   }
 
   var data = sheetGD.getDataRange().getValues();
-  var tuDate = tuNgay ? new Date(tuNgay).setHours(0, 0, 0, 0) : layThoiDiem3ThangTruoc();
+  var tuDate = tuNgay ? new Date(tuNgay).setHours(0, 0, 0, 0) : layThoiDiem3ThangTruoc_();
   var denDate = new Date(denNgayStr).setHours(23, 59, 59, 999);
-  var arrKyCache = taiDanhSachKyVetBaiCache();
+  var arrKyCache = taiDanhSachKyVetBaiCache_();
 
   // Bước 1: lọc ra chỉ số dòng phù hợp bộ lọc (không dựng object ngay để đỡ tốn công cho các phiếu không thuộc trang cần lấy)
   var matchedRowIdx = [];
@@ -3386,7 +3330,7 @@ function layDanhSachGiaoDichTheoBoLoc(loaiPhieu, tabPhieu, tuNgay, denNgay, tran
       doKho: parseFloat(data[i][8]) || 0,
       bdmt: parseFloat(data[i][10]) || 0,
       nguonDK: data[i][13] || "Mặc định/Thủ công",
-      isLocked: kiemTraKhoaKyVetBaiPure(dObj, arrKyCache)
+      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache)
     };
   });
 
@@ -3400,15 +3344,13 @@ function layDanhSachGiaoDichTheoBoLoc(loaiPhieu, tabPhieu, tuNgay, denNgay, tran
   };
 }
 
-function taoMaPhieuMoi(prefix) {
-  yeuCauPhien_();
+function taoMaPhieuMoi_(prefix) {
   var tsp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss");
   var randSuffix = Math.floor(Math.random() * 9000) + 1000;
   return prefix + tsp + "_" + randSuffix;
 }
 
-function xuLySuaXoaGiaoDich(dataEdit) {
-  yeuCauPhien_();
+function xuLySuaXoaGiaoDich_(dataEdit) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(KHODAM_CONFIG.SHEET_GIAODICH);
   var data = sheet.getDataRange().getValues();
@@ -3421,8 +3363,8 @@ function xuLySuaXoaGiaoDich(dataEdit) {
   }
 
   var ngayCheck = dataEdit.ngay || (rowIdx > -1 ? data[rowIdx-1][1] : new Date());
-  var arrKyCache = taiDanhSachKyVetBaiCache();
-  if (kiemTraKhoaKyVetBaiPure(ngayCheck, arrKyCache)) return "❌ Khóa bảo mật: Phiếu thuộc kỳ cũ!";
+  var arrKyCache = taiDanhSachKyVetBaiCache_();
+  if (kiemTraKhoaKyVetBaiPure_(ngayCheck, arrKyCache)) return "❌ Khóa bảo mật: Phiếu thuộc kỳ cũ!";
 
   if (dataEdit.hanhDong === "XOA") {
     if (rowIdx > -1) { 
@@ -3441,11 +3383,11 @@ function xuLySuaXoaGiaoDich(dataEdit) {
       return "❌ Không tìm thấy phiếu " + dataEdit.maPhieu + " để cập nhật (có thể đã bị xóa). Vui lòng tải lại danh sách và thử lại.";
     }
     var ngay = new Date(dataEdit.ngay);
-    var thongSo = layThongSoVaTieuHaoCache(ngay, arrKyCache);
+    var thongSo = layThongSoVaTieuHaoCache_(ngay, arrKyCache);
     var mt = parseFloat(dataEdit.khoiLuongMT) || 0;
     
-    var dienGiaiDK = sanitize(dataEdit.dienGiaiDoKho || "");
-    var hinhThucVal = sanitize(dataEdit.hinhThuc);
+    var dienGiaiDK = sanitize_(dataEdit.dienGiaiDoKho || "");
+    var hinhThucVal = sanitize_(dataEdit.hinhThuc);
 
     if (dataEdit.loai === "NHẬP" && hinhThucVal !== "TP" && hinhThucVal !== "DC") {
       var dCheck = parseFloat(dataEdit.doKho);
@@ -3455,7 +3397,7 @@ function xuLySuaXoaGiaoDich(dataEdit) {
     }
 
     if (hinhThucVal === "TP" && mt === 0) {
-      var kqScan = xuLyNhapSanPhamSanXuat(dataEdit.ngay, dataEdit.optionChon);
+      var kqScan = xuLyNhapSanPhamSanXuat_(dataEdit.ngay, dataEdit.optionChon);
       if (kqScan.status === "error") return "❌ " + kqScan.message;
       mt = kqScan.tongKhoiLuongUot;
       if (!dienGiaiDK) dienGiaiDK = kqScan.dienGiaiDoKho;
@@ -3470,11 +3412,11 @@ function xuLySuaXoaGiaoDich(dataEdit) {
       if (hinhThucVal === "TC") khoNhapValRaw = dataEdit.khoNhap || "Không có";
     }
 
-    var khoXuatVal = sanitize(khoXuatValRaw);
-    var khoNhapVal = sanitize(khoNhapValRaw);
+    var khoXuatVal = sanitize_(khoXuatValRaw);
+    var khoNhapVal = sanitize_(khoNhapValRaw);
     var khoLienQuan = (dataEdit.loai === "NHẬP") ? khoNhapVal : khoXuatVal;
 
-    var refDK = xuLyXacDinhDoKho(dataEdit.loai, hinhThucVal, khoLienQuan, ngay, dataEdit.doKho, dataEdit.optionChon);
+    var refDK = xuLyXacDinhDoKho_(dataEdit.loai, hinhThucVal, khoLienQuan, ngay, dataEdit.doKho, dataEdit.optionChon);
     var doKho = refDK.doKho;
     if (!dienGiaiDK) dienGiaiDK = refDK.dienGiai;
 
@@ -3490,7 +3432,7 @@ function xuLySuaXoaGiaoDich(dataEdit) {
     // khi ghi) theo đúng REGION_FORMAT() (Config.gs, hàm đọc động từ
     // PropertiesService - đổi ngay trên giao diện Hệ thống → Cấu hình hệ
     // thống, không phải sửa rải rác nhiều hàm hay deploy lại).
-    var _rfKD = REGION_FORMAT();
+    var _rfKD = REGION_FORMAT_();
 
     if (rowIdx > -1 && dataEdit.hanhDong === "SUA") {
       sheet.getRange(rowIdx, 2, 1, 11).setValues([[
@@ -3526,7 +3468,7 @@ function xuLySuaXoaGiaoDich(dataEdit) {
       }
 
       var prefix = dataEdit.loai === "NHẬP" ? "NK_" : "XK_";
-      var maPhieuChinh = taoMaPhieuMoi(prefix);
+      var maPhieuChinh = taoMaPhieuMoi_(prefix);
       var rowMoi = sheet.getLastRow() + 1;
 
       sheet.appendRow([
@@ -3559,8 +3501,7 @@ function xuLySuaXoaGiaoDich(dataEdit) {
  * màn hình "Xuất kho > Xuất trung chuyển"). Vì vậy KHÔNG được lọc theo Loại="NHẬP" để tìm phiếu
  * nhập trung chuyển; phải xét độc lập cột Kho Xuất / Kho Nhập của các phiếu hình thức TC, bất kể Loại.
  */
-function tongHopSoLieuKhoXuatBan(khoXuatBan, tuTime, denTime) {
-  yeuCauPhien_();
+function tongHopSoLieuKhoXuatBan_(khoXuatBan, tuTime, denTime) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetGD = ss.getSheetByName(KHODAM_CONFIG.SHEET_GIAODICH);
   var kq = {
@@ -3593,8 +3534,7 @@ function tongHopSoLieuKhoXuatBan(khoXuatBan, tuTime, denTime) {
 }
 
 /** Tìm kho đã "Xuất trung chuyển" (TC) nhiều BDMT nhất VÀO khoXuatBan trong khoảng thời gian — dùng làm gợi ý mặc định cho Nút 1. */
-function timKhoNguonTCLonNhat(khoXuatBan, tuTime, denTime) {
-  yeuCauPhien_();
+function timKhoNguonTCLonNhat_(khoXuatBan, tuTime, denTime) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetGD = ss.getSheetByName(KHODAM_CONFIG.SHEET_GIAODICH);
   if (!sheetGD || sheetGD.getLastRow() <= 1) return null;
@@ -3620,16 +3560,15 @@ function timKhoNguonTCLonNhat(khoXuatBan, tuTime, denTime) {
 }
 
 /** Bước 1 (nút 1): Đối soát chênh lệch KHÔ (BDMT) giữa Nhập trung chuyển và Xuất bán. */
-function taoPhieuDieuChinhKho(khoXuatBan, tuTime, denTime, denNgayGoc) {
-  yeuCauPhien_();
-  var sl = tongHopSoLieuKhoXuatBan(khoXuatBan, tuTime, denTime);
+function taoPhieuDieuChinhKho_(khoXuatBan, tuTime, denTime, denNgayGoc) {
+  var sl = tongHopSoLieuKhoXuatBan_(khoXuatBan, tuTime, denTime);
   var bdmtKhaDung = sl.nhapTC_BDMT - sl.xuatKhac_BDMT;
   // Guard chia cho 0: nếu không có phiếu nhập trung chuyển nào trong kỳ thì lấy độ khô mặc định 45%
   var doKhoTB = sl.nhapTC_MT > 0 ? (sl.nhapTC_BDMT / sl.nhapTC_MT) : 0.45;
   var chenhLechBDMT = sl.xuatBan_BDMT - bdmtKhaDung;
   var mt = doKhoTB > 0 ? Math.abs(chenhLechBDMT) / doKhoTB : 0;
   // Gợi ý mặc định: kho đã trung chuyển vào kho xuất bán nhiều nhất trong kỳ (người dùng vẫn có thể đổi kho khác)
-  var khoNguonTC = timKhoNguonTCLonNhat(khoXuatBan, tuTime, denTime);
+  var khoNguonTC = timKhoNguonTCLonNhat_(khoXuatBan, tuTime, denTime);
 
   return "DATA_STEP1::" + JSON.stringify({
     chenhLechKho: chenhLechBDMT,
@@ -3647,9 +3586,8 @@ function taoPhieuDieuChinhKho(khoXuatBan, tuTime, denTime, denNgayGoc) {
  * chỉnh Khô ở Bước 1 thì tongHopSoLieuKhoXuatBan() sẽ tự động lấy dữ liệu MỚI NHẤT từ
  * sheet (bao gồm cả phiếu Bước 1 vừa tạo) vì hàm luôn đọc lại dữ liệu tại thời điểm gọi.
  */
-function taoPhieuDieuChinhTuoi(khoXuatBan, tuTime, denTime, tuNgayGoc, denNgayGoc) {
-  yeuCauPhien_();
-  var sl = tongHopSoLieuKhoXuatBan(khoXuatBan, tuTime, denTime);
+function taoPhieuDieuChinhTuoi_(khoXuatBan, tuTime, denTime, tuNgayGoc, denNgayGoc) {
+  var sl = tongHopSoLieuKhoXuatBan_(khoXuatBan, tuTime, denTime);
   var bdmtKhaDung = sl.nhapTC_BDMT - sl.xuatKhac_BDMT;
   var mtKhaDung = sl.nhapTC_MT - sl.xuatKhac_MT;
   var chenhLechMT = mtKhaDung - sl.xuatBan_MT;
@@ -3688,8 +3626,7 @@ function taoPhieuDieuChinhTuoi(khoXuatBan, tuTime, denTime, tuNgayGoc, denNgayGo
 }
 
 /** Hàm điều phối chính — gọi từ processFormData('Hoanthanhdonhang', ...) */
-function xuLyHoanThanhDonHangXuatBan(dataParam) {
-  yeuCauPhien_();
+function xuLyHoanThanhDonHangXuatBan_(dataParam) {
   var khoXuatBan = String((dataParam && dataParam.khoXuatBan) || "").trim();
   if (!khoXuatBan || khoXuatBan === "Không có") return "❌ Vui lòng chọn Kho Xuất Bán hợp lệ!";
   if (!dataParam.tuNgay || !dataParam.denNgay) return "❌ Vui lòng chọn đầy đủ khoảng thời gian!";
@@ -3699,8 +3636,8 @@ function xuLyHoanThanhDonHangXuatBan(dataParam) {
   if (isNaN(tuTime) || isNaN(denTime)) return "❌ Định dạng ngày không hợp lệ!";
   if (tuTime > denTime) return "❌ 'Từ ngày' phải trước 'Đến ngày'!";
 
-  if (dataParam.cheDo === "BDMT") return taoPhieuDieuChinhKho(khoXuatBan, tuTime, denTime, dataParam.denNgay);
-  if (dataParam.cheDo === "MT") return taoPhieuDieuChinhTuoi(khoXuatBan, tuTime, denTime, dataParam.tuNgay, dataParam.denNgay);
+  if (dataParam.cheDo === "BDMT") return taoPhieuDieuChinhKho_(khoXuatBan, tuTime, denTime, dataParam.denNgay);
+  if (dataParam.cheDo === "MT") return taoPhieuDieuChinhTuoi_(khoXuatBan, tuTime, denTime, dataParam.tuNgay, dataParam.denNgay);
   return "❌ Chế độ không hợp lệ.";
 }
 
@@ -3716,8 +3653,7 @@ function xuLyHoanThanhDonHangXuatBan(dataParam) {
  *   hình thức "DC", độ khô CỐ ĐỊNH = 0 (điều chỉnh Tươi thuần túy, không đụng Khô).
  *   { buoc:'MT', khoXuatBan, ngay:'yyyy-MM-dd', chenhLechMT }
  */
-function KD_taoPhieuDieuChinhTuDong(payload) {
-  yeuCauPhien_();
+function KD_taoPhieuDieuChinhTuDong_(payload) {
   payload = payload || {};
   var khoXuatBan = String(payload.khoXuatBan || "").trim();
   if (!khoXuatBan) return "❌ Thiếu thông tin Kho Xuất Bán.";
@@ -3736,7 +3672,7 @@ function KD_taoPhieuDieuChinhTuDong(payload) {
       dienGiaiDoKho: "Tự động điều chỉnh Khô (BDMT) - Hoàn thành đơn hàng xuất bán [" + khoXuatBan + "]",
       hanhDong: "THEM", boQuaTrung: true
     };
-    return xuLySuaXoaGiaoDich(dataEditBDMT);
+    return xuLySuaXoaGiaoDich_(dataEditBDMT);
   }
 
   if (payload.buoc === "MT") {
@@ -3754,15 +3690,14 @@ function KD_taoPhieuDieuChinhTuDong(payload) {
       dienGiaiDoKho: "Tự động điều chỉnh Tươi (MT) do hao hụt ẩm - Hoàn thành đơn hàng xuất bán [" + khoXuatBan + "]",
       hanhDong: "THEM"
     };
-    return xuLySuaXoaGiaoDich(dataEditMT);
+    return xuLySuaXoaGiaoDich_(dataEditMT);
   }
 
   return "❌ Bước điều chỉnh không hợp lệ.";
 }
 
-function layDanhSachDanhMucKho() {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layDanhSachDanhMucKho_() {
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetDM = ss.getSheetByName(KHODAM_CONFIG.SHEET_DANHMUCKHO);
   if (!sheetDM || sheetDM.getLastRow() <= 1) return [];
@@ -3775,9 +3710,8 @@ function layDanhSachDanhMucKho() {
   return list;
 }
 
-function xuLyDanhMucKho(dataDM) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function xuLyDanhMucKho_(dataDM) {
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetDM = ss.getSheetByName(KHODAM_CONFIG.SHEET_DANHMUCKHO);
   if (dataDM.hanhDong === "XOA") {
@@ -3785,20 +3719,19 @@ function xuLyDanhMucKho(dataDM) {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim() === String(dataDM.maKho).trim()) { 
         sheetDM.getRange(i + 1, 5).setValue("Đã hủy"); 
-        xoaCacheKho(); return "🗑️ Đã xóa kho."; 
+        xoaCacheKho_(); return "🗑️ Đã xóa kho."; 
       }
     }
   } else if (dataDM.hanhDong === "THEM") {
-    sheetDM.appendRow(["KHO_" + new Date().getTime(), sanitize(dataDM.tenNhaMay), sanitize(dataDM.tenKho), new Date(dataDM.ngayKhoiTao), "Hoạt động"]);
-    xoaCacheKho();
+    sheetDM.appendRow(["KHO_" + new Date().getTime(), sanitize_(dataDM.tenNhaMay), sanitize_(dataDM.tenKho), new Date(dataDM.ngayKhoiTao), "Hoạt động"]);
+    xoaCacheKho_();
     return "✅ Đã thêm kho.";
   }
   return "❌ Lỗi.";
 }
 
-function layDanhSachKyVetBai() {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layDanhSachKyVetBai_() {
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetCfg = ss.getSheetByName(KHODAM_CONFIG.SHEET_CAUHINH);
   if (!sheetCfg || sheetCfg.getLastRow() <= 1) return [];
@@ -3814,8 +3747,7 @@ function layDanhSachKyVetBai() {
   return list.reverse();
 }
 
-function xuLyKyVetBai(dataEdit) {
-  yeuCauPhien_();
+function xuLyKyVetBai_(dataEdit) {
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetCfg = ss.getSheetByName(KHODAM_CONFIG.SHEET_CAUHINH);
   if (dataEdit.hanhDong === "XOA") {
@@ -3857,20 +3789,19 @@ function xuLyKyVetBai(dataEdit) {
 
     var strTuMoi = "Từ: " + Utilities.formatDate(tuMoi, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
     var strDenMoi = "Đến: " + Utilities.formatDate(denMoi, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
-    sheetCfg.appendRow(["Thông Số Kho", sanitize(dataEdit.kyVetBai), strTuMoi + " - " + strDenMoi, "Tiêu hao: " + dataEdit.tieuHao + "%"]);
+    sheetCfg.appendRow(["Thông Số Kho", sanitize_(dataEdit.kyVetBai), strTuMoi + " - " + strDenMoi, "Tiêu hao: " + dataEdit.tieuHao + "%"]);
     return "✅ Đã tạo kỳ mới thành công!";
   }
   return "❌ Lỗi.";
 }
 
 /** Lấy danh sách độ khô theo bộ lọc, có phân trang (20/trang). Mặc định 3 tháng gần nhất. */
-function layDanhSachDoKhoTheoBoLoc(tuNgay, denNgay, trang) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layDanhSachDoKhoTheoBoLoc_(tuNgay, denNgay, trang) {
+  kiemTraVaTaoTieuDeSheets_();
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheetDK = ss.getSheetByName(KHODAM_CONFIG.SHEET_NHAPDOKHO);
 
-  var tuNgayStr = tuNgay || layNgay3ThangTruocStr();
+  var tuNgayStr = tuNgay || layNgay3ThangTruocStr_();
   var denNgayStr = denNgay || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   var soTrang = parseInt(trang, 10);
   if (isNaN(soTrang) || soTrang < 1) soTrang = 1;
@@ -3880,9 +3811,9 @@ function layDanhSachDoKhoTheoBoLoc(tuNgay, denNgay, trang) {
   }
 
   var data = sheetDK.getDataRange().getValues();
-  var tuDate = tuNgay ? new Date(tuNgay).setHours(0, 0, 0, 0) : layThoiDiem3ThangTruoc();
+  var tuDate = tuNgay ? new Date(tuNgay).setHours(0, 0, 0, 0) : layThoiDiem3ThangTruoc_();
   var denDate = new Date(denNgayStr).setHours(23, 59, 59, 999);
-  var arrKyCache = taiDanhSachKyVetBaiCache();
+  var arrKyCache = taiDanhSachKyVetBaiCache_();
 
   var matchedRowIdx = [];
   for (var i = data.length - 1; i >= 1; i--) {
@@ -3907,7 +3838,7 @@ function layDanhSachDoKhoTheoBoLoc(tuNgay, denNgay, trang) {
       hinhThuc: data[i][1] || "NKSX",
       doKho: parseFloat(data[i][2]) || 0,
       doAm: parseFloat(data[i][3]) || 0,
-      isLocked: kiemTraKhoaKyVetBaiPure(dObj, arrKyCache)
+      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache)
     };
   });
 
@@ -3921,11 +3852,10 @@ function layDanhSachDoKhoTheoBoLoc(tuNgay, denNgay, trang) {
   };
 }
 
-function xuLySuaXoaDoKho(dataEdit) {
-  yeuCauPhien_();
+function xuLySuaXoaDoKho_(dataEdit) {
   var target = String(dataEdit.ngay).trim();
-  var arrKyCache = taiDanhSachKyVetBaiCache();
-  if (kiemTraKhoaKyVetBaiPure(target, arrKyCache)) return "❌ Khóa bảo mật: Ngày thuộc kỳ cũ!";
+  var arrKyCache = taiDanhSachKyVetBaiCache_();
+  if (kiemTraKhoaKyVetBaiPure_(target, arrKyCache)) return "❌ Khóa bảo mật: Ngày thuộc kỳ cũ!";
   var ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(KHODAM_CONFIG.SHEET_NHAPDOKHO);
   var data = sheet.getDataRange().getValues();
@@ -3940,7 +3870,7 @@ function xuLySuaXoaDoKho(dataEdit) {
       return "🗑️ Đã xóa độ khô (cập nhật trạng thái 'Đã hủy')."; 
     }
   } else {
-    var hinhThucSanitized = sanitize(dataEdit.hinhThuc || "NKSX");
+    var hinhThucSanitized = sanitize_(dataEdit.hinhThuc || "NKSX");
     var dk = parseFloat(dataEdit.doKho) || 0, da = parseFloat(dataEdit.doAm) || 0;
     if (dk > 1) dk = dk / 100; if (da > 1) da = da / 100;
     
@@ -3962,8 +3892,7 @@ function xuLySuaXoaDoKho(dataEdit) {
 // ==========================================
 
 /** Tên hiển thị đầy đủ cho mã hình thức nhập/xuất, dùng để nhóm báo cáo theo hình thức. */
-function tenHienThiHinhThuc(code) {
-  yeuCauPhien_();
+function tenHienThiHinhThuc_(code) {
   var map = {
     "TP": "TP - Dăm sản xuất",
     "TT": "TT - Xuất bán",
@@ -3978,21 +3907,19 @@ function tenHienThiHinhThuc(code) {
   return map[code] || code || "(Không xác định)";
 }
 
-function layDanhSachTenNhaMay() {
-  yeuCauPhien_();
+function layDanhSachTenNhaMay_() {
   var arr = [];
-  layDanhSachDanhMucKho().forEach(function(k) {
+  layDanhSachDanhMucKho_().forEach(function(k) {
     if (arr.indexOf(k.tenNhaMay) === -1) arr.push(k.tenNhaMay);
   });
   return arr;
 }
 
 /** Chuyển map {hinhThuc: {mt, bdmt}} thành mảng đã sắp xếp giảm dần theo BDMT, có tên hiển thị. */
-function _chuyenHinhThucThanhMang(mapHinhThuc) {
-  yeuCauPhien_();
+function _chuyenHinhThucThanhMang_(mapHinhThuc) {
   var arr = [];
   for (var k in mapHinhThuc) {
-    arr.push({ hinhThuc: k, ten: tenHienThiHinhThuc(k), mt: mapHinhThuc[k].mt, bdmt: mapHinhThuc[k].bdmt });
+    arr.push({ hinhThuc: k, ten: tenHienThiHinhThuc_(k), mt: mapHinhThuc[k].mt, bdmt: mapHinhThuc[k].bdmt });
   }
   arr.sort(function(a, b) { return b.bdmt - a.bdmt; });
   return arr;
@@ -4009,13 +3936,12 @@ function _chuyenHinhThucThanhMang(mapHinhThuc) {
  * @param {string} [params.tenKho]     - Chỉ lọc 1 kho cụ thể. "Tất cả" hoặc bỏ trống = không lọc.
  * @param {string} [params.tenNhaMay]  - Chỉ lọc 1 nhà máy cụ thể. "Tất cả" hoặc bỏ trống = không lọc.
  */
-function layBaoCaoTonKho(params) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layBaoCaoTonKho_(params) {
+  kiemTraVaTaoTieuDeSheets_();
   params = params || {};
 
   var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
-  var tuNgayStr = params.tuNgay || layNgay3ThangTruocStr();
+  var tuNgayStr = params.tuNgay || layNgay3ThangTruocStr_();
   var denNgayStr = params.denNgay || todayStr;
   var tenKhoLoc = (params.tenKho && params.tenKho !== "Tất cả") ? params.tenKho : null;
   var tenNhaMayLoc = (params.tenNhaMay && params.tenNhaMay !== "Tất cả") ? params.tenNhaMay : null;
@@ -4035,7 +3961,7 @@ function layBaoCaoTonKho(params) {
 
   // Khởi tạo từ danh mục kho trước (đã lọc theo kho/nhà máy), để kho chưa có giao dịch vẫn hiện tồn = 0
   var map = {};
-  layDanhSachDanhMucKho().forEach(function(k) {
+  layDanhSachDanhMucKho_().forEach(function(k) {
     if (tenKhoLoc && k.tenKho !== tenKhoLoc) return;
     if (tenNhaMayLoc && k.tenNhaMay !== tenNhaMayLoc) return;
     map[k.tenKho] = taoKhoiRong(k.tenKho, k.tenNhaMay);
@@ -4131,8 +4057,8 @@ function layBaoCaoTonKho(params) {
       tonCuoiMT: tonCuoiMT,
       tonCuoiBDMT: tonCuoiBDMT,
       tonCuoiDoKho: tonCuoiMT > 0.0001 ? (tonCuoiBDMT / tonCuoiMT) : null,
-      nhapTheoHinhThuc: _chuyenHinhThucThanhMang(it.nhapTheoHinhThuc),
-      xuatTheoHinhThuc: _chuyenHinhThucThanhMang(it.xuatTheoHinhThuc)
+      nhapTheoHinhThuc: _chuyenHinhThucThanhMang_(it.nhapTheoHinhThuc),
+      xuatTheoHinhThuc: _chuyenHinhThucThanhMang_(it.xuatTheoHinhThuc)
     });
   }
   ketQua.sort(function(a, b) {
@@ -4145,8 +4071,8 @@ function layBaoCaoTonKho(params) {
     denNgay: denNgayStr,
     tenKhoLoc: tenKhoLoc || "Tất cả",
     tenNhaMayLoc: tenNhaMayLoc || "Tất cả",
-    khoList: layDanhSachTenKho(),
-    nhaMayList: layDanhSachTenNhaMay(),
+    khoList: layDanhSachTenKho_(),
+    nhaMayList: layDanhSachTenNhaMay_(),
     chiTiet: ketQua
   };
 }
@@ -4163,11 +4089,10 @@ function layBaoCaoTonKho(params) {
  * @param {string} [params.denNgay]
  * @param {string} [params.tenKho] - "Tất cả" hoặc bỏ trống = không lọc theo kho.
  */
-function layBaoCaoTheoKyVetBai(params) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function layBaoCaoTheoKyVetBai_(params) {
+  kiemTraVaTaoTieuDeSheets_();
   params = params || {};
-  var tuNgayStr = params.tuNgay || layNgay3ThangTruocStr();
+  var tuNgayStr = params.tuNgay || layNgay3ThangTruocStr_();
   var denNgayStr = params.denNgay || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   var tenKhoLoc = (params.tenKho && params.tenKho !== "Tất cả") ? params.tenKho : null;
 
@@ -4209,7 +4134,7 @@ function layBaoCaoTheoKyVetBai(params) {
   }
 
   // Sắp xếp theo đúng thứ tự thời gian thực tế của kỳ vét bãi; kỳ không xác định được xếp cuối
-  var arrKyCache = taiDanhSachKyVetBaiCache();
+  var arrKyCache = taiDanhSachKyVetBaiCache_();
   var thuTu = {};
   arrKyCache.forEach(function(k, idx) { thuTu[k.tenKy] = idx; });
 
@@ -4235,7 +4160,7 @@ function layBaoCaoTheoKyVetBai(params) {
     tuNgay: tuNgayStr,
     denNgay: denNgayStr,
     tenKhoLoc: tenKhoLoc || "Tất cả",
-    khoList: layDanhSachTenKho(),
+    khoList: layDanhSachTenKho_(),
     chiTiet: ketQua
   };
 }
@@ -4253,9 +4178,8 @@ function layBaoCaoTheoKyVetBai(params) {
 // KHÔNG có lỗi hành vi (chỉ là quy ước khác), giữ nguyên để tránh rủi ro làm
 // hỏng module Kho Dăm đang chạy thật - chỉ mới nơi nào MỚI thêm/sửa (VD
 // PHẦN 6 dùng sanitize()) mới cần tuân theo quy ước {status,message}.
-function processFormData(action, data) {
-  yeuCauPhien_();
-  kiemTraVaTaoTieuDeSheets();
+function processFormData_(action, data) {
+  kiemTraVaTaoTieuDeSheets_();
   var lock = LockService.getScriptLock();
   // STUCK-02: khóa bị người khác giữ quá lâu -> báo "đang bận" dễ hiểu (trước đây
   // hiện nguyên văn lỗi tiếng Anh "Lock timeout...") như mọi hàm ghi khác.
@@ -4264,14 +4188,14 @@ function processFormData(action, data) {
   }
   try {
     var ketQua;
-    if (action === "Danhmuckho") ketQua = xuLyDanhMucKho(data);
-    else if (action === "Thongsokho") ketQua = xuLyKyVetBai(data);
-    else if (action === "Nhapdokho") ketQua = xuLySuaXoaDoKho(data);
-    else if (action === "Nhapkho" || action === "Xuatkho") ketQua = xuLySuaXoaGiaoDich(data);
-    else if (action === "Hoanthanhdonhang") ketQua = xuLyHoanThanhDonHangXuatBan(data);
-    else if (action === "HoanthanhTuDong") ketQua = KD_taoPhieuDieuChinhTuDong(data);
-    else if (action === "Baocaotonkho") ketQua = layBaoCaoTonKho(data);
-    else if (action === "BaocaoKyVetBai") ketQua = layBaoCaoTheoKyVetBai(data);
+    if (action === "Danhmuckho") ketQua = xuLyDanhMucKho_(data);
+    else if (action === "Thongsokho") ketQua = xuLyKyVetBai_(data);
+    else if (action === "Nhapdokho") ketQua = xuLySuaXoaDoKho_(data);
+    else if (action === "Nhapkho" || action === "Xuatkho") ketQua = xuLySuaXoaGiaoDich_(data);
+    else if (action === "Hoanthanhdonhang") ketQua = xuLyHoanThanhDonHangXuatBan_(data);
+    else if (action === "HoanthanhTuDong") ketQua = KD_taoPhieuDieuChinhTuDong_(data);
+    else if (action === "Baocaotonkho") ketQua = layBaoCaoTonKho_(data);
+    else if (action === "BaocaoKyVetBai") ketQua = layBaoCaoTheoKyVetBai_(data);
     // BUG-002: chỉ CẢNH BÁO (không chặn) nếu cột sheet Kho Dăm bị chèn/xóa/đổi thủ công
     if (typeof ketQua === "string" && ketQua.indexOf("❌") !== 0) {
       var canhBaoHeaderKD = KD_canhBaoLechHeader_(action);
@@ -4392,8 +4316,7 @@ function XH_timCotTheoTen_(headerRow) {
 // FIX #25 (NGHIÊM TRỌNG): cùng lỗi mất dữ liệu multi-file như step1_PreviewDraft
 // (xem comment ở đó) - nay cũng nhận MỘT MẢNG file (fileDataList) và gộp kết
 // quả tất cả các file trong 1 lần gọi, thay vì chỉ xử lý đúng 1 file.
-function XH_step1_PreviewDraft(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
-  yeuCauPhien_();
+function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
   try {
     const danhSachFile = (Array.isArray(fileDataList) ? fileDataList : [fileDataList]).filter(f => f && f.base64);
     if (danhSachFile.length === 0) return { status: "error", message: "Không có file để xử lý." };
@@ -4448,8 +4371,8 @@ function XH_step1_PreviewDraft(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
             let klHang = parseSoTheoLocale_(klHangRaw);
             if (!klHangRaw || isNaN(klHang) || klHang === 0) continue;
 
-            let dateC = toDateObj(r[cotMap.ngayCan1]);
-            let dateD = cotMap.ngayCan2 !== undefined ? toDateObj(r[cotMap.ngayCan2]) : null;
+            let dateC = toDateObj_(r[cotMap.ngayCan1]);
+            let dateD = cotMap.ngayCan2 !== undefined ? toDateObj_(r[cotMap.ngayCan2]) : null;
 
             let now = new Date();
             let nam = dateC ? dateC.getFullYear() : now.getFullYear();
@@ -4469,7 +4392,7 @@ function XH_step1_PreviewDraft(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
             let typeImport = duplicateMap.has(currentMaChungTu) ? "Bỏ qua (Đã tồn tại)" : "Mới";
 
             let ngayXuat = null;
-            if (cotMap.ngayXuat !== undefined) ngayXuat = toDateObj(r[cotMap.ngayXuat]);
+            if (cotMap.ngayXuat !== undefined) ngayXuat = toDateObj_(r[cotMap.ngayXuat]);
 
             // Kho xuất/Kho nhập: ưu tiên lấy TỪ FILE nếu người chuẩn bị dữ liệu đã
             // điền theo đúng cột (Kho xuất/Kho nhập); nếu file không có 2 cột này,
@@ -4552,8 +4475,7 @@ function XH_step1_PreviewDraft(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
   }
 }
 
-function XH_step1_ConfirmImport(confirmedDataList) {
-  yeuCauPhien_();
+function XH_step1_ConfirmImport_(confirmedDataList) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
@@ -4598,11 +4520,11 @@ function XH_step1_ConfirmImport(confirmedDataList) {
       // hưởng các giá trị số (trả nguyên giá trị nếu không phải chuỗi), nên an
       // toàn kết hợp với setNumberFormat("@") của Số TKHQ/Số BKLS bên dưới.
       batchNew.push([
-        item.uniqueKey, ngayCan1Str, ngayCan2Str, sanitize(item.bienSo || ""),
+        item.uniqueKey, ngayCan1Str, ngayCan2Str, sanitize_(item.bienSo || ""),
         parseFloat(item.canLan1) || 0, parseFloat(item.canLan2) || 0, parseFloat(item.klHang) || 0,
-        sanitize(item.donViVanChuyen || ""), sanitize(item.tenTaiXe || ""), klTan,
-        ngayXuat || "", sanitize(item.soBKLS || ""), sanitize(item.khoiLuongM3 || ""), sanitize(item.nguoiCan || ""),
-        sanitize(item.soTKHQ || ""), sanitize(item.khoXuat || ""), sanitize(item.khoNhap || "")
+        sanitize_(item.donViVanChuyen || ""), sanitize_(item.tenTaiXe || ""), klTan,
+        ngayXuat || "", sanitize_(item.soBKLS || ""), sanitize_(item.khoiLuongM3 || ""), sanitize_(item.nguoiCan || ""),
+        sanitize_(item.soTKHQ || ""), sanitize_(item.khoXuat || ""), sanitize_(item.khoNhap || "")
       ]);
       countNew++;
     }
@@ -4637,16 +4559,14 @@ function XH_step1_ConfirmImport(confirmedDataList) {
 /* ---------- Nhập liệu Đơn Hàng Xuất Bán (NL_DH_XB) ---------- */
 
 // Danh sách Kho xuất - tái sử dụng danh mục kho của module Kho Dăm
-function XH_getKhoXuatList() {
-  yeuCauPhien_();
-  try { return { status: "success", data: layDanhSachTenKho() }; }
+function XH_getKhoXuatList_() {
+  try { return { status: "success", data: layDanhSachTenKho_() }; }
   catch (e) { return { status: "error", message: e.toString() }; }
 }
 
 // Độ khô nhà máy = độ khô TRUNG BÌNH của "hàng nhập sản xuất" (sheet Nhapdokho
 // của module Kho Dăm) trong khoảng [tuNgay, denNgay]. Chỉ tính các dòng "Hợp lệ".
-function XH_tinhDoKhoNhaMay(tuNgay, denNgay) {
-  yeuCauPhien_();
+function XH_tinhDoKhoNhaMay_(tuNgay, denNgay) {
   try {
     if (!tuNgay || !denNgay) return { status: "error", message: "Vui lòng chọn đủ Từ ngày và Đến ngày." };
     const ss = SpreadsheetApp.openById(KHODAM_CONFIG.SPREADSHEET_ID);
@@ -4675,8 +4595,7 @@ function XH_tinhDoKhoNhaMay(tuNgay, denNgay) {
 
 // payload: {ngayDonHang, soTKHQ, tau, khachHang, diaChiKH, tenHangHoa, donGiaUSD,
 //           klMT, klBDMT, khoXuat, tuNgay, denNgay, doKhoNhaMay, loaiXe}
-function XH_saveDonHang(payload) {
-  yeuCauPhien_();
+function XH_saveDonHang_(payload) {
   XH_dambaoHeaderDonHang_();
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
@@ -4726,13 +4645,13 @@ function XH_saveDonHang(payload) {
     // Formula/CSV Injection - TRƯỚC ĐÂY module Xuất hàng không dùng sanitize()
     // dù ghi thẳng text người dùng nhập vào sổ sách, khác với module Kho Dăm).
     sheet.appendRow([
-      stt, new Date(payload.ngayDonHang), sanitize(String(payload.soTKHQ || "").trim()), sanitize(String(payload.tau || "").trim()),
-      sanitize(String(payload.khachHang || "").trim()), sanitize(String(payload.diaChiKH || "").trim()), sanitize(String(payload.tenHangHoa || "").trim()),
+      stt, new Date(payload.ngayDonHang), sanitize_(String(payload.soTKHQ || "").trim()), sanitize_(String(payload.tau || "").trim()),
+      sanitize_(String(payload.khachHang || "").trim()), sanitize_(String(payload.diaChiKH || "").trim()), sanitize_(String(payload.tenHangHoa || "").trim()),
       parseFloat(payload.donGiaUSD) || 0, klMT, klBDMT, doKhoTinh,
       parseFloat(payload.doKhoNhaMay) || 0, payload.tuNgay || "", payload.denNgay || "", loaiXe,
-      sanitize(String(payload.khoXuat || "").trim())
+      sanitize_(String(payload.khoXuat || "").trim())
     ]);
-    sheet.getRange(sheet.getLastRow(), 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
+    sheet.getRange(sheet.getLastRow(), 2).setNumberFormat(REGION_FORMAT_().DATE_FMT);
 
     logAudit_("XUATHANG_DONHANG", "OK", "Thêm đơn hàng xuất bán: " + payload.khachHang + " - " + payload.tau);
     return { status: "success", message: "✅ Đã lưu đơn hàng xuất bán." + (_canhBaoHeaderDH ? " | " + _canhBaoHeaderDH : "") };
@@ -4744,8 +4663,7 @@ function XH_saveDonHang(payload) {
   }
 }
 
-function XH_getDonHangList() {
-  yeuCauPhien_();
+function XH_getDonHangList_() {
   try {
     XH_dambaoHeaderDonHang_();
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
@@ -4794,8 +4712,7 @@ function XH_timDongDonHang_(sheet, rowIndex, sttKyVong) {
 }
 
 // Lấy chi tiết 1 đơn hàng để nạp vào form Sửa
-function XH_getDonHangByRow(rowIndex, sttKyVong) {
-  yeuCauPhien_();
+function XH_getDonHangByRow_(rowIndex, sttKyVong) {
   try {
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
@@ -4815,8 +4732,7 @@ function XH_getDonHangByRow(rowIndex, sttKyVong) {
 }
 
 // Cập nhật 1 đơn hàng đã có, theo đúng dòng thật (rowIndex) - ghi đè toàn bộ dữ liệu
-function XH_updateDonHang(rowIndex, payload, sttKyVong) {
-  yeuCauPhien_();
+function XH_updateDonHang_(rowIndex, payload, sttKyVong) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -4840,13 +4756,13 @@ function XH_updateDonHang(rowIndex, payload, sttKyVong) {
     sheet.getRange(r, 3, 1, 1).setNumberFormat("@");
     // FIX (Sanitize): xem giải thích ở XH_saveDonHang phía trên.
     sheet.getRange(r, 1, 1, 16).setValues([[
-      sttCu, new Date(payload.ngayDonHang), sanitize(String(payload.soTKHQ || "").trim()), sanitize(String(payload.tau || "").trim()),
-      sanitize(String(payload.khachHang || "").trim()), sanitize(String(payload.diaChiKH || "").trim()), sanitize(String(payload.tenHangHoa || "").trim()),
+      sttCu, new Date(payload.ngayDonHang), sanitize_(String(payload.soTKHQ || "").trim()), sanitize_(String(payload.tau || "").trim()),
+      sanitize_(String(payload.khachHang || "").trim()), sanitize_(String(payload.diaChiKH || "").trim()), sanitize_(String(payload.tenHangHoa || "").trim()),
       parseFloat(payload.donGiaUSD) || 0, klMT, klBDMT, doKho,
       parseFloat(payload.doKhoNhaMay) || 0, payload.tuNgay || "", payload.denNgay || "", loaiXe,
-      sanitize(String(payload.khoXuat || "").trim())
+      sanitize_(String(payload.khoXuat || "").trim())
     ]]);
-    sheet.getRange(r, 2).setNumberFormat(REGION_FORMAT().DATE_FMT);
+    sheet.getRange(r, 2).setNumberFormat(REGION_FORMAT_().DATE_FMT);
 
     logAudit_("XUATHANG_DONHANG", "OK", "Sửa đơn hàng xuất bán dòng " + r + ": " + payload.khachHang);
     return { status: "success", message: "✏️ Đã cập nhật đơn hàng." };
@@ -4858,8 +4774,7 @@ function XH_updateDonHang(rowIndex, payload, sttKyVong) {
   }
 }
 
-function XH_deleteDonHang(rowIndex, sttKyVong) {
-  yeuCauPhien_();
+function XH_deleteDonHang_(rowIndex, sttKyVong) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -4912,7 +4827,7 @@ function XH_locBaoCaoXuatQuaCan_(filters) {
 
     // "Ngày giờ cân 1" lưu dạng chuỗi text "dd/MM/yyyy HH:mm:ss" trong NL_PC_XH
     // (không phải kiểu Date thật) - tái sử dụng toDateObj() để phân tích đúng.
-    const ngayCanObj = toDateObj(row[1]);
+    const ngayCanObj = toDateObj_(row[1]);
     if (!ngayCanObj || isNaN(ngayCanObj.getTime())) return;
     if (tuNgay && ngayCanObj < tuNgay) return;
     if (denNgay && ngayCanObj > denNgay) return;
@@ -4947,8 +4862,7 @@ function XH_locBaoCaoXuatQuaCan_(filters) {
 // filters = {donViVanChuyen, soXe, soTKHQ, tuNgay, denNgay, trang} - trả về ĐÚNG
 // 20 dòng/trang theo yêu cầu, kèm danh mục lọc và tổng số liệu TOÀN BỘ (không
 // chỉ trang hiện tại).
-function XH_getBaoCaoXuatQuaCan(filters) {
-  yeuCauPhien_();
+function XH_getBaoCaoXuatQuaCan_(filters) {
   try {
     filters = filters || {};
     const loc = XH_locBaoCaoXuatQuaCan_(filters);
@@ -4971,8 +4885,7 @@ function XH_getBaoCaoXuatQuaCan(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function XH_exportBaoCaoXuatQuaCanExcel(filters) {
-  yeuCauPhien_();
+function XH_exportBaoCaoXuatQuaCanExcel_(filters) {
   try {
     const loc = XH_locBaoCaoXuatQuaCan_(filters || {});
     if (loc.matched.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
@@ -4984,8 +4897,7 @@ function XH_exportBaoCaoXuatQuaCanExcel(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function XH_exportBaoCaoXuatQuaCanPDF(filters) {
-  yeuCauPhien_();
+function XH_exportBaoCaoXuatQuaCanPDF_(filters) {
   try {
     const loc = XH_locBaoCaoXuatQuaCan_(filters || {});
     if (loc.matched.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
@@ -5031,8 +4943,7 @@ function XH_locBaoCaoXuatMisa_(filters) {
   return result;
 }
 
-function XH_getBaoCaoXuatMisa(filters) {
-  yeuCauPhien_();
+function XH_getBaoCaoXuatMisa_(filters) {
   try {
     const list = XH_locBaoCaoXuatMisa_(filters || {});
     let tongKLMT = 0, tongKLBDMT = 0, tongThanhTienUSD = 0;
@@ -5041,15 +4952,14 @@ function XH_getBaoCaoXuatMisa(filters) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function XH_exportBaoCaoXuatMisaExcel(filters) {
-  yeuCauPhien_();
+function XH_exportBaoCaoXuatMisaExcel_(filters) {
   try {
     const list = XH_locBaoCaoXuatMisa_(filters || {});
     if (list.length === 0) return { status: "error", message: "Không có dữ liệu phù hợp bộ lọc để xuất." };
     const headers = ["Ngày Đơn Hàng", "Số TKHQ", "Tàu", "Khách Hàng", "Tên Hàng Hóa", "Đơn Giá (USD)", "KL_MT", "KL_BDMT", "Thành Tiền (USD)", "Kho Xuất"];
     const rows = list.map(r => [new Date(r.ngayRaw), r.soTKHQ, r.tau, r.khachHang, r.tenHangHoa, r.donGiaUSD, r.klMT, r.klBDMT, r.thanhTienUSD, r.khoXuat]);
     const tempSS = createTempSheetForExport_("BaoCao_XuatMisa_" + Utilities.formatDate(new Date(), "GMT+7", "ddMM_HHmm"), headers, rows, [6, 7, 8, 9]);
-    tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat(MISA_FORMAT().DATE_FMT);
+    tempSS.getSheets()[0].getRange(2, 1, rows.length, 1).setNumberFormat(MISA_FORMAT_().DATE_FMT);
     logAudit_('EXPORT_EXCEL', 'OK', 'Xuất báo cáo xuất kết xuất Misa, ' + list.length + ' dòng.');
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -5150,7 +5060,7 @@ function SL_thucHienSaoLuu_(nguon) {
 }
 
 // Hàm do TRIGGER hằng đêm gọi. Là hàm công khai (trigger không gọi được hàm có
-// "_" cuối) nhưng KHÔNG nằm trong HAM_API_ và chỉ chạy khi mã trigger gửi kèm
+// "_" cuối) nhưng KHÔNG nằm trong bảng API_ROUTES và chỉ chạy khi mã trigger gửi kèm
 // khớp đúng trigger đã cài - gọi thẳng qua google.script.run không có/không
 // đoán được mã này nên bị bỏ qua.
 function laLuotChayTriggerThat_(e) {
@@ -5160,7 +5070,7 @@ function laLuotChayTriggerThat_(e) {
 }
 
 function PHIEN_HE_THONG_TRIGGER_() {
-  return { email: "trigger-tu-dong", vaiTro: "HE_THONG", coQuyen: true, laAdmin: false, laChiXem: false };
+  return { email: "trigger-tu-dong", vaiTro: null, vaiTroNhan: "Trigger tự động", quyen: [], coQuyen: true, laAdmin: false, laChiXem: false };
 }
 
 function TRIGGER_saoLuuHangDem(e) {
@@ -5169,10 +5079,8 @@ function TRIGGER_saoLuuHangDem(e) {
   SL_thucHienSaoLuu_("Tự động");
 }
 
-function HT_layTinhTrangSaoLuu() {
-  yeuCauPhien_();
+function HT_layTinhTrangSaoLuu_() {
   try {
-    yeuCauQuyenAdmin_();
     const goc = SL_layThuMucGoc_(false);
     const raw = PropertiesService.getScriptProperties().getProperty(SL_PROP_KET_QUA_);
     let ketQuaCuoi = null;
@@ -5192,10 +5100,8 @@ function HT_layTinhTrangSaoLuu() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_luuCauHinhSaoLuu(cauHinh) {
-  yeuCauPhien_();
+function HT_luuCauHinhSaoLuu_(cauHinh) {
   try {
-    yeuCauQuyenAdmin_();
     cauHinh = cauHinh || {};
     const giuLai = parseInt(cauHinh.giuLai, 10);
     if (!(giuLai >= 1 && giuLai <= 365)) throw new Error("Số bản giữ lại phải từ 1 đến 365.");
@@ -5212,10 +5118,8 @@ function HT_luuCauHinhSaoLuu(cauHinh) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_saoLuuNgay() {
-  yeuCauPhien_();
+function HT_saoLuuNgay_() {
   try {
-    yeuCauQuyenAdmin_();
     const kq = SL_thucHienSaoLuu_("Thủ công (" + layThongTinNguoiDungHienTai_().email + ")");
     return {
       status: kq.soFile > 0 ? "success" : "error",
@@ -5284,10 +5188,8 @@ function NK_loc_(boLoc) {
   return { tu: tu, den: den, dong: ketQua, biCat: biCat, dsHanhDong: sapXep(dsHanhDong), dsEmail: sapXep(dsEmail), dsTrangThai: sapXep(dsTrangThai) };
 }
 
-function HT_layNhatKy(boLoc) {
-  yeuCauPhien_();
+function HT_layNhatKy_(boLoc) {
   try {
-    yeuCauQuyenAdmin_();
     const kq = NK_loc_(boLoc);
     const tz = Session.getScriptTimeZone();
     const tongSo = kq.dong.length;
@@ -5308,10 +5210,8 @@ function HT_layNhatKy(boLoc) {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_xuatNhatKyExcel(boLoc) {
-  yeuCauPhien_();
+function HT_xuatNhatKyExcel_(boLoc) {
   try {
-    yeuCauQuyenAdmin_();
     const kq = NK_loc_(boLoc);
     if (kq.dong.length === 0) return { status: "error", message: "Không có dòng nhật ký nào phù hợp bộ lọc." };
     const rows = kq.dong.map(function (d) { return [d.t, d.hanhDong, d.trangThai, d.noiDung, d.email]; });

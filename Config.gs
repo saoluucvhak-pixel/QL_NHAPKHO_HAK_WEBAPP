@@ -153,8 +153,7 @@ const KHODAM_CONFIG = {
 const REGION_FORMAT_MAC_DINH = "VN"; // Giá trị mặc định nếu CHƯA từng cấu hình qua giao diện
 const SO_THAP_PHAN_CO_DINH = 2;      // Cố định 2 số lẻ cho khối lượng - không cấu hình được, không liên quan Locale
 
-function REGION_FORMAT() {
-  yeuCauPhien_();
+function REGION_FORMAT_() {
   const mien = PropertiesService.getScriptProperties().getProperty("REGION_FORMAT_MIEN") || REGION_FORMAT_MAC_DINH;
   const dateFmt = mien === "VN" ? "dd/MM/yyyy" : "MM/dd/yyyy";
   return {
@@ -177,7 +176,7 @@ function parseSoTheoLocale_(rawValue) {
   if (typeof rawValue === "number") return rawValue; // Đã là số thật (ô Excel kiểu Number) - dùng luôn, an toàn tuyệt đối, không phụ thuộc Locale
   let str = String(rawValue == null ? "" : rawValue).trim();
   if (!str) return NaN;
-  const mien = REGION_FORMAT().MIEN;
+  const mien = REGION_FORMAT_().MIEN;
   if (mien === "VN") {
     // Việt Nam: "." là phân cách hàng nghìn (bỏ đi), "," là dấu thập phân (đổi thành ".")
     str = str.replace(/\./g, "").replace(",", ".");
@@ -198,8 +197,7 @@ function parseSoTheoLocale_(rawValue) {
 // Dăm...), và không cần khớp với bất kỳ cài đặt Locale thật nào cả.
 const MISA_FORMAT_MAC_DINH = "VN";
 
-function MISA_FORMAT() {
-  yeuCauPhien_();
+function MISA_FORMAT_() {
   const mien = PropertiesService.getScriptProperties().getProperty("MISA_FORMAT_MIEN") || MISA_FORMAT_MAC_DINH;
   const dateFmt = mien === "VN" ? "dd/MM/yyyy" : "MM/dd/yyyy";
   return {
@@ -212,16 +210,14 @@ function MISA_FORMAT() {
 
 // Lấy TOÀN BỘ cấu hình hiện tại (Locale hệ thống + Locale Misa riêng) - dùng
 // cho giao diện Cấu hình hệ thống hiển thị đúng trạng thái đang áp dụng.
-function HT_layCauHinhVungMien() {
-  yeuCauPhien_();
+function HT_layCauHinhVungMien_() {
   try {
     // FIX (phân quyền - phát hiện qua test tự động): hàm này bị BỎ SÓT khi gate
     // quyền Admin cho cả mục "Cấu hình hệ thống" - dù giá trị trả về (VN/US) ít
     // nhạy cảm, vẫn nên nhất quán với các hàm HT_lay*/HT_luu* còn lại trong cùng
     // mục cấu hình (đã chặn Admin-only), tránh 1 điểm hở dù nhỏ.
-    yeuCauQuyenAdmin_();
-    const rf = REGION_FORMAT();
-    const mf = MISA_FORMAT();
+    const rf = REGION_FORMAT_();
+    const mf = MISA_FORMAT_();
     return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -231,17 +227,15 @@ function HT_layCauHinhVungMien() {
 // webapp) của từng Sheet liên quan đến "Vùng miền chung", để anh đối chiếu
 // xem có KHỚP với Locale hệ thống đang chọn hay không - đây chính là cách duy
 // nhất để biết chắc có bị lệch hay không, thay vì đoán.
-function HT_layLocaleThatCuaSheet() {
-  yeuCauPhien_();
+function HT_layLocaleThatCuaSheet_() {
   try {
-    yeuCauQuyenAdmin_();
     const dsSheet = [
       { ten: "PhieuCan_DN", id: CONFIG.SPREADSHEET_ID },
       { ten: "Update_MiSa_PC", id: CONFIG.MISA_DST_ID },
       { ten: "DATA_GIAODICH (Kho Dăm)", id: KHODAM_CONFIG.SPREADSHEET_ID },
       { ten: "NL_DH_XB (Xuất hàng)", id: XUATHANG_CONFIG.SPREADSHEET_ID }
     ];
-    const mienDangChon = REGION_FORMAT().MIEN; // "VN" hoặc "US"
+    const mienDangChon = REGION_FORMAT_().MIEN; // "VN" hoặc "US"
     const ketQua = dsSheet.map(function (sheetInfo) {
       let localeThat = "";
       let loi = "";
@@ -271,10 +265,8 @@ function HT_layLocaleThatCuaSheet() {
 }
 
 // Lưu TOÀN BỘ cấu hình mới - áp dụng NGAY LẬP TỨC cho mọi lần ghi Sheet tiếp theo
-function HT_luuCauHinhVungMien(mien, mienMisa) {
-  yeuCauPhien_();
+function HT_luuCauHinhVungMien_(mien, mienMisa) {
   try {
-    yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi Locale toàn hệ thống ảnh hưởng mọi người dùng - chỉ Admin
     const props = PropertiesService.getScriptProperties();
     mien = (String(mien || "").toUpperCase() === "US") ? "US" : "VN";
     mienMisa = (String(mienMisa || "").toUpperCase() === "US") ? "US" : "VN";
@@ -310,8 +302,7 @@ const MISA_DEFAULTS_MAC_DINH = {
   ngayDenHanMacDinh: "31/12/2050"           // Cột I (index 8) - hạn thanh toán mặc định khi CHƯA xác định được từ ĐNTT
 };
 
-function MISA_DEFAULTS() {
-  yeuCauPhien_();
+function MISA_DEFAULTS_() {
   const saved = PropertiesService.getScriptProperties().getProperty("MISA_DEFAULTS_JSON");
   if (!saved) return MISA_DEFAULTS_MAC_DINH;
   try {
@@ -320,15 +311,12 @@ function MISA_DEFAULTS() {
   } catch (e) { return MISA_DEFAULTS_MAC_DINH; }
 }
 
-function HT_layMisaDefaults() {
-  yeuCauPhien_();
-  try { yeuCauQuyenAdmin_(); return { status: "success", data: MISA_DEFAULTS() }; } catch (e) { return { status: "error", message: e.toString() }; }
+function HT_layMisaDefaults_() {
+  try { return { status: "success", data: MISA_DEFAULTS_() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_luuMisaDefaults(data) {
-  yeuCauPhien_();
+function HT_luuMisaDefaults_(data) {
   try {
-    yeuCauQuyenAdmin_(); // FIX (phân quyền): đổi giá trị mặc định báo cáo Misa (TK kế toán, mã hàng...) ảnh hưởng toàn công ty - chỉ Admin
     data = data || {};
     const d = MISA_DEFAULTS_MAC_DINH;
     const clean = {
@@ -402,10 +390,8 @@ function apDungOverrideLienKet_() {
 }
 apDungOverrideLienKet_(); // chạy ngay khi project được nạp
 
-function HT_layLienKetDuLieu() {
-  yeuCauPhien_();
+function HT_layLienKetDuLieu_() {
   try {
-    yeuCauQuyenAdmin_(); // FIX (phân quyền): trước đây AI có link đăng nhập Google cũng xem/đổi được ID Spreadsheet/Thư mục toàn hệ thống
     const tatCa = PropertiesService.getScriptProperties().getProperties() || {};
     const data = LIENKET_DANH_SACH.map(function (item) {
       const obj = _layObjectTheoNhom_(item.nhom);
@@ -422,15 +408,13 @@ function HT_layLienKetDuLieu() {
 
 // overrides = { CONFIG_SPREADSHEET_ID: "...", ... } - để trống 1 trường nghĩa
 // là khôi phục lại giá trị GỐC trong code cho đúng trường đó.
-function HT_luuLienKetDuLieu(overrides) {
-  yeuCauPhien_();
+function HT_luuLienKetDuLieu_(overrides) {
   try {
     // FIX (NGHIÊM TRỌNG - phân quyền): TRƯỚC ĐÂY hàm này không có bất kỳ kiểm
     // tra quyền nào - bất kỳ ai đăng nhập Google mở được webapp đều có thể đổi
     // ID Spreadsheet/Thư mục CHÍNH của toàn hệ thống, chuyển hướng dữ liệu công
     // ty sang nơi khác. Nay CHỈ ADMIN mới gọi được (chặn cứng ở server, không
     // chỉ ẩn nút trên giao diện).
-    yeuCauQuyenAdmin_();
     overrides = overrides || {};
     const props = PropertiesService.getScriptProperties();
     LIENKET_DANH_SACH.forEach(function (item) {
@@ -461,16 +445,13 @@ function HT_luuLienKetDuLieu(overrides) {
 // khoản chủ sở hữu đó để chạy hàm này (qua nút trên giao diện, hoặc mở thẳng
 // trong trình soạn thảo Apps Script rồi bấm Run) - nếu không sẽ thấy lỗi ở
 // từng dòng kết quả tương ứng, KHÔNG dừng cả quá trình.
-function HT_chiaSeTaiNguyenChoDanhSachQuyen() {
-  yeuCauPhien_();
+function HT_chiaSeTaiNguyenChoDanhSachQuyen_() {
   try {
-    yeuCauQuyenAdmin_();
-    const nguoiDung = DS_QUYEN_().map(function (u) {
-      const email = String(u.email || "").trim().toLowerCase();
-      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
-      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
-      return { email: email, quyenDrive: quyenDrive };
-    }).filter(function (u) { return u.email; });
+    // Người dùng đang Hoạt động (bỏ qua người bị Khóa). Chưa lưu danh sách nào
+    // thì dùng Quản trị cố định (như danh sách mặc định trước đây).
+    let nguoiDung = DS_QUYEN_().filter(function (u) { return u.email && u.trangThai !== TRANG_THAI_ND.KHOA; })
+      .map(function (u) { return { email: u.email, quyenDrive: ND_chuanQuyenDrive_(u.quyenDrive) }; });
+    if (!nguoiDung.length) nguoiDung = QUAN_TRI_CO_DINH.map(function (e) { return { email: String(e).toLowerCase(), quyenDrive: "EDITOR" }; });
     if (!nguoiDung.length) return { status: "error", message: "Danh sách quyền đang trống." };
 
     const taiNguyen = _layDanhSachTaiNguyenDaGopId_();
@@ -518,10 +499,8 @@ function _layDanhSachTaiNguyenDaGopId_() {
 // KHÔNG tách riêng được "Xem" và "Bình luận" khi ĐỌC lại quyền hiện có
 // (getViewers() gộp chung cả 2 nhóm) - đây là giới hạn của chính API, không
 // phải lỗi code.
-function HT_layTinhTrangChiaSeTaiNguyen() {
-  yeuCauPhien_();
+function HT_layTinhTrangChiaSeTaiNguyen_() {
   try {
-    yeuCauQuyenAdmin_();
     const ketQua = [];
     _layDanhSachTaiNguyenDaGopId_().forEach(function (tn) {
       try {
@@ -542,10 +521,8 @@ function HT_layTinhTrangChiaSeTaiNguyen() {
 
 // Thu hồi quyền Drive của 1 email trên ĐÚNG 1 tài nguyên cụ thể (id/loai lấy
 // từ chính dòng do HT_layTinhTrangChiaSeTaiNguyen() trả về).
-function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
-  yeuCauPhien_();
+function HT_thuHoiQuyenTaiNguyen_(id, loai, email) {
   try {
-    yeuCauQuyenAdmin_();
     email = String(email || "").trim().toLowerCase();
     if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
     const resource = loai === "folder" ? DriveApp.getFolderById(id) : DriveApp.getFileById(id);
@@ -562,10 +539,8 @@ function HT_thuHoiQuyenTaiNguyen(id, loai, email) {
 // trên + bấm Lưu danh sách) - 2 việc này ĐỘC LẬP: xoá khỏi danh sách quyền
 // chỉ chặn đăng nhập webapp, KHÔNG tự thu hồi quyền họ đã có trực tiếp trên
 // Google Sheet (họ vẫn mở/sửa được Sheet nếu vào thẳng Google Drive).
-function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
-  yeuCauPhien_();
+function HT_thuHoiToanBoQuyenDriveChoEmail_(email) {
   try {
-    yeuCauQuyenAdmin_();
     email = String(email || "").trim().toLowerCase();
     if (!email) return { status: "error", message: "Thiếu email cần thu hồi." };
 
@@ -601,16 +576,12 @@ function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
 //    chữ ký + hạn + đối chiếu danh sách quyền rồi cấp 1 "mã phiên" (lưu ở
 //    CacheService, hết hạn tối đa PHIEN_TOI_DA_MS_).
 //  - MỌI lời gọi từ giao diện đều đi qua 1 cổng duy nhất API(maPhien, tenHam,
-//    thamSo): kiểm tra phiên + kiểm tra email VẪN còn trong danh sách quyền (thu
-//    hồi có hiệu lực ngay lần gọi kế tiếp) + vai trò Chỉ xem chỉ được gọi các
-//    hàm đọc, rồi mới chạy hàm nghiệp vụ.
-//  - Mỗi hàm công khai (không kết thúc bằng "_") trong Code.gs/Config.gs đều
-//    mở đầu bằng yeuCauPhien_(): gọi thẳng hàm đó qua google.script.run mà
-//    không đi qua API (không có phiên hợp lệ) sẽ bị từ chối. KHI THÊM HÀM MỚI
-//    cho giao diện gọi, BẮT BUỘC thêm dòng yeuCauPhien_() ở đầu hàm VÀ thêm tên
-//    hàm vào HAM_API_ - API() chỉ cho gọi hàm thỏa CẢ 2 điều kiện. Nếu hàm mới
-//    CHỈ ĐỌC dữ liệu và người Chỉ xem cũng cần dùng, thêm tên hàm vào
-//    HAM_CHO_PHEP_CHI_XEM_ bên dưới.
+//    thamSo): kiểm tra phiên + kiểm tra email VẪN còn quyền (thu hồi/khóa có
+//    hiệu lực ngay lần gọi kế tiếp) + mức quyền của chức năng theo bảng
+//    API_ROUTES (taoApiRoutes_), rồi mới chạy hàm nghiệp vụ.
+//  - Hàm nghiệp vụ đều là hàm NỘI BỘ (tên kết thúc "_") nên không gọi thẳng
+//    được bằng google.script.run. KHI THÊM CHỨC NĂNG MỚI cho giao diện: viết
+//    hàm tenHam_(...) rồi thêm 1 dòng vào taoApiRoutes_ kèm mức quyền.
 //
 // CÀI ĐẶT 1 LẦN (trang hướng dẫn tự hiện khi chưa cài): trong trình soạn thảo
 // Apps Script chọn hàm CAI_DAT_CONG_DANG_NHAP → Chạy → sao chép mã nguồn Cổng
@@ -619,28 +590,111 @@ function HT_thuHoiToanBoQuyenDriveChoEmail(email) {
 // with Google account) → mở link Cổng bằng tài khoản Admin để đăng nhập → vào
 // Hệ thống › Quản lý người dùng › Cổng đăng nhập, dán link Cổng rồi Lưu.
 //
-// 3 vai trò:
-//  - ADMIN: toàn quyền, bao gồm cả Cấu hình hệ thống / Liên kết dữ liệu /
-//    Cấu hình Misa mặc định / Quản lý người dùng / Cổng đăng nhập.
-//  - NHANVIEN: dùng các chức năng nghiệp vụ hàng ngày nhưng KHÔNG vào được các
-//    mục cấu hình toàn hệ thống nói trên.
-//  - CHIXEM: chỉ xem Dashboard, báo cáo, danh sách và xuất file Excel/PDF;
-//    KHÔNG nhập/sửa/xóa/import được gì (chặn cứng ở API(), không chỉ ẩn nút).
-//
-// Danh sách THẬT được lưu trong PropertiesService (đổi được ngay trên giao
-// diện Hệ thống → Quản lý người dùng). Mảng dưới đây chỉ là giá trị KHỞI TẠO
-// LẦN ĐẦU (dùng khi chưa từng lưu danh sách nào).
-const DANH_SACH_QUYEN_MAC_DINH = [
-  { email: "saoluucvhak@gmail.com", vaiTro: "ADMIN", quyenDrive: "EDITOR" }
-];
+// 4 vai trò (xem VAI_TRO / QUYEN_THEO_VAI_TRO bên dưới): Quản trị (toàn quyền),
+// Tổng hợp (nghiệp vụ + Sao lưu, Nhật ký), Nhân viên (nghiệp vụ hằng ngày), Chỉ
+// xem (Dashboard, báo cáo, danh sách, xuất Excel/PDF - chặn cứng ở API()).
 
+// ---- VAI TRÒ & QUYỀN (cùng khuôn với hệ thống ĐNTT) ----
+// Vai trò = tổ hợp các MỨC QUYỀN. Mỗi chức năng giao diện gọi được khai báo
+// DUY NHẤT 1 lần trong bảng API_ROUTES (taoApiRoutes_) kèm mức quyền cần có.
+//  - XEM: Dashboard, báo cáo, danh sách, xuất Excel/PDF.
+//  - NGHIEP_VU: import, nhập tay, báo giá, xuất hàng, Kho Dăm.
+//  - HE_THONG: Sao lưu dữ liệu, Nhật ký hoạt động.
+//  - QUAN_TRI: Cấu hình hệ thống, Liên kết dữ liệu, Người dùng, Chia sẻ Drive, Cổng đăng nhập.
+const VAI_TRO = { ADMIN: "ADMIN", TONG_HOP: "TONG_HOP", NHANVIEN: "NHANVIEN", CHIXEM: "CHIXEM" };
+const VAI_TRO_NHAN = { ADMIN: "Quản trị", TONG_HOP: "Tổng hợp", NHANVIEN: "Nhân viên", CHIXEM: "Chỉ xem" };
+const QUYEN = { XEM: "XEM", NGHIEP_VU: "NGHIEP_VU", HE_THONG: "HE_THONG", QUAN_TRI: "QUAN_TRI" };
+const QUYEN_THEO_VAI_TRO = {
+  ADMIN: [QUYEN.XEM, QUYEN.NGHIEP_VU, QUYEN.HE_THONG, QUYEN.QUAN_TRI],
+  TONG_HOP: [QUYEN.XEM, QUYEN.NGHIEP_VU, QUYEN.HE_THONG],
+  NHANVIEN: [QUYEN.XEM, QUYEN.NGHIEP_VU],
+  CHIXEM: [QUYEN.XEM]
+};
+// Quản trị cố định: LUÔN là Quản trị, không khóa/đổi được từ webapp (tránh tự
+// khóa nhầm mình ra ngoài). Thêm/bớt email trực tiếp tại đây.
+const QUAN_TRI_CO_DINH = ["saoluucvhak@gmail.com", "phuthuy.apple@gmail.com"];
+const TRANG_THAI_ND = { HOAT_DONG: "Hoạt động", KHOA: "Khóa" };
+
+// ---- DANH SÁCH NGƯỜI DÙNG: sheet SYS_NguoiDung trong FILE CHỨA SCRIPT ----
+// (file Google Sheet mà dự án Apps Script này gắn vào). Admin sửa trên giao
+// diện Hệ thống › Quản lý người dùng (có hiệu lực ngay) hoặc sửa thẳng trên
+// sheet (có hiệu lực trong <= 60 giây). Lần đầu tự chuyển danh sách cũ đang
+// lưu ở Script Properties (DANH_SACH_QUYEN_JSON) sang sheet.
+const ND_SHEET_ = "SYS_NguoiDung";
+const ND_HEADERS_ = ["Email", "Họ tên", "Vai trò", "Trạng thái", "Quyền Drive", "Cập nhật lúc", "Cập nhật bởi"];
+const ND_CACHE_KEY_ = "sys_nguoi_dung_v1";
+const ND_CACHE_GIAY_ = 60;
+const ND_PROP_DA_CHUYEN_ = "ND_DA_CHUYEN_SANG_SHEET";
+
+function ND_fileChuaScript_() {
+  return SpreadsheetApp.getActive();
+}
+
+function ND_sheet_(chiDoc) {
+  const ss = ND_fileChuaScript_();
+  if (!ss) throw new Error("Không mở được file chứa script (dự án Apps Script chưa gắn vào Google Sheet) - không đọc được danh sách người dùng.");
+  let sh = ss.getSheetByName(ND_SHEET_);
+  if (!sh && chiDoc) return null;
+  if (!sh) {
+    sh = ss.insertSheet(ND_SHEET_);
+    sh.getRange(1, 1, 1, ND_HEADERS_.length).setValues([ND_HEADERS_]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function ND_chuanVaiTro_(v) {
+  const x = String(v || "").trim().toUpperCase();
+  return QUYEN_THEO_VAI_TRO[x] ? x : VAI_TRO.NHANVIEN;
+}
+function ND_chuanTrangThai_(v) {
+  return String(v || "").trim() === TRANG_THAI_ND.KHOA ? TRANG_THAI_ND.KHOA : TRANG_THAI_ND.HOAT_DONG;
+}
+function ND_chuanQuyenDrive_(v) {
+  const x = String(v || "").trim().toUpperCase();
+  return QUYEN_DRIVE_HOP_LE.indexOf(x) !== -1 ? x : "EDITOR";
+}
+
+// Chuyển 1 lần danh sách cũ (Script Properties) sang sheet nếu sheet còn trống.
+function ND_chuyenDanhSachCu_(sh) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(ND_PROP_DA_CHUYEN_)) return;
+  let cu = [];
+  try { cu = JSON.parse(props.getProperty("DANH_SACH_QUYEN_JSON") || "[]"); } catch (e) { cu = []; }
+  if (Array.isArray(cu) && cu.length > 0 && sh.getLastRow() <= 1) {
+    const now = new Date();
+    const dong = cu.filter(function (u) { return u && String(u.email || "").trim(); }).map(function (u) {
+      return [String(u.email).trim().toLowerCase(), "", ND_chuanVaiTro_(u.vaiTro), TRANG_THAI_ND.HOAT_DONG, ND_chuanQuyenDrive_(u.quyenDrive), now, "Chuyển từ danh sách cũ"];
+    });
+    if (dong.length) sh.getRange(2, 1, dong.length, ND_HEADERS_.length).setValues(dong);
+  }
+  props.setProperty(ND_PROP_DA_CHUYEN_, "1");
+}
+
+/** Toàn bộ người dùng trong sheet (kể cả đã Khóa): [{email, hoTen, vaiTro, trangThai, quyenDrive}]. */
 function DS_QUYEN_() {
-  const saved = PropertiesService.getScriptProperties().getProperty("DANH_SACH_QUYEN_JSON");
-  if (!saved) return DANH_SACH_QUYEN_MAC_DINH;
-  try {
-    const parsed = JSON.parse(saved);
-    return (Array.isArray(parsed) && parsed.length > 0) ? parsed : DANH_SACH_QUYEN_MAC_DINH;
-  } catch (e) { return DANH_SACH_QUYEN_MAC_DINH; }
+  const cache = CacheService.getScriptCache();
+  try { const raw = cache.get(ND_CACHE_KEY_); if (raw) return JSON.parse(raw); } catch (e) { /* đọc lại sheet */ }
+  // Chỉ ĐỌC: chưa có sheet thì không tạo (trừ khi cần chuyển danh sách cũ sang).
+  let sh = ND_sheet_(true);
+  if (!sh && !PropertiesService.getScriptProperties().getProperty(ND_PROP_DA_CHUYEN_) &&
+      PropertiesService.getScriptProperties().getProperty("DANH_SACH_QUYEN_JSON")) sh = ND_sheet_();
+  if (sh) ND_chuyenDanhSachCu_(sh);
+  const lr = sh ? sh.getLastRow() : 0;
+  const ds = lr > 1 ? sh.getRange(2, 1, lr - 1, ND_HEADERS_.length).getValues().map(function (r) {
+    return {
+      email: String(r[0] || "").trim().toLowerCase(),
+      hoTen: String(r[1] || "").trim(),
+      vaiTro: ND_chuanVaiTro_(r[2]),
+      trangThai: ND_chuanTrangThai_(r[3]),
+      quyenDrive: ND_chuanQuyenDrive_(r[4])
+    };
+  }).filter(function (u) { return u.email; }) : [];
+  try { cache.put(ND_CACHE_KEY_, JSON.stringify(ds), ND_CACHE_GIAY_); } catch (e) { /* bỏ qua */ }
+  return ds;
+}
+function ND_xoaCache_() {
+  try { CacheService.getScriptCache().remove(ND_CACHE_KEY_); } catch (e) { /* bỏ qua */ }
 }
 
 // Gmail bỏ qua dấu "." và phần "+..." ở tên đăng nhập (nguyen.van.a@gmail.com,
@@ -653,52 +707,30 @@ function chuanHoaEmailSoSanh_(email) {
   return m[1].split("+")[0].replace(/\./g, "") + "@gmail.com";
 }
 
-function timNguoiDungTheoEmail_(email) {
-  email = String(email || "").trim().toLowerCase();
-  const emailSoSanh = chuanHoaEmailSoSanh_(email);
-  const found = email ? DS_QUYEN_().find(function (u) { return chuanHoaEmailSoSanh_(u.email) === emailSoSanh; }) : null;
-  return {
-    email: email,
-    vaiTro: found ? found.vaiTro : null,
-    coQuyen: !!found,
-    laAdmin: !!found && found.vaiTro === "ADMIN",
-    laChiXem: !!found && found.vaiTro === "CHIXEM"
-  };
+function laQuanTriCoDinh_(email) {
+  const e = chuanHoaEmailSoSanh_(email);
+  return !!e && QUAN_TRI_CO_DINH.some(function (x) { return chuanHoaEmailSoSanh_(x) === e; });
 }
 
-const VAI_TRO_HOP_LE_ = ["ADMIN", "NHANVIEN", "CHIXEM"];
-
-// Vai trò CHIXEM chỉ được gọi các hàm CHỈ ĐỌC dưới đây (xem/lọc báo cáo, tải
-// danh sách, xuất file Excel/PDF từ dữ liệu có sẵn). Mọi hàm khác - nhập, sửa,
-// xóa, import, tạo phiếu, cấu hình - bị API() từ chối.
-const HAM_CHO_PHEP_CHI_XEM_ = {
-  HT_layThongTinNguoiDungHienTai: true, HT_layDashboard: true, HT_layCauHinhVungMien: true,
-  getFilterOptions: true, getDataForGiaoDichForm: true,
-  getBaoCaoTongHop: true, getBaoCaoMisa: true, getBaoCaoDonGia: true,
-  exportBaoCaoTongHopExcel: true, exportBaoCaoTongHopPDF: true,
-  exportBaoCaoMisaExcel: true, exportBaoCaoMisaPDF: true,
-  exportBaoCaoDonGiaExcel: true, exportBaoCaoDonGiaPDF: true, exportPhieuCanPDF: true,
-  XH_getBaoCaoXuatQuaCan: true, XH_getBaoCaoXuatMisa: true,
-  XH_exportBaoCaoXuatQuaCanExcel: true, XH_exportBaoCaoXuatQuaCanPDF: true, XH_exportBaoCaoXuatMisaExcel: true,
-  XH_getDonHangList: true, XH_getDonHangByRow: true, XH_getKhoXuatList: true, XH_tinhDoKhoNhaMay: true,
-  BG_getQuoteList: true, BG_getQuoteListWithStatus: true, BG_getQuoteDetail: true, BG_showAllData: true,
-  BG_getBaogiaRowByHash: true, BG_getMaBaoGiaList: true, BG_getMaKLList: true, BG_exportFileSmart: true,
-  // BG_updateHieuLuc chỉ dựng lại bảng "Còn hiệu lực" (tự tính từ dữ liệu báo
-  // giá gốc, không đổi dữ liệu nhập) - cần để xem báo giá đang hiệu lực.
-  BG_updateHieuLuc: true,
-  layBaoCaoTonKho: true, layDanhSachDanhMucKho: true, layDanhSachDoKhoTheoBoLoc: true, layDanhSachKyVetBai: true,
-  processFormData: true
-};
-// processFormData gom nhiều thao tác - Chỉ xem chỉ được các thao tác báo cáo.
-const HANH_DONG_CHO_PHEP_CHI_XEM_ = { Baocaotonkho: true, BaocaoKyVetBai: true };
-
-function kiemTraQuyenChiXem_(nd, ten, thamSo) {
-  if (!nd || !nd.laChiXem) return;
-  const duocPhep = HAM_CHO_PHEP_CHI_XEM_[ten] === true &&
-    (ten !== "processFormData" || HANH_DONG_CHO_PHEP_CHI_XEM_[String((thamSo || [])[0])] === true);
-  if (!duocPhep) {
-    throw new Error("Tài khoản " + nd.email + " chỉ có quyền XEM - không được thực hiện thao tác nhập/sửa/xóa này. Liên hệ Quản trị viên nếu cần được cấp quyền Nhân viên.");
-  }
+/** Người dùng + vai trò HIỆU LỰC (null nếu chưa được cấp quyền hoặc đang bị Khóa). */
+function timNguoiDungTheoEmail_(email) {
+  email = String(email || "").trim().toLowerCase();
+  const soSanh = chuanHoaEmailSoSanh_(email);
+  const found = email ? DS_QUYEN_().find(function (u) { return chuanHoaEmailSoSanh_(u.email) === soSanh; }) : null;
+  let vaiTro = null;
+  if (email && laQuanTriCoDinh_(email)) vaiTro = VAI_TRO.ADMIN;
+  else if (found && found.trangThai === TRANG_THAI_ND.HOAT_DONG) vaiTro = found.vaiTro;
+  return {
+    email: email,
+    hoTen: found ? found.hoTen : "",
+    vaiTro: vaiTro,
+    vaiTroNhan: vaiTro ? VAI_TRO_NHAN[vaiTro] : "",
+    quyen: vaiTro ? QUYEN_THEO_VAI_TRO[vaiTro].slice() : [],
+    coQuyen: !!vaiTro,
+    laAdmin: vaiTro === VAI_TRO.ADMIN,
+    laChiXem: vaiTro === VAI_TRO.CHIXEM,
+    biKhoa: !vaiTro && !!found && found.trangThai === TRANG_THAI_ND.KHOA
+  };
 }
 
 // Người dùng của lượt thực thi hiện tại - CHỈ được gán bởi API() sau khi đã
@@ -712,7 +744,7 @@ const PHIEN_TOI_DA_MS_ = 12 * 60 * 60 * 1000;   // tối đa 12 giờ kể từ 
 const PHIEN_CACHE_GIAY_ = 6 * 60 * 60;          // không thao tác 6 giờ thì hết phiên (giới hạn tối đa của CacheService)
 
 function layThongTinNguoiDungHienTai_() {
-  return PHIEN_HIEN_TAI_ || { email: "", vaiTro: null, coQuyen: false, laAdmin: false };
+  return PHIEN_HIEN_TAI_ || { email: "", vaiTro: null, vaiTroNhan: "", quyen: [], coQuyen: false, laAdmin: false, laChiXem: false };
 }
 
 // Dòng đầu tiên của MỌI hàm công khai (xem giải thích ở đầu mục này).
@@ -723,18 +755,18 @@ function yeuCauPhien_() {
   return PHIEN_HIEN_TAI_;
 }
 
-// Chặn cứng Ở SERVER cho các hàm CHỈ ADMIN được phép gọi.
-function yeuCauQuyenAdmin_() {
+// Lỗi thiếu quyền: giao diện chỉ báo lỗi, KHÔNG đưa về màn đăng nhập (khác MA_LOI_PHIEN_).
+const MA_LOI_QUYEN_ = "[QUYEN] ";
+/** Chặn nếu người thao tác không có mức quyền `quyen` (QUYEN.*). */
+function yeuCauQuyen_(quyen) {
   const nd = yeuCauPhien_();
-  if (!nd.laAdmin) {
-    const dsAdmin = DS_QUYEN_().filter(function (u) { return u.vaiTro === "ADMIN"; }).map(function (u) { return u.email; }).join(", ");
-    throw new Error("Bạn không có quyền Quản trị để thực hiện thao tác này (tài khoản: " + nd.email + "). Liên hệ Quản trị viên (" + dsAdmin + ") nếu cần được cấp quyền.");
+  if (!nd.quyen || nd.quyen.indexOf(quyen) === -1) {
+    throw new Error(MA_LOI_QUYEN_ + "Tài khoản " + nd.email + " (" + (nd.vaiTroNhan || "chưa có vai trò") + ") không có quyền thực hiện thao tác này.");
   }
   return nd;
 }
 
-function HT_layThongTinNguoiDungHienTai() {
-  yeuCauPhien_();
+function HT_layThongTinNguoiDungHienTai_() {
   try { return { status: "success", data: layThongTinNguoiDungHienTai_() }; } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
@@ -862,60 +894,159 @@ function xacThucPhien_(maPhien) {
   const nd = timNguoiDungTheoEmail_(phien.email);
   if (!nd.coQuyen) {
     cache.remove("phien_" + ma);
-    throw new Error(MA_LOI_PHIEN_ + "Tài khoản " + nd.email + " không còn trong danh sách được cấp quyền.");
+    throw new Error(MA_LOI_PHIEN_ + "Tài khoản " + nd.email + (nd.biKhoa ? " đã bị khóa." : " không còn trong danh sách được cấp quyền."));
   }
   cache.put("phien_" + ma, raw, PHIEN_CACHE_GIAY_); // gia hạn trượt khi còn thao tác
   return nd;
 }
 
-/* ----- Cổng gọi hàm duy nhất từ giao diện ----- */
-// DANH SÁCH TƯỜNG MINH các hàm giao diện được phép gọi qua API(). Các hàm công
-// khai còn lại (VD xuLySuaXoaGiaoDich, taoPhieuDieuChinhKho, sanitize...) là
-// hàm NỘI BỘ: chỉ được gọi qua hàm điều phối có khóa LockService + ghi nhật ký
-// (processFormData...), gọi thẳng sẽ bỏ qua khóa ghi đồng thời và nhật ký nên
-// bị chặn. KHI THÊM CHỨC NĂNG MỚI CHO GIAO DIỆN: thêm tên hàm vào đây (hàm cũng
-// phải mở đầu bằng yeuCauPhien_()); nếu chỉ đọc dữ liệu và vai trò Chỉ xem cần
-// dùng thì thêm cả vào HAM_CHO_PHEP_CHI_XEM_.
-const HAM_API_ = [
-  // Hệ thống / phân quyền / cổng đăng nhập
-  "HT_layThongTinNguoiDungHienTai", "HT_layDashboard",
-  "HT_layCauHinhVungMien", "HT_luuCauHinhVungMien", "HT_layLocaleThatCuaSheet", "HT_xacNhanCauTrucSheetHienTai",
-  "HT_layLienKetDuLieu", "HT_luuLienKetDuLieu", "HT_layMisaDefaults", "HT_luuMisaDefaults",
-  "HT_layDanhSachQuyen", "HT_luuDanhSachQuyen", "HT_chiaSeTaiNguyenChoDanhSachQuyen", "HT_layTinhTrangChiaSeTaiNguyen",
-  "HT_thuHoiQuyenTaiNguyen", "HT_thuHoiToanBoQuyenDriveChoEmail",
-  "HT_layCauHinhCong", "HT_layMaNguonCong", "HT_luuLinkCong", "HT_doiKhoaCong",
-  "HT_layTinhTrangSaoLuu", "HT_luuCauHinhSaoLuu", "HT_saoLuuNgay", "HT_layNhatKy", "HT_xuatNhatKyExcel",
-  // Import / nhập liệu phiếu cân nhập
-  "step1_PreviewDraft", "step1_ConfirmImport", "addManualPhieuCan", "taoFileMauPhieuCan", "taoFileMauXuatHang",
-  // Báo cáo nhập kho + Misa
-  "getFilterOptions", "getBaoCaoTongHop", "getBaoCaoMisa", "getBaoCaoDonGia", "runCreateMisaData", "downloadMisaExcel",
-  "exportBaoCaoTongHopExcel", "exportBaoCaoTongHopPDF", "exportBaoCaoMisaExcel", "exportBaoCaoMisaPDF",
-  "exportBaoCaoDonGiaExcel", "exportBaoCaoDonGiaPDF", "exportPhieuCanPDF",
-  // Báo giá
-  "BG_getMaBaoGiaList", "BG_addMaBaoGia", "BG_deleteMaBaoGia", "BG_getMaKLList", "BG_addMaKL", "BG_deleteMaKL",
-  "BG_getQuoteList", "BG_getQuoteListWithStatus", "BG_getQuoteDetail", "BG_createQuote", "BG_deleteQuote",
-  "BG_getBaogiaRowByHash", "BG_updateBaogiaRow", "BG_deleteBaogiaRow", "BG_updateHieuLuc", "BG_showAllData", "BG_exportFileSmart",
-  // Kho dăm (ghi dữ liệu đi qua processFormData để có khóa + nhật ký)
-  "processFormData", "getDataForGiaoDichForm", "layBaoCaoTonKho", "layDanhSachDanhMucKho",
-  "layDanhSachDoKhoTheoBoLoc", "layDanhSachKyVetBai", "xuLyNhapSanPhamSanXuat",
-  // Xuất hàng + báo cáo xuất kho
-  "XH_step1_PreviewDraft", "XH_step1_ConfirmImport", "XH_getKhoXuatList", "XH_tinhDoKhoNhaMay",
-  "XH_saveDonHang", "XH_getDonHangList", "XH_getDonHangByRow", "XH_updateDonHang", "XH_deleteDonHang",
-  "XH_getBaoCaoXuatQuaCan", "XH_getBaoCaoXuatMisa",
-  "XH_exportBaoCaoXuatQuaCanExcel", "XH_exportBaoCaoXuatQuaCanPDF", "XH_exportBaoCaoXuatMisaExcel"
-].reduce(function (m, ten) { m[ten] = true; return m; }, {});
+// ============================================================
+// BẢNG PHÂN QUYỀN DUY NHẤT (taoApiRoutes_): tên chức năng (giao diện gọi qua API) -> hàm nội
+// bộ + mức quyền cần có. Chức năng KHÔNG có trong bảng thì KHÔNG gọi được từ
+// giao diện. Hàm nghiệp vụ đều là hàm nội bộ (tên kết thúc "_") nên trình
+// duyệt cũng không gọi thẳng được bằng google.script.run.
+// Thêm chức năng mới: viết hàm tenHam_(...) rồi thêm 1 dòng vào bảng này.
+// ============================================================
+// Dựng bảng ở lần gọi đầu tiên (không dựng lúc nạp file): Config.gs được nạp
+// TRƯỚC Code.gs nên lúc đó các hàm nghiệp vụ trong Code.gs chưa tồn tại.
+let _API_ROUTES_CACHE_ = null;
+function API_ROUTES_() {
+  if (!_API_ROUTES_CACHE_) _API_ROUTES_CACHE_ = taoApiRoutes_();
+  return _API_ROUTES_CACHE_;
+}
+function taoApiRoutes_() {
+  const X = QUYEN.XEM, N = QUYEN.NGHIEP_VU, H = QUYEN.HE_THONG, Q = QUYEN.QUAN_TRI;
+  const r = function (fn, quyen) { return { fn: fn, quyen: quyen }; };
+  // Mỗi thao tác của processFormData (Kho Dăm) 1 mức quyền riêng.
+  const rTheoThaoTac = function (fn, quyenTheoThaoTac) { return { fn: fn, quyenTheoThaoTac: quyenTheoThaoTac }; };
+  return {
+    // --- Chung: người dùng, Dashboard ---
+    HT_layThongTinNguoiDungHienTai: r(HT_layThongTinNguoiDungHienTai_, X),
+    HT_layDashboard: r(HT_layDashboard_, X),
 
+    // --- Báo cáo nhập kho + Misa (xem, xuất file) ---
+    getFilterOptions: r(getFilterOptions_, X),
+    getBaoCaoTongHop: r(getBaoCaoTongHop_, X),
+    getBaoCaoMisa: r(getBaoCaoMisa_, X),
+    getBaoCaoDonGia: r(getBaoCaoDonGia_, X),
+    exportBaoCaoTongHopExcel: r(exportBaoCaoTongHopExcel_, X),
+    exportBaoCaoTongHopPDF: r(exportBaoCaoTongHopPDF_, X),
+    exportBaoCaoMisaExcel: r(exportBaoCaoMisaExcel_, X),
+    exportBaoCaoMisaPDF: r(exportBaoCaoMisaPDF_, X),
+    exportBaoCaoDonGiaExcel: r(exportBaoCaoDonGiaExcel_, X),
+    exportBaoCaoDonGiaPDF: r(exportBaoCaoDonGiaPDF_, X),
+    exportPhieuCanPDF: r(exportPhieuCanPDF_, X),
+
+    // --- Báo cáo xuất hàng (xem, xuất file) ---
+    XH_getBaoCaoXuatQuaCan: r(XH_getBaoCaoXuatQuaCan_, X),
+    XH_getBaoCaoXuatMisa: r(XH_getBaoCaoXuatMisa_, X),
+    XH_exportBaoCaoXuatQuaCanExcel: r(XH_exportBaoCaoXuatQuaCanExcel_, X),
+    XH_exportBaoCaoXuatQuaCanPDF: r(XH_exportBaoCaoXuatQuaCanPDF_, X),
+    XH_exportBaoCaoXuatMisaExcel: r(XH_exportBaoCaoXuatMisaExcel_, X),
+    XH_getDonHangList: r(XH_getDonHangList_, X),
+    XH_getDonHangByRow: r(XH_getDonHangByRow_, X),
+    XH_getKhoXuatList: r(XH_getKhoXuatList_, X),
+    XH_tinhDoKhoNhaMay: r(XH_tinhDoKhoNhaMay_, X),
+
+    // --- Báo giá: xem ---
+    BG_getMaBaoGiaList: r(BG_getMaBaoGiaList_, X),
+    BG_getMaKLList: r(BG_getMaKLList_, X),
+    BG_getQuoteList: r(BG_getQuoteList_, X),
+    BG_getQuoteListWithStatus: r(BG_getQuoteListWithStatus_, X),
+    BG_getQuoteDetail: r(BG_getQuoteDetail_, X),
+    BG_getBaogiaRowByHash: r(BG_getBaogiaRowByHash_, X),
+    BG_exportFileSmart: r(BG_exportFileSmart_, X),
+    // Dựng lại bảng "Còn hiệu lực"/"Toàn bộ" từ dữ liệu báo giá gốc để XEM (không đổi dữ liệu nhập).
+    BG_updateHieuLuc: r(BG_updateHieuLuc_, X),
+    BG_showAllData: r(BG_showAllData_, X),
+
+    // --- Kho Dăm: xem ---
+    getDataForGiaoDichForm: r(getDataForGiaoDichForm_, X),
+    layBaoCaoTonKho: r(layBaoCaoTonKho_, X),
+    layDanhSachDanhMucKho: r(layDanhSachDanhMucKho_, X),
+    layDanhSachDoKhoTheoBoLoc: r(layDanhSachDoKhoTheoBoLoc_, X),
+    layDanhSachKyVetBai: r(layDanhSachKyVetBai_, X),
+
+    // --- Nhập liệu phiếu cân (nghiệp vụ) ---
+    step1_PreviewDraft: r(step1_PreviewDraft_, N),
+    step1_ConfirmImport: r(step1_ConfirmImport_, N),
+    addManualPhieuCan: r(addManualPhieuCan_, N),
+    taoFileMauPhieuCan: r(taoFileMauPhieuCan_, N),
+    taoFileMauXuatHang: r(taoFileMauXuatHang_, N),
+    runCreateMisaData: r(runCreateMisaData_, N),
+    downloadMisaExcel: r(downloadMisaExcel_, N),
+
+    // --- Báo giá: nhập/sửa/xóa (nghiệp vụ) ---
+    BG_addMaBaoGia: r(BG_addMaBaoGia_, N),
+    BG_deleteMaBaoGia: r(BG_deleteMaBaoGia_, N),
+    BG_addMaKL: r(BG_addMaKL_, N),
+    BG_deleteMaKL: r(BG_deleteMaKL_, N),
+    BG_createQuote: r(BG_createQuote_, N),
+    BG_deleteQuote: r(BG_deleteQuote_, N),
+    BG_updateBaogiaRow: r(BG_updateBaogiaRow_, N),
+    BG_deleteBaogiaRow: r(BG_deleteBaogiaRow_, N),
+
+    // --- Xuất hàng: nhập/sửa/xóa (nghiệp vụ) ---
+    XH_step1_PreviewDraft: r(XH_step1_PreviewDraft_, N),
+    XH_step1_ConfirmImport: r(XH_step1_ConfirmImport_, N),
+    XH_saveDonHang: r(XH_saveDonHang_, N),
+    XH_updateDonHang: r(XH_updateDonHang_, N),
+    XH_deleteDonHang: r(XH_deleteDonHang_, N),
+
+    // --- Kho Dăm: ghi dữ liệu (có khóa + nhật ký) ---
+    xuLyNhapSanPhamSanXuat: r(xuLyNhapSanPhamSanXuat_, N),
+    processFormData: rTheoThaoTac(processFormData_, {
+      Danhmuckho: N, Thongsokho: N, Nhapdokho: N, Nhapkho: N, Xuatkho: N,
+      Hoanthanhdonhang: N, HoanthanhTuDong: N,
+      Baocaotonkho: X, BaocaoKyVetBai: X
+    }),
+
+    // --- Hệ thống: Sao lưu, Nhật ký hoạt động (Quản trị + Tổng hợp) ---
+    HT_layTinhTrangSaoLuu: r(HT_layTinhTrangSaoLuu_, H),
+    HT_luuCauHinhSaoLuu: r(HT_luuCauHinhSaoLuu_, H),
+    HT_saoLuuNgay: r(HT_saoLuuNgay_, H),
+    HT_layNhatKy: r(HT_layNhatKy_, H),
+    HT_xuatNhatKyExcel: r(HT_xuatNhatKyExcel_, H),
+
+    // --- Cấu hình hệ thống (Quản trị) ---
+    HT_layCauHinhVungMien: r(HT_layCauHinhVungMien_, Q),
+    HT_luuCauHinhVungMien: r(HT_luuCauHinhVungMien_, Q),
+    HT_layLocaleThatCuaSheet: r(HT_layLocaleThatCuaSheet_, Q),
+    HT_xacNhanCauTrucSheetHienTai: r(HT_xacNhanCauTrucSheetHienTai_, Q),
+    HT_layLienKetDuLieu: r(HT_layLienKetDuLieu_, Q),
+    HT_luuLienKetDuLieu: r(HT_luuLienKetDuLieu_, Q),
+    HT_layMisaDefaults: r(HT_layMisaDefaults_, Q),
+    HT_luuMisaDefaults: r(HT_luuMisaDefaults_, Q),
+
+    // --- Người dùng, Chia sẻ Drive, Cổng đăng nhập (Quản trị) ---
+    HT_layDanhSachQuyen: r(HT_layDanhSachQuyen_, Q),
+    HT_luuDanhSachQuyen: r(HT_luuDanhSachQuyen_, Q),
+    HT_chiaSeTaiNguyenChoDanhSachQuyen: r(HT_chiaSeTaiNguyenChoDanhSachQuyen_, Q),
+    HT_layTinhTrangChiaSeTaiNguyen: r(HT_layTinhTrangChiaSeTaiNguyen_, Q),
+    HT_thuHoiQuyenTaiNguyen: r(HT_thuHoiQuyenTaiNguyen_, Q),
+    HT_thuHoiToanBoQuyenDriveChoEmail: r(HT_thuHoiToanBoQuyenDriveChoEmail_, Q),
+    HT_layCauHinhCong: r(HT_layCauHinhCong_, Q),
+    HT_layMaNguonCong: r(HT_layMaNguonCong_, Q),
+    HT_luuLinkCong: r(HT_luuLinkCong_, Q),
+    HT_doiKhoaCong: r(HT_doiKhoaCong_, Q)
+  };
+}
+
+/** CỬA VÀO DUY NHẤT cho giao diện: kiểm tra phiên + quyền theo API_ROUTES rồi
+ * gọi đúng hàm nội bộ đã đăng ký. */
 function API(maPhien, tenHam, thamSo) {
-  PHIEN_HIEN_TAI_ = xacThucPhien_(maPhien);
   const ten = String(tenHam || "");
-  const fn = HAM_API_[ten] === true ? globalThis[ten] : null;
-  // Chỉ cho gọi đúng các hàm trong HAM_API_ và vẫn phải có dòng yeuCauPhien_()
-  // ở đầu (2 lớp: quên 1 trong 2 thì hàm bị chặn chứ không bị lộ).
-  if (typeof fn !== "function" || String(fn).indexOf("yeuCauPhien_()") === -1) {
-    throw new Error("Không được phép gọi hàm: " + ten);
-  }
-  kiemTraQuyenChiXem_(PHIEN_HIEN_TAI_, ten, thamSo);
-  return chuyenLinkXuatThanhFile_(fn.apply(null, Array.isArray(thamSo) ? thamSo : []));
+  const routes = API_ROUTES_();
+  const route = Object.prototype.hasOwnProperty.call(routes, ten) ? routes[ten] : null;
+  if (!route) throw new Error("Chức năng không tồn tại: " + ten);
+  const args = Array.isArray(thamSo) ? thamSo : [];
+  PHIEN_HIEN_TAI_ = xacThucPhien_(maPhien);
+  const quyen = route.quyenTheoThaoTac
+    ? (Object.prototype.hasOwnProperty.call(route.quyenTheoThaoTac, String(args[0])) ? route.quyenTheoThaoTac[String(args[0])] : null)
+    : route.quyen;
+  if (!quyen) throw new Error("Thao tác không tồn tại: " + ten + " / " + String(args[0]));
+  yeuCauQuyen_(quyen);
+  return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
 }
 
 // Các chức năng Xuất Excel/PDF trả về link docs.google.com/.../export của file
@@ -1042,19 +1173,15 @@ function trangHuongDanCauHinhDangNhap_() {
 }
 
 /* ----- Quản trị Cổng đăng nhập (chỉ Admin) ----- */
-function HT_layCauHinhCong() {
-  yeuCauPhien_();
+function HT_layCauHinhCong_() {
   try {
-    yeuCauQuyenAdmin_();
     const linkChinh = layLinkWebappChinh_();
     return { status: "success", data: { linkCong: layLinkCong_(), linkWebappChinh: linkChinh, linkWebappHopLe: laLinkWebAppHopLe_(linkChinh) } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_layMaNguonCong() {
-  yeuCauPhien_();
+function HT_layMaNguonCong_() {
   try {
-    yeuCauQuyenAdmin_();
     const linkChinh = layLinkWebappChinh_();
     if (!laLinkWebAppHopLe_(linkChinh)) throw new Error("Không tự nhận diện được URL /exec của webapp chính (" + (linkChinh || "trống") + "). Đặt thuộc tính tập lệnh LINK_WEBAPP_CHINH bằng đúng URL /exec rồi thử lại.");
     logAudit_("CONG_DANG_NHAP", "OK", "Xem mã nguồn Cổng");
@@ -1062,10 +1189,8 @@ function HT_layMaNguonCong() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_luuLinkCong(link) {
-  yeuCauPhien_();
+function HT_luuLinkCong_(link) {
   try {
-    yeuCauQuyenAdmin_();
     link = String(link || "").trim();
     if (!laLinkWebAppHopLe_(link)) throw new Error("Link Cổng không hợp lệ - phải là link Web app dạng https://script.google.com/macros/s/.../exec");
     if (link === layLinkWebappChinh_()) throw new Error("Đây là link của CHÍNH webapp quản lý, không phải link dự án Cổng đăng nhập.");
@@ -1078,10 +1203,8 @@ function HT_luuLinkCong(link) {
 // Đổi khóa khi nghi mã nguồn Cổng bị lộ: Cổng cũ ngừng hoạt động ngay (các
 // phiên đang đăng nhập vẫn giữ nguyên) cho tới khi dán mã nguồn mới vào Cổng
 // và triển khai lại (Manage deployments › Edit › New version).
-function HT_doiKhoaCong() {
-  yeuCauPhien_();
+function HT_doiKhoaCong_() {
   try {
-    yeuCauQuyenAdmin_();
     const linkChinh = layLinkWebappChinh_();
     if (!laLinkWebAppHopLe_(linkChinh)) throw new Error("Không tự nhận diện được URL /exec của webapp chính - đặt thuộc tính LINK_WEBAPP_CHINH trước.");
     const ma = taoMaNguonCong_(taoKhoaCongMoi_(), linkChinh);
@@ -1090,11 +1213,14 @@ function HT_doiKhoaCong() {
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
-function HT_layDanhSachQuyen() {
-  yeuCauPhien_();
+function HT_layDanhSachQuyen_() {
   try {
-    yeuCauQuyenAdmin_();
-    return { status: "success", data: DS_QUYEN_() };
+    return {
+      status: "success",
+      data: DS_QUYEN_(),
+      quanTriCoDinh: QUAN_TRI_CO_DINH.slice(),
+      vaiTro: Object.keys(VAI_TRO_NHAN).map(function (ma) { return { ma: ma, nhan: VAI_TRO_NHAN[ma] }; })
+    };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
@@ -1105,37 +1231,55 @@ function HT_layDanhSachQuyen() {
 // dùng webapp - chỉ chia sẻ khi CHỦ ĐỘNG muốn ai đó mở thẳng Sheet gốc.
 const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
 
-// danhSach = [{email, vaiTro, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ danh sách hiện tại.
-function HT_luuDanhSachQuyen(danhSach) {
-  yeuCauPhien_();
+// danhSach = [{email, hoTen, vaiTro, trangThai, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ
+// sheet SYS_NguoiDung. Dòng không đổi giữ nguyên "Cập nhật lúc/bởi" cũ.
+function HT_luuDanhSachQuyen_(danhSach) {
   try {
-    yeuCauQuyenAdmin_();
     if (!Array.isArray(danhSach) || danhSach.length === 0) {
       throw new Error("Danh sách người dùng không được để trống.");
     }
-    const clean = danhSach.map(function (u) {
-      const email = String(u.email || "").trim().toLowerCase();
-      const vaiTroTho = String(u.vaiTro || "").toUpperCase();
-      const vaiTro = VAI_TRO_HOP_LE_.indexOf(vaiTroTho) !== -1 ? vaiTroTho : "NHANVIEN";
-      const quyenDriveThoRaw = String(u.quyenDrive || "").toUpperCase();
-      const quyenDrive = QUYEN_DRIVE_HOP_LE.indexOf(quyenDriveThoRaw) !== -1 ? quyenDriveThoRaw : "EDITOR";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new Error("Email '" + email + "' không hợp lệ.");
-      }
-      return { email: email, vaiTro: vaiTro, quyenDrive: quyenDrive };
-    });
-    // Loại email trùng (giữ lần xuất hiện đầu tiên)
     const seen = {}; const finalList = [];
-    clean.forEach(function (u) {
-      const key = chuanHoaEmailSoSanh_(u.email);
-      if (!seen[key]) { seen[key] = true; finalList.push(u); }
+    danhSach.forEach(function (u) {
+      const email = String((u && u.email) || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Email '" + email + "' không hợp lệ.");
+      const key = chuanHoaEmailSoSanh_(email);
+      if (seen[key]) return; // loại email trùng, giữ lần xuất hiện đầu tiên
+      seen[key] = true;
+      finalList.push({
+        email: email,
+        hoTen: String(u.hoTen || "").trim(),
+        vaiTro: ND_chuanVaiTro_(u.vaiTro),
+        trangThai: ND_chuanTrangThai_(u.trangThai),
+        quyenDrive: ND_chuanQuyenDrive_(u.quyenDrive)
+      });
     });
-    if (!finalList.some(function (u) { return u.vaiTro === "ADMIN"; })) {
-      throw new Error("Phải giữ lại ít nhất 1 tài khoản ADMIN, không thể xóa hết (nếu không sẽ không còn ai quản trị được hệ thống).");
+    if (!finalList.some(function (u) { return u.vaiTro === VAI_TRO.ADMIN && u.trangThai === TRANG_THAI_ND.HOAT_DONG; })) {
+      throw new Error("Phải giữ lại ít nhất 1 tài khoản Quản trị đang hoạt động trong danh sách.");
     }
 
-    PropertiesService.getScriptProperties().setProperty("DANH_SACH_QUYEN_JSON", JSON.stringify(finalList));
-    logAudit_("CAUHINH_PHANQUYEN", "OK", JSON.stringify(finalList));
+    const sh = ND_sheet_();
+    ND_chuyenDanhSachCu_(sh);
+    const lr = sh.getLastRow();
+    const cu = {};
+    if (lr > 1) sh.getRange(2, 1, lr - 1, ND_HEADERS_.length).getValues().forEach(function (r) {
+      const k = chuanHoaEmailSoSanh_(r[0]);
+      if (k) cu[k] = r;
+    });
+    const now = new Date();
+    const nguoiSua = layThongTinNguoiDungHienTai_().email || "";
+    const thayDoi = [];
+    const dong = finalList.map(function (u) {
+      const r = cu[chuanHoaEmailSoSanh_(u.email)];
+      const giuNguyen = r && String(r[1] || "").trim() === u.hoTen && ND_chuanVaiTro_(r[2]) === u.vaiTro &&
+        ND_chuanTrangThai_(r[3]) === u.trangThai && ND_chuanQuyenDrive_(r[4]) === u.quyenDrive;
+      if (!giuNguyen) thayDoi.push(u.email + ": " + VAI_TRO_NHAN[u.vaiTro] + ", " + u.trangThai);
+      return [u.email, u.hoTen, u.vaiTro, u.trangThai, u.quyenDrive, giuNguyen ? r[5] : now, giuNguyen ? r[6] : nguoiSua];
+    });
+    Object.keys(cu).forEach(function (k) { if (!seen[k]) thayDoi.push("Xóa " + cu[k][0]); });
+    if (lr > 1) sh.getRange(2, 1, lr - 1, ND_HEADERS_.length).clearContent();
+    sh.getRange(2, 1, dong.length, ND_HEADERS_.length).setValues(dong);
+    ND_xoaCache_();
+    logAudit_("CAUHINH_PHANQUYEN", "OK", thayDoi.join("; ") || "Không có thay đổi");
     return { status: "success", message: "✅ Đã lưu danh sách " + finalList.length + " người dùng." };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
