@@ -22,7 +22,7 @@
 | Utilities / Session | Hợp lệ |
 | Logger / console.log | Chỉ ở hàm cài đặt Cổng chạy tay |
 | Trigger | Sao lưu hằng đêm (xác thực `triggerUid`); tính giá theo giờ đã sửa (TRIGGER-01) |
-| Execution timeout | Luồng dài nhất còn lại: báo cáo không lọc ngày (ARCH-02), chốt sổ năm lớn (nay chạy lại an toàn nếu bị ngắt) |
+| Execution timeout | Luồng dài nhất còn lại: báo cáo không lọc ngày (ARCH-02) |
 | Hash Map / Lookup table | Import dùng `Map` theo Mã chứng từ (O(1)); tính giá lọc báo giá theo mã. |
 
 ## Phase 6 — Google Sheet như cơ sở dữ liệu
@@ -31,8 +31,8 @@
 |---|---|
 | Primary key | Mã chứng từ (cột V) — duy nhất, kiểm tra trùng cả trong sheet chính lẫn lưu trữ khi import |
 | Index | Không có index thật; dựng `Map` trong bộ nhớ mỗi lượt import (đủ nhanh tới vài trăm nghìn dòng) |
-| Phân vùng dữ liệu | Theo năm (Chốt sổ). Đề xuất tách ra file riêng (09_Architecture.md) |
-| Toàn vẹn | Khóa ghi, cảnh báo lệch cột (5 module), chốt sổ chạy lại an toàn, `sanitize()` chống công thức |
+| Phân vùng dữ liệu | Theo năm — Khóa sổ năm làm ở ĐNTT, phiếu đã trả sang `PhieuCan_DN_<năm>`. Đề xuất tách ra file riêng (09_Architecture.md) |
+| Toàn vẹn | Khóa ghi, cảnh báo lệch cột (5 module), kiểm tra dòng đích trước khi ghi theo số dòng (CONCUR-01), cờ "ĐNTT đang khóa sổ" (CONCUR-02), `sanitize()` chống công thức |
 | Chuẩn hóa | Danh mục mã báo giá / mã KL / kho tách sheet riêng — hợp lý |
 | Trùng lặp | Chặn theo Mã chứng từ; Draft "Chưa thanh toán" ghi đè theo mã |
 

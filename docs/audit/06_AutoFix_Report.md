@@ -8,7 +8,7 @@ Ràng buộc tuân thủ: không đổi nghiệp vụ · không đổi kết qu�
 |---:|---|---|---|---|
 | 1 | TRIGGER-01 | Code.gs | Trigger theo giờ tính giá lỗi mọi lần chạy (`PHIEN_HET_HAN`) | Trigger thật của dự án chạy được; gọi từ trình duyệt vẫn bắt buộc đăng nhập |
 | 2 | REGRESS-01 | Code.gs | Bản sửa hiệu năng/chống kẹt bị ghi đè mất ở main | Áp lại lên code mới, giữ nguyên Cổng đăng nhập |
-| 3 | STUCK-01 | Code.gs | Chốt sổ bị ngắt → trùng dữ liệu, báo cáo cộng đôi | Chạy lại tự hết trùng |
+| 3 | STUCK-01 | Code.gs | Chốt sổ bị ngắt → trùng dữ liệu, báo cáo cộng đôi | Chạy lại tự hết trùng (sau đó chức năng Chốt sổ đã bỏ) |
 | 4 | STUCK-02 | Code.gs | Kho Dăm báo "Lock timeout" tiếng Anh | "Hệ thống đang bận…" |
 | 5 | BUG-002 | Code.gs | Không cảnh báo lệch cột sheet Báo giá, Kho Dăm | Cảnh báo kèm thông báo thành công (không chặn); Admin xác nhận chuẩn mới được |
 | 6 | PERF-01 | Code.gs | Mở trang đọc 17 cột toàn lịch sử | 12 cột + cache năm lưu trữ |

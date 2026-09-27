@@ -29,3 +29,7 @@ Các test mới được chạy trên **code cũ** trước khi sửa để ch�
 - Không có test runtime trên Google thật (không có quyền chạy trên dự án Apps Script của bạn).
 - Luồng đọc file Excel (chuyển đổi qua Drive API) chưa mô phỏng được.
 - Giao diện: đã kiểm tra các báo cáo lớn; chưa có bộ test giao diện tự động cho toàn bộ màn hình.
+
+## Cập nhật 27/09/2026
+- Bỏ 11 test của chức năng Chốt sổ (đã gỡ); thêm `concurrentKhoaSo.test.js` (8 test): ĐNTT xóa dòng giữa lúc đọc và ghi → tính giá / import lại không ghi gì và báo thực hiện lại (2 test này thất bại trên code trước khi sửa); cờ "ĐNTT đang Khóa sổ" chặn import / nhập tay / tính giá; cờ quá 10 phút bị bỏ qua.
+- **Tổng hiện tại: 20 bộ test · 212 test · đạt 100%.** Repo ĐNTT: 101 test đạt (thêm 2 test cờ khóa sổ).

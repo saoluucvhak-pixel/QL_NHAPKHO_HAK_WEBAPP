@@ -84,7 +84,10 @@ function makeFakeRange(sheet, row, col, numRows, numCols) {
     getValues() {
       demApi_('getValues', numRows * numCols, false);
       kiemTraTiemLoi_('getValues');
-      return this.__docNoiBo();
+      const out = this.__docNoiBo();
+      // Mô phỏng 1 ứng dụng KHÁC (VD ĐNTT Khóa sổ) sửa sheet NGAY SAU lần đọc này.
+      if (sheet.__hookSauKhiDoc && sheet.__hookSauKhiDoc(row, col, numRows, numCols) === true) sheet.__hookSauKhiDoc = null;
+      return out;
     },
     __docNoiBo() {
       const out = [];
@@ -213,8 +216,21 @@ function makeFakeSheet(name, initialRows) {
 
 function makeFakeSpreadsheet(id) {
   const sheets = new Map();
+  const metadata = [];
   const spreadsheet = {
     __id: id,
+    __metadata: metadata,
+    addDeveloperMetadata(key, value, visibility) {
+      const m = { key, value: value === undefined ? null : String(value), visibility, getKey: () => key, getValue: () => m.value,
+        getVisibility: () => visibility, remove() { const i = metadata.indexOf(m); if (i >= 0) metadata.splice(i, 1); } };
+      metadata.push(m);
+      return spreadsheet;
+    },
+    createDeveloperMetadataFinder() {
+      let khoa = null;
+      const finder = { withKey(k) { khoa = k; return finder; }, find: () => { demApi_('findDeveloperMetadata'); return metadata.filter((m) => khoa === null || m.key === khoa); } };
+      return finder;
+    },
     getId: () => id,
     getSheetByName(name) { demApi_('getSheetByName'); return sheets.has(name) ? sheets.get(name) : null; },
     insertSheet(name) {
@@ -252,6 +268,7 @@ function makeFakeSpreadsheetApp() {
       return ss;
     },
     __byId: byId,
+    DeveloperMetadataVisibility: { DOCUMENT: 'DOCUMENT', PROJECT: 'PROJECT' },
   };
 }
 
