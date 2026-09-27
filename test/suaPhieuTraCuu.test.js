@@ -58,19 +58,69 @@ describe('Sửa Khách hàng / Đại lý / Nguồn gốc (phiếu chưa OK)', (
     expect(audit.some((a) => a[1] === 'SUA_PHIEU_CAN' && /1\/2026\/NK/.test(a[3]))).toBe(true);
   });
 
-  test('Mã ĐG mới không có báo giá -> vẫn lưu, báo rõ "Lỗi ĐK/Báo giá"', () => {
+  test('đổi ĐL/NG mà KHÔNG tính được giá (Mã ĐG mới chưa có báo giá) -> CHƯA LƯU, không ghi ô nào', () => {
     const env = createGasEnv();
     nap(env, [phieu('1/2026/NK')]);
-    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DLX', nguonGoc: 'NGX' });
+    const truoc = dongCua(env, '1/2026/NK').slice();
+    mocks.resetApiCounter_();
+    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Mới', daiLy: 'DLX', nguonGoc: 'NGX' });
+    expect(res.status).toBe('error');
+    expect(res.message).toMatch(/^CHƯA LƯU: không tính được giá cho Mã ĐG DLX_NGX_Y \(khối lượng 20 tấn, ngày cân 10\/06\/2026\)/);
+    expect(mocks.getApiCounter_().oWrite).toBe(0);
+    expect(dongCua(env, '1/2026/NK')).toEqual(truoc); // cả Khách hàng cũng không bị lưu
+  });
+
+  test('đổi ĐL/NG: khối lượng nằm ngoài dải báo giá -> cũng không lưu', () => {
+    const env = createGasEnv();
+    const p = phieu('1/2026/NK'); p[9] = 2000000; // 2.000 tấn > Max 1.000 tấn
+    nap(env, [p]);
+    expect(env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DL2', nguonGoc: 'NG2' }).message).toMatch(/^CHƯA LƯU/);
+    expect(dongCua(env, '1/2026/NK')[13]).toBe('DL1');
+  });
+
+  test('phiếu đang "Lỗi ĐK/Báo giá", đổi sang ĐL/NG có báo giá -> lưu, hết lỗi', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK', { dl: 'DLX', ng: 'NGX', y: 'Lỗi ĐK/Báo giá' })]);
+    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Cũ', daiLy: 'DL1', nguonGoc: 'NG1' });
     expect(res.status).toBe('success');
-    expect(res.message).toMatch(/Lỗi ĐK\/Báo giá/);
-    expect(dongCua(env, '1/2026/NK')[24]).toBe('Lỗi ĐK/Báo giá');
+    expect(dongCua(env, '1/2026/NK').slice(23, 26)).toEqual([1000, 'Test giá', 20000]);
+  });
+
+  test('chỉ đổi Khách hàng -> lưu Khách hàng, GIÁ GIỮ NGUYÊN (không tính lại)', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    const res = env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Đổi Tên', daiLy: 'dl1', nguonGoc: 'ng1' });
+    expect(res.status).toBe('success');
+    expect(res.message).toMatch(/giá giữ nguyên/);
+    const r = dongCua(env, '1/2026/NK');
+    expect(r[11]).toBe('Khách Đổi Tên');
+    expect([r[16], r[19], r[23], r[24], r[25]]).toEqual(['DL1_NG1_Y', 111, 111, 'Test giá', 999]);
+  });
+
+  test('không thay đổi gì -> báo không có thay đổi', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    expect(env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'Khách Cũ', daiLy: 'DL1', nguonGoc: 'NG1' }).message).toMatch(/Không có thay đổi/);
+  });
+
+  test('không ghi đè cột U, V, W (Picture, Mã chứng từ, Số CT)', () => {
+    const env = createGasEnv();
+    nap(env, [phieu('1/2026/NK')]);
+    const sh = env.spreadsheetApp.openById(PHIEUCAN_ID).getSheetByName('PhieuCan_DN');
+    const ghi = [];
+    const goc = sh.getRange.bind(sh);
+    sh.getRange = (...a) => { const rg = goc(...a); const sv = rg.setValues.bind(rg); rg.setValues = (v) => { ghi.push(a); return sv(v); }; return rg; };
+    env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: 'A', daiLy: 'DL2', nguonGoc: 'NG2' });
+    const cot = new Set();
+    ghi.forEach(([, c, , n]) => { for (let k = c; k < c + (n || 1); k++) cot.add(k); });
+    [21, 22, 23].forEach((c) => expect(cot.has(c)).toBe(false));
+    expect(cot.has(11) && cot.has(20) && cot.has(24) && cot.has(26)).toBe(true);
   });
 
   test('chống công thức (sanitize) như import', () => {
     const env = createGasEnv();
     nap(env, [phieu('1/2026/NK')]);
-    env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: '=IMPORTXML("x")', daiLy: 'DL1', nguonGoc: 'NG1' });
+    expect(env.call('TC_suaPhieuNhap', '1/2026/NK', { khachHang: '=IMPORTXML("x")', daiLy: 'DL1', nguonGoc: 'NG1' }).status).toBe('success');
     expect(dongCua(env, '1/2026/NK')[11]).toBe('\'=IMPORTXML("x")');
   });
 

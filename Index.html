@@ -1503,7 +1503,7 @@
                   <li><b>Phiếu cân nhập</b>: gõ số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc hoặc mã đơn giá (không cần gõ dấu) rồi bấm <b>Tìm</b> hoặc Enter. Mặc định tìm trong 90 ngày gần nhất; xóa trống 2 ô ngày để tìm toàn bộ, kể cả các năm đã khóa sổ (cột "Nơi lưu" cho biết phiếu đang ở sheet nào).</li>
                   <li><b>Phiếu cân xuất</b>: tìm theo số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/kho nhập.</li>
                   <li>Bấm vào 1 dòng (hoặc nút <b>🔍 Xem</b>) để mở <b>chi tiết phiếu</b>: thông tin chính + toàn bộ các cột trên sheet; phiếu nhập có nút <b>In Phiếu Nhập Kho</b>. Nút <b>🔍 Chi tiết</b> cũng có sẵn trên từng dòng của các báo cáo phiếu cân nhập/xuất.</li>
-                  <li><b>Sửa phiếu nhập</b> (vai trò Nhân viên trở lên): trong chi tiết phiếu CHƯA đóng thanh toán (Trạng thái giá khác "OK"), sửa <b>Khách hàng / Đại lý / Nguồn gốc</b> rồi bấm <b>Lưu &amp; tính lại giá</b> - Mã ĐG tự đổi thành <code>ĐL_NG_Y</code> và giá tính lại ngay theo báo giá hiệu lực tại ngày cân. Nút <b>Chỉ tính lại giá</b> tính lại mà không sửa gì. Phiếu đã OK hoặc đã chuyển sang sheet lưu trữ thì không sửa được.</li>
+                  <li><b>Sửa phiếu nhập</b> (vai trò Nhân viên trở lên): trong chi tiết phiếu CHƯA đóng thanh toán (Trạng thái giá khác "OK"), sửa <b>Khách hàng / Đại lý / Nguồn gốc</b> rồi bấm <b>Lưu &amp; tính lại giá</b> - Mã ĐG tự đổi thành <code>ĐL_NG_Y</code>. Đổi Đại lý / Nguồn gốc <b>bắt buộc tính được giá mới</b> theo báo giá hiệu lực tại ngày cân mới lưu; không có báo giá khớp thì <b>không lưu gì</b> (báo rõ Mã ĐG, khối lượng, ngày cân để kiểm tra). Chỉ đổi Khách hàng thì giá giữ nguyên. Nút <b>Chỉ tính lại giá</b> tính lại mà không sửa gì. Phiếu đã OK hoặc đã chuyển sang sheet lưu trữ thì không sửa được.</li>
                   <li><b>Tính lại giá hàng loạt</b>: sau khi Tìm, nút <b>🔄 Tính lại giá … phiếu chưa đóng thanh toán</b> tính lại giá mọi phiếu chưa OK khớp đúng bộ lọc vừa tìm (kể cả phiếu ngoài 500 dòng đang hiển thị). Phiếu đã OK không bị động tới.</li>
                   <li>Phiếu có trong sheet Draft Chưa Thanh Toán được cập nhật theo khi sửa/tính lại giá. Mọi thao tác sửa/tính lại giá đều ghi vào Nhật ký hoạt động. Vai trò Chỉ xem chỉ tra cứu, xem chi tiết.</li>
                 </ul>
@@ -2906,7 +2906,7 @@
         + '<div class="field"><label>Đại lý (ĐL)</label><input id="tcs_dl" list="tcdl_dl" value="' + escapeHtml(t.daiLy) + '" style="text-transform:uppercase;"></div>'
         + '<div class="field"><label>Nguồn gốc (NG)</label><input id="tcs_ng" list="tcdl_ng" value="' + escapeHtml(t.nguonGoc) + '" style="text-transform:uppercase;"></div>'
         + '</div>'
-        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Mã ĐG mới: <b id="tcs_maDG">' + escapeHtml(t.maDonGia) + '</b> - giá tính theo báo giá hiệu lực tại ngày cân.</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Mã ĐG mới: <b id="tcs_maDG">' + escapeHtml(t.maDonGia) + '</b> · Đổi <b>Đại lý / Nguồn gốc</b> bắt buộc tính được giá mới (có báo giá hiệu lực khớp Mã ĐG + khối lượng + ngày cân) mới lưu - không tính được giá thì <b>không lưu</b>. Chỉ đổi Khách hàng thì giá giữ nguyên.</div>'
         + '<div class="btnrow" style="margin:0;">'
         + '<button type="button" class="btn btn-primary" data-tc-luu>💾 Lưu &amp; tính lại giá</button>'
         + '<button type="button" class="btn btn-ghost" data-tc-tinhgia>🔄 Chỉ tính lại giá</button>'

@@ -1000,6 +1000,27 @@ function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
 // nơi lưu dữ liệu kiêm nơi tính toán; muốn giảm tiếp cả bước ĐỌC này cần một
 // giải pháp lưu trữ khác (VD tách riêng sheet "đang chờ tính giá" khỏi sheet
 // lịch sử đã chốt - xem đề xuất kiến trúc lưu trữ đã trao đổi).
+// Bảng báo giá (Baogia_DN_SAVE) dạng dùng cho tính giá - mở theo BG_ss_() (xem
+// ghi chú đồng bộ Liên kết dữ liệu trong runCalculatePrice_core_).
+function TG_docBaoGia_() {
+  const ssBG = BG_ss_(); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
+  return rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
+}
+
+// Giá của 1 phiếu (dòng A..Z) theo báo giá: DUY NHẤT 1 công thức, dùng chung cho
+// engine tính giá và cho "Sửa phiếu" ở Tra cứu (tính giá TRƯỚC khi quyết định lưu).
+function TG_tinhGiaDong_(r, dataBG) {
+  const valQ = String(r[16] || "").trim().toUpperCase(); const rVal = parseFloat(r[17]) || 0; const klJ = parseFloat(r[9]) || 0; const klSoSanh = klJ / 1000;
+  const dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
+  const ts = dt.getTime(); let giaFound = 0;
+  if (valQ !== "" && klSoSanh > 0) { const listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (const bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
+  const hieuSo = Math.round(giaFound + rVal);
+  const thanhTienRaw = Math.round(klSoSanh * hieuSo);
+  const thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000;
+  const trangThai = (giaFound > 0 && thanhTienLamTron > 0) ? "Test giá" : "Lỗi ĐK/Báo giá";
+  return { gia: giaFound, hieuSo: hieuSo, trangThai: trangThai, thanhTien: thanhTienLamTron };
+}
+
 // chonDong (tùy chọn): hàm (dòng A..Z) -> true/false để CHỈ tính lại một phần các
 // phiếu chưa "OK" (Tra cứu: 1 phiếu vừa sửa, hoặc các phiếu khớp bộ lọc). Không
 // truyền = tính mọi phiếu chưa "OK" như trước. Phiếu "OK" luôn được bỏ qua.
@@ -1018,8 +1039,7 @@ function runCalculatePrice_core_(chonDong) {
     // sheet CŨ - sai giá cho mọi phiếu cân mới mà không ai biết. Nay dùng
     // BG_ss_() (mở theo BAOGIA_CONFIG.SPREADSHEET_ID, ĐÃ nằm trong danh sách
     // Liên kết dữ liệu) để luôn đồng bộ với đúng 1 nguồn cấu hình duy nhất.
-    const ssBG = BG_ss_(); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
-    const dataBG = rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
+    const dataBG = TG_docBaoGia_();
 
     // Chỉ gom danh sách các DÒNG THỰC SỰ CẦN GHI LẠI (chưa "OK") - dòng đã "OK"
     // bỏ qua hoàn toàn, không đưa vào đây (khác bản cũ luôn đẩy cả dòng "OK" vào
@@ -1031,15 +1051,8 @@ function runCalculatePrice_core_(chonDong) {
       if (currentStatusY === "OK") continue;
       if (chonDong && !chonDong(r)) continue;
 
-      const valQ = String(r[16] || "").trim().toUpperCase(); const rVal = parseFloat(r[17]) || 0; const klJ = parseFloat(r[9]) || 0; const klSoSanh = klJ / 1000;
-      const dt = new Date(r[1]); if (r[2]) { let t = r[2]; let h = (t instanceof Date) ? t.getHours() : parseInt(String(t).split(":")[0]) || 0; let m = (t instanceof Date) ? t.getMinutes() : parseInt(String(t).split(":")[1]) || 0; dt.setHours(h, m, 0, 0); }
-      const ts = dt.getTime(); let giaFound = 0;
-      if (valQ !== "" && klSoSanh > 0) { const listCungMa = dataBG.filter(bg => bg.keyQ === valQ); if (listCungMa.length > 0) { for (const bg of listCungMa) { if (_tsTrongKhoangHieuLuc_(ts, bg.start, bg.end) && klSoSanh > bg.minKl && klSoSanh <= bg.maxKl) { giaFound = bg.price; break; } } } }
-      const hieuSo = Math.round(giaFound + rVal);
-      const thanhTienRaw = Math.round(klSoSanh * hieuSo);
-      const thanhTienLamTron = Math.floor(thanhTienRaw / 1000) * 1000;
-      const trangThai = (giaFound > 0 && thanhTienLamTron > 0) ? "Test giá" : "Lỗi ĐK/Báo giá";
-      capNhat.push({ rowNum: i + 2, maCT: String(r[21] || "").trim(), gia: giaFound, hieuSo: hieuSo, trangThai: trangThai, thanhTien: thanhTienLamTron });
+      const g = TG_tinhGiaDong_(r, dataBG);
+      capNhat.push({ rowNum: i + 2, maCT: String(r[21] || "").trim(), gia: g.gia, hieuSo: g.hieuSo, trangThai: g.trangThai, thanhTien: g.thanhTien });
     }
 
     // Gom các dòng cần ghi thành từng KHỐI LIÊN TIẾP (rowNum liền nhau) - ghi 1
@@ -5534,7 +5547,8 @@ function TC_chiTietPhieuXuat_(soPhieu, ts) {
  * Chỉ áp dụng cho phiếu ở sheet đang theo dõi (PhieuCan_DN) và CHƯA "OK" (cột Y
  * - ĐNTT ghi "OK" khi đã đóng thanh toán). Sửa Khách hàng / Đại lý / Nguồn gốc
  * theo ĐÚNG quy tắc import: K = ĐL_NG, N = ĐL, O = NG (chữ hoa), Q (Mã ĐG) =
- * ĐL_NG_Y, S = thời điểm cập nhật; rồi tính lại giá bằng chính engine tính giá.
+ * ĐL_NG_Y, S = thời điểm cập nhật. Đổi ĐL/NG bắt buộc tính được giá mới mới lưu
+ * (cùng công thức engine tính giá - TG_tinhGiaDong_).
  * Phiếu có trong sheet Draft Chưa Thanh Toán được cập nhật theo (không thêm mới).
  * Có khóa hệ thống + cờ Khóa sổ ĐNTT + kiểm tra dòng đích (CONCUR-01/02). */
 function TC_chayCoKhoa_(viec) {
@@ -5621,6 +5635,11 @@ function TC_dongBoDraftChuaTT_(sheetPC, ketQua) {
 }
 
 // thongTin = {khachHang, daiLy, nguonGoc}
+// BẮT BUỘC: đổi Đại lý hoặc Nguồn gốc (-> đổi Mã ĐG) thì phải TÍNH ĐƯỢC giá mới
+// (có báo giá khớp Mã ĐG + khối lượng + ngày cân) mới lưu. Giá được tính TRƯỚC,
+// không tính được -> KHÔNG ghi gì; tính được -> ghi thông tin + giá cùng lượt,
+// không có trạng thái "đã đổi Mã ĐG nhưng giá còn cũ/lỗi".
+// Chỉ đổi Khách hàng (không ảnh hưởng giá) -> lưu Khách hàng, giữ nguyên giá.
 function TC_suaPhieuNhap_(maChungTu, thongTin) {
   return TC_chayCoKhoa_(function () {
     const maCT = String(maChungTu || "").trim();
@@ -5639,27 +5658,48 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
     if (String(cu[24] || "").trim() === "OK") throw new Error("Phiếu " + maCT + " đã đóng thanh toán (Trạng thái giá = OK) - không sửa được.");
 
     const truoc = { kh: String(cu[11] || ""), dl: String(cu[13] || ""), ng: String(cu[14] || "") };
-    // K..S (cột 11..19): giữ nguyên M (Mã hàng), P, R (Giảm giá) đã đọc trong khóa.
-    const moi = cu.slice(10, 19);
-    moi[0] = dl + "_" + ng; moi[1] = kh; moi[3] = dl; moi[4] = ng; moi[6] = dl + "_" + ng + "_Y"; moi[8] = new Date();
+    const doiMaDG = truoc.dl !== dl || truoc.ng !== ng;
+    const thayDoi = [["Khách hàng", truoc.kh, kh], ["Đại lý", truoc.dl, dl], ["Nguồn gốc", truoc.ng, ng]]
+      .filter(function (x) { return x[1] !== x[2]; }).map(function (x) { return x[0] + ": " + x[1] + " → " + x[2]; });
+    if (!thayDoi.length) throw new Error("Không có thay đổi nào để lưu.");
+
+    // Dòng mới A..Z trong bộ nhớ: K..S theo quy tắc import, M/P/R giữ nguyên.
+    const moi = cu.slice();
+    moi[11] = kh; moi[18] = new Date();
+    let kq = null;
+    if (doiMaDG) {
+      moi[10] = dl + "_" + ng; moi[13] = dl; moi[14] = ng; moi[16] = dl + "_" + ng + "_Y";
+      kq = TG_tinhGiaDong_(moi, TG_docBaoGia_());
+      if (kq.trangThai !== "Test giá") {
+        const klTan = (parseFloat(cu[9]) || 0) / 1000;
+        const ngay = cu[1] instanceof Date ? Utilities.formatDate(cu[1], "GMT+7", "dd/MM/yyyy") : String(cu[1] || "");
+        throw new Error("CHƯA LƯU: không tính được giá cho Mã ĐG " + moi[16] + " (khối lượng " + klTan.toLocaleString("vi-VN")
+          + " tấn, ngày cân " + ngay + ") - chưa có báo giá hiệu lực khớp. Kiểm tra lại Đại lý / Nguồn gốc, hoặc nhập báo giá cho mã này trước.");
+      }
+      moi[19] = kq.gia; moi[23] = kq.hieuSo; moi[24] = kq.trangThai; moi[25] = kq.thanhTien;
+    }
+
     PC_kiemTraDongConDung_(sheet, new Map([[dong, PC_chuKyDong_(cu)]]));
     // ĐNTT (dự án khác) có thể vừa đóng thanh toán phiếu này -> đọc lại cột Y ngay trước khi ghi.
     if (String(sheet.getRange(dong, 25).getValue() || "").trim() === "OK") throw new Error("Phiếu " + maCT + " vừa được đóng thanh toán (OK) - không sửa được.");
-    sheet.getRange(dong, 11, 1, 9).setValues([moi]);
-
-    const gia = runCalculatePrice_core_(function (r) { return String(r[21] || "").trim() === maCT; });
-    if (gia.status !== "success") {
-      logAudit_("SUA_PHIEU_CAN", "ERROR", maCT + ": đã sửa thông tin nhưng tính giá lỗi - " + gia.message);
-      return { status: "error", message: "Đã lưu Khách hàng/Đại lý/Nguồn gốc nhưng tính lại giá bị lỗi: " + gia.message + " - bấm \"Tính lại giá\" để thử lại." };
+    if (doiMaDG) {
+      // Giá đã tính xong TRƯỚC khi ghi. Ghi K..T (thông tin + đơn giá gốc) và X..Z
+      // (đơn giá, trạng thái, thành tiền) - không đụng U/V/W (Picture, Mã CT, Số CT).
+      sheet.getRange(dong, 11, 1, 10).setValues([moi.slice(10, 20)]);
+      sheet.getRange(dong, 24, 1, 3).setValues([moi.slice(23, 26)]);
+      sheet.getRangeList(["X" + dong, "Z" + dong]).setNumberFormat("#,##0");
+    } else {
+      sheet.getRange(dong, 12, 1, 1).setValues([[kh]]);            // L - Khách hàng
+      sheet.getRange(dong, 19, 1, 1).setValues([[moi[18]]]);       // S - lúc cập nhật
     }
-    const kq = (gia.ketQua || [])[0];
-    const soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
-    const thayDoi = [["Khách hàng", truoc.kh, kh], ["Đại lý", truoc.dl, dl], ["Nguồn gốc", truoc.ng, ng]]
-      .filter(function (x) { return x[1] !== x[2]; }).map(function (x) { return x[0] + ": " + x[1] + " → " + x[2]; });
-    logAudit_("SUA_PHIEU_CAN", "OK", maCT + " | " + (thayDoi.join("; ") || "không đổi thông tin") + " | " + (kq ? kq.trangThai + ", đơn giá " + kq.hieuSo + ", thành tiền " + kq.thanhTien : ""));
+
+    const soDraft = TC_dongBoDraftChuaTT_(sheet, [{ rowNum: dong, maCT: maCT }]);
+    logAudit_("SUA_PHIEU_CAN", "OK", maCT + " | " + thayDoi.join("; ") + " | "
+      + (kq ? kq.trangThai + ", đơn giá " + kq.hieuSo + ", thành tiền " + kq.thanhTien : "giá giữ nguyên"));
     return {
       status: "success",
-      message: "Đã lưu phiếu " + maCT + (thayDoi.length ? " (" + thayDoi.join("; ") + ")" : "") + " và tính lại giá: " + TC_moTaGia_(kq)
+      message: "Đã lưu phiếu " + maCT + " (" + thayDoi.join("; ") + ")"
+        + (kq ? " - giá mới: " + TC_moTaGia_(kq) : " - chỉ đổi Khách hàng, giá giữ nguyên")
         + (soDraft ? " · đã cập nhật bản sao trong Draft Chưa TT" : ""),
       ketQua: kq
     };
