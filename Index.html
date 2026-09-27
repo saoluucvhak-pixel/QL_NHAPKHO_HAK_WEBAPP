@@ -54,6 +54,10 @@
     .tc-bang-truong th{width:38%;color:var(--ink-soft);font-weight:500;background:transparent;position:static;}
     .tc-bang-truong td{word-break:break-word;}
     tr[data-tc-mo]{cursor:pointer;}
+    .tc-nhanh{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px;}
+    .tc-chip{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;}
+    .tc-chip:hover{border-color:var(--brand);color:var(--brand);}
+    .tc-chip.active{background:var(--brand);border-color:var(--brand);color:#fff;}
     .tc-sua{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;background:var(--accent-soft);}
     .tc-sua h3{font-size:14px;margin:0 0 10px;}
     .tc-sua .field-grid{margin-bottom:6px;}
@@ -1033,6 +1037,13 @@
               <div class="field"><label>Từ ngày cân</label><input type="date" id="tcn_tuNgay"></div>
               <div class="field"><label>Đến ngày cân</label><input type="date" id="tcn_denNgay"></div>
             </div>
+            <div class="tc-nhanh" data-tc-nhanh="tcn">
+              <button type="button" class="tc-chip" data-khoang="thangNay">Tháng này</button>
+              <button type="button" class="tc-chip" data-khoang="thangTruoc">Tháng trước</button>
+              <button type="button" class="tc-chip" data-khoang="quyNay">Quý này</button>
+              <button type="button" class="tc-chip" data-khoang="namNay">Năm nay</button>
+              <button type="button" class="tc-chip" data-khoang="boLoc">✕ Bỏ lọc ngày</button>
+            </div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnTraCuuNhap">🔍 Tìm</button>
             </div>
@@ -1078,6 +1089,13 @@
               <div class="field" style="grid-column:span 2;"><label>Từ khóa</label><input id="tcx_tuKhoa" placeholder="Số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/nhập…"></div>
               <div class="field"><label>Từ ngày cân</label><input type="date" id="tcx_tuNgay"></div>
               <div class="field"><label>Đến ngày cân</label><input type="date" id="tcx_denNgay"></div>
+            </div>
+            <div class="tc-nhanh" data-tc-nhanh="tcx">
+              <button type="button" class="tc-chip" data-khoang="thangNay">Tháng này</button>
+              <button type="button" class="tc-chip" data-khoang="thangTruoc">Tháng trước</button>
+              <button type="button" class="tc-chip" data-khoang="quyNay">Quý này</button>
+              <button type="button" class="tc-chip" data-khoang="namNay">Năm nay</button>
+              <button type="button" class="tc-chip" data-khoang="boLoc">✕ Bỏ lọc ngày</button>
             </div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnTraCuuXuat">🔍 Tìm</button>
@@ -1509,6 +1527,7 @@
               <div class="guide-body">
                 <ul>
                   <li><b>Phiếu cân nhập</b>: gõ số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc hoặc mã đơn giá (không cần gõ dấu) rồi bấm <b>Tìm</b> hoặc Enter. Mặc định tìm trong 90 ngày gần nhất; xóa trống 2 ô ngày để tìm toàn bộ, kể cả các năm đã khóa sổ (cột "Nơi lưu" cho biết phiếu đang ở sheet nào).</li>
+                  <li>Nút lọc nhanh <b>Tháng này / Tháng trước / Quý này / Năm nay</b> tự điền khoảng ngày và tìm ngay; <b>✕ Bỏ lọc ngày</b> xóa 2 ô ngày để tìm toàn bộ.</li>
                   <li><b>Phiếu cân xuất</b>: tìm theo số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/kho nhập.</li>
                   <li>Bấm vào 1 dòng (hoặc nút <b>🔍 Xem</b>) để mở <b>chi tiết phiếu</b>: thông tin chính + toàn bộ các cột trên sheet; phiếu nhập có nút <b>In Phiếu Nhập Kho</b>. Nút <b>🔍 Chi tiết</b> cũng có sẵn trên từng dòng của các báo cáo phiếu cân nhập/xuất.</li>
                   <li><b>Sửa phiếu nhập</b> (vai trò Nhân viên trở lên): trong chi tiết phiếu CHƯA đóng thanh toán (Trạng thái giá khác "OK"), sửa <b>Khách hàng / Đại lý / Nguồn gốc / Hình ảnh (Y/N)</b> rồi bấm <b>Lưu &amp; tính lại giá</b> - Mã ĐG tự đổi thành <code>ĐL_NG_Y</code> (có hình ảnh) hoặc <code>ĐL_NG_N</code> (không hình ảnh). Đổi Đại lý / Nguồn gốc / Hình ảnh <b>bắt buộc tính được giá mới</b> theo báo giá hiệu lực tại ngày cân mới lưu; không có báo giá khớp thì <b>không lưu gì</b> (báo rõ Mã ĐG, khối lượng, ngày cân để kiểm tra). Chỉ đổi Khách hàng thì giá giữ nguyên. Nút <b>Chỉ tính lại giá</b> tính lại mà không sửa gì. Phiếu đã OK hoặc đã chuyển sang sheet lưu trữ thì không sửa được.</li>
@@ -2747,6 +2766,32 @@
         document.getElementById(p + '_denNgay').value = todayStr();
       });
     }
+    // Lọc nhanh theo ngày (Tháng này / Tháng trước / Quý này / Năm nay / Bỏ lọc ngày):
+    // điền Từ ngày - Đến ngày rồi tìm ngay. Tự sửa ô ngày thì bỏ đánh dấu nút.
+    function tcNgayStr(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function tcKhoangNhanh(loai){
+      const h = new Date(), y = h.getFullYear(), m = h.getMonth();
+      if (loai === 'thangNay') return [new Date(y, m, 1), new Date(y, m + 1, 0)];
+      if (loai === 'thangTruoc') return [new Date(y, m - 1, 1), new Date(y, m, 0)];
+      if (loai === 'quyNay') { const q = Math.floor(m / 3) * 3; return [new Date(y, q, 1), new Date(y, q + 3, 0)]; }
+      if (loai === 'namNay') return [new Date(y, 0, 1), new Date(y, 11, 31)];
+      return null; // boLoc
+    }
+    document.querySelectorAll('[data-tc-nhanh]').forEach(hang=>{
+      const p = hang.getAttribute('data-tc-nhanh');
+      hang.addEventListener('click', e=>{
+        const nut = e.target.closest('.tc-chip');
+        if (!nut) return;
+        const k = tcKhoangNhanh(nut.getAttribute('data-khoang'));
+        document.getElementById(p + '_tuNgay').value = k ? tcNgayStr(k[0]) : '';
+        document.getElementById(p + '_denNgay').value = k ? tcNgayStr(k[1]) : '';
+        hang.querySelectorAll('.tc-chip').forEach(c=>c.classList.toggle('active', c === nut && !!k));
+        (p === 'tcn' ? tcTimNhap : tcTimXuat)();
+      });
+      ['_tuNgay', '_denNgay'].forEach(id=>{
+        document.getElementById(p + id).addEventListener('input', ()=>hang.querySelectorAll('.tc-chip').forEach(c=>c.classList.remove('active')));
+      });
+    });
     function tcBoLoc(p){
       return {
         tuKhoa: document.getElementById(p + '_tuKhoa').value.trim(),
