@@ -111,15 +111,14 @@ function createGasEnv(opts) {
     call(fnName, ...args) {
       const ma = this.maPhien(); // tạo phiên TRƯỚC khi nạp context của lần gọi (giữ đúng realm Date)
       const context = loadFreshContext();
-      const fn = context[fnName];
+      // Chức năng có trong bảng API_ROUTES được gọi ĐÚNG như giao diện thật: qua
+      // cổng API(maPhien, tenHam, thamSo) với phiên của email hiện tại
+      // (session.__setEmail). Chưa có email = chưa đăng nhập (mã phiên rỗng).
+      if (Object.prototype.hasOwnProperty.call(context.API_ROUTES_(), fnName)) return context.API(ma, fnName, args);
+      // Hàm nội bộ: test có thể gọi bằng tên cũ (không có "_" cuối) hoặc tên thật.
+      const fn = typeof context[fnName] === 'function' ? context[fnName] : context[fnName + '_'];
       if (typeof fn !== 'function') {
         throw new Error('Hàm "' + fnName + '" không tồn tại (hoặc không phải function declaration) trong Code.gs/Config.gs.');
-      }
-      // Hàm công khai (mở đầu bằng yeuCauPhien_()) được gọi ĐÚNG như giao diện
-      // thật: qua cổng API(maPhien, tenHam, thamSo) với phiên của email hiện tại
-      // (session.__setEmail). Chưa có email = chưa đăng nhập (mã phiên rỗng).
-      if (String(fn).indexOf('yeuCauPhien_()') !== -1) {
-        if (vm.runInContext('HAM_API_', context)[fnName] === true) return context.API(ma, fnName, args);
       }
       // Hàm nội bộ (không mở cho giao diện) - chạy như đang ở GIỮA 1 lượt API() đã xác thực.
       this.__datPhienNoiBo(context, ma);
@@ -167,7 +166,7 @@ function createGasEnv(opts) {
       context.__dateArgs = dateArgs;
       const date = vm.runInContext('new Date(...__dateArgs)', context);
       this.__datPhienNoiBo(context, ma);
-      const fn = context[fnName];
+      const fn = typeof context[fnName] === 'function' ? context[fnName] : context[fnName + '_'];
       if (typeof fn !== 'function') {
         throw new Error('Hàm "' + fnName + '" không tồn tại trong Code.gs/Config.gs.');
       }

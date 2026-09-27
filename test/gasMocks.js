@@ -254,6 +254,12 @@ function makeFakeSpreadsheetApp() {
   const byId = new Map();
   const byUrl = new Map();
   return {
+    // File Google Sheet mà dự án Apps Script gắn vào (nơi có sheet SYS_NguoiDung).
+    getActive() {
+      if (!byId.has('FILE_CHUA_SCRIPT')) byId.set('FILE_CHUA_SCRIPT', makeFakeSpreadsheet('FILE_CHUA_SCRIPT'));
+      return byId.get('FILE_CHUA_SCRIPT');
+    },
+    getActiveSpreadsheet() { return this.getActive(); },
     openById(id) {
       demApi_('openById');
       if (!byId.has(id)) byId.set(id, makeFakeSpreadsheet(id));

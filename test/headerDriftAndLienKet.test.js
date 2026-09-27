@@ -75,8 +75,7 @@ describe('HT_xacNhanCauTrucSheetHienTai() / HT_datLaiChuanHeaderSheet_() - Admin
 
   test('HT_xacNhanCauTrucSheetHienTai bị chặn nếu không phải Admin (đã kiểm tra ở permission.test.js, kiểm tra lại 1 lần trực tiếp ở đây)', () => {
     const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
-    const res = env.call('HT_xacNhanCauTrucSheetHienTai');
-    expect(res.status).toBe('error');
+    expect(() => env.call('HT_xacNhanCauTrucSheetHienTai')).toThrow(/\[QUYEN\].*không có quyền/);
   });
 });
 

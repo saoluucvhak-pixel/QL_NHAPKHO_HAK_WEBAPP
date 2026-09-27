@@ -1522,13 +1522,13 @@
           <div class="card">
             <h2>Danh sách người dùng được cấp quyền truy cập</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Nhân viên đăng nhập qua <b>Cổng đăng nhập Gmail</b> ở trên; chỉ những email trong danh sách dưới đây mới vào được hệ thống. Nhập <b>đúng email Gmail</b> nhân viên dùng để đăng nhập (dấu chấm trong tên Gmail không quan trọng). Thêm/xóa có hiệu lực ngay — người bị xóa sẽ bị chặn từ thao tác kế tiếp.
-              Vai trò <b>Quản trị</b>: toàn quyền, kể cả Cấu hình hệ thống/Liên kết dữ liệu/mục này. Vai trò <b>Nhân viên</b>: dùng các chức năng nghiệp vụ hàng ngày, không vào được các mục cấu hình toàn hệ thống. Vai trò <b>Chỉ xem</b>: chỉ xem Dashboard, báo cáo, danh sách và xuất Excel/PDF — không nhập/sửa/xóa/import được gì.
+              Nhân viên đăng nhập qua <b>Cổng đăng nhập Gmail</b> ở trên; chỉ những email <b>Hoạt động</b> trong danh sách dưới đây mới vào được hệ thống. Nhập <b>đúng email Gmail</b> nhân viên dùng để đăng nhập (dấu chấm trong tên Gmail không quan trọng). Thêm/xóa/<b>Khóa</b> có hiệu lực ngay — người bị xóa hoặc khóa sẽ bị chặn từ thao tác kế tiếp.
+              Danh sách lưu ở sheet <code>SYS_NguoiDung</code> trong file chứa script này (sửa thẳng trên sheet cũng được, có hiệu lực trong vòng 1 phút). <b>Quản trị</b>: toàn quyền. <b>Tổng hợp</b>: nghiệp vụ + Sao lưu dữ liệu, Nhật ký hoạt động. <b>Nhân viên</b>: import, nhập tay, báo giá, xuất hàng, Kho Dăm. <b>Chỉ xem</b>: Dashboard, báo cáo, danh sách, xuất Excel/PDF.<span id="ht_quanTriCoDinh"></span>
               Cột <b>Quyền Drive</b> chỉ dùng khi bấm nút "Chia sẻ tự động" bên dưới — <b>KHÔNG cần</b> để dùng webapp.
             </p>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Email</th><th>Vai trò</th><th>Quyền Drive</th><th></th></tr></thead>
+                <thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Quyền Drive</th><th></th></tr></thead>
                 <tbody id="ht_quyenBody"></tbody>
               </table>
             </div>
@@ -1539,7 +1539,7 @@
               <button class="btn btn-primary" id="btnLuuDanhSachQuyen">💾 Lưu danh sách</button>
               <button class="btn btn-ghost" id="btnTaiLaiDanhSachQuyen">🔄 Tải lại</button>
             </div>
-            <div class="guide-warn">Phải giữ lại ít nhất 1 tài khoản Quản trị. Xóa nhầm email đang tự dùng để đăng nhập sẽ khiến chính bạn bị khóa khỏi hệ thống ngay khi Lưu — hãy chắc chắn trước khi bấm Lưu.</div>
+            <div class="guide-warn">Phải giữ lại ít nhất 1 tài khoản Quản trị đang Hoạt động. Xóa/khóa nhầm email đang tự dùng để đăng nhập sẽ khiến chính bạn bị khóa khỏi hệ thống ngay khi Lưu — hãy chắc chắn trước khi bấm Lưu.</div>
           </div>
 
           <div class="card">
@@ -1751,6 +1751,9 @@
               reject(new Error(msg));
               return;
             }
+            // Lỗi thiếu quyền ([QUYEN] ...): chỉ báo lỗi, không đăng xuất.
+            const msgLoi = String((err && err.message) || err || '');
+            if (msgLoi.indexOf('[QUYEN] ') !== -1) { reject(new Error(msgLoi.replace(/^.*\[QUYEN\]\s*/, ''))); return; }
             reject(err);
           })
           .API(PHIEN, fnName, args);
@@ -1925,39 +1928,39 @@
       htLoadDashboard();
       khoiDongDangNhap();
     });
-    // FIX (phân quyền): hiển thị đang đăng nhập bằng tài khoản nào / vai trò gì,
-    // và ẩn (không chỉ để trống) các mục CHỈ ADMIN mới dùng được khỏi sidebar
-    // cho nhân viên thường - server vẫn luôn CHẶN CỨNG các hàm này dù có cố
-    // gọi trực tiếp (xem yeuCauQuyenAdmin_ ở Config.gs), đây chỉ là lớp ẩn UI
-    // cho gọn gàng, không phải lớp bảo mật chính.
+    // Hiển thị đang đăng nhập bằng tài khoản nào / vai trò gì, và ẩn các mục
+    // không đủ quyền. Máy chủ vẫn CHẶN CỨNG theo bảng API_ROUTES (Config.gs) -
+    // đây chỉ là lớp ẩn giao diện cho gọn, không phải lớp bảo mật chính.
     function initUserInfo(){
       runServer('HT_layThongTinNguoiDungHienTai').then(res=>{
         if (res.status !== 'success' || !res.data) return;
         state.currentUser = res.data;
         const foot = document.querySelector('.sidebar-foot');
         if (foot) {
-          foot.innerHTML = '© HAKGROUP · Quản lý Thanh toán HAK<br>👤 ' + escapeHtml(res.data.email || '(không xác định)')
-            + ' · ' + (res.data.laAdmin ? '<b>Quản trị</b>' : (res.data.laChiXem ? 'Chỉ xem' : 'Nhân viên'))
+          foot.innerHTML = '© HAKGROUP · Quản lý Thanh toán HAK<br>👤 ' + escapeHtml(res.data.hoTen || res.data.email || '(không xác định)')
+            + ' · <b>' + escapeHtml(res.data.vaiTroNhan || '') + '</b>' 
             + '<br><a href="#" id="btnDangXuat" style="color:var(--accent);">Đăng xuất</a>';
           const btn = document.getElementById('btnDangXuat');
           if (btn) btn.addEventListener('click', e => { e.preventDefault(); dangXuat(); });
         }
         apDungVaiTro(res.data);
-        if (res.data.laAdmin) nhacLuuLinkCong();
+        if (coQuyen(res.data, 'QUAN_TRI')) nhacLuuLinkCong();
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
     }
 
-    // Ẩn/hiện menu theo vai trò. Vai trò Chỉ xem: ẩn các menu/tab/nút nhập-
-    // sửa-xóa. Đây chỉ là lớp giao diện cho gọn - API() ở máy chủ mới là nơi
-    // chặn cứng (kiemTraQuyenChiXem_). Luôn đặt cả 2 chiều ẩn/hiện vì có thể đổi
+    // Ẩn/hiện menu theo MỨC QUYỀN (u.quyen: XEM / NGHIEP_VU / HE_THONG / QUAN_TRI -
+    // cùng bảng API_ROUTES ở máy chủ). Luôn đặt cả 2 chiều ẩn/hiện vì có thể đổi
     // người dùng ngay trong trang (đăng xuất rồi đăng nhập tài khoản khác).
+    function coQuyen(u, quyen){ return !!(u && Array.isArray(u.quyen) && u.quyen.indexOf(quyen) !== -1); }
+    const TAB_HE_THONG_THEO_QUYEN = { 'ht-tab-cauhinh': 'QUAN_TRI', 'ht-tab-quyen': 'QUAN_TRI', 'ht-tab-luutru': 'HE_THONG', 'ht-tab-nhatky': 'HE_THONG' };
     function apDungVaiTro(u){
       const hien = (el, co) => { if (el) el.style.display = co ? '' : 'none'; };
-      ['ht-tab-cauhinh', 'ht-tab-quyen', 'ht-tab-luutru', 'ht-tab-nhatky'].forEach(tabId=>{
-        hien(document.querySelector('.sub-item[data-tab="' + tabId + '"]'), u.laAdmin);
-        hien(document.querySelector('.tabbtn[data-pane="' + tabId + '"]'), u.laAdmin);
+      Object.keys(TAB_HE_THONG_THEO_QUYEN).forEach(tabId=>{
+        const duoc = coQuyen(u, TAB_HE_THONG_THEO_QUYEN[tabId]);
+        hien(document.querySelector('.sub-item[data-tab="' + tabId + '"]'), duoc);
+        hien(document.querySelector('.tabbtn[data-pane="' + tabId + '"]'), duoc);
       });
-      const chiXem = !!u.laChiXem;
+      const chiXem = !coQuyen(u, 'NGHIEP_VU');
       document.body.classList.toggle('che-do-chi-xem', chiXem);
       ['view-import', 'view-router-nhaplieu'].forEach(viewId=>{
         hien(document.querySelector('.menu-item[data-view="' + viewId + '"]'), !chiXem);
@@ -4792,18 +4795,25 @@
     // =================================================================
     // HỆ THỐNG - QUẢN LÝ NGƯỜI DÙNG (phân quyền truy cập - chỉ Admin)
     // =================================================================
-    function htVeDongQuyen(email, vaiTro, quyenDrive){
+    const HT_VAI_TRO = [['ADMIN', 'Quản trị'], ['TONG_HOP', 'Tổng hợp'], ['NHANVIEN', 'Nhân viên'], ['CHIXEM', 'Chỉ xem']];
+    function htVeDongQuyen(u){
+      u = u || {};
+      const vaiTro = HT_VAI_TRO.some(v => v[0] === u.vaiTro) ? u.vaiTro : 'NHANVIEN';
+      const khoa = u.trangThai === 'Khóa';
       return '<tr>'
-        + '<td><input type="email" class="ht-quyen-email" value="'+escapeHtml(email || '')+'" placeholder="ten@gmail.com" style="width:100%;font-size:12px;"></td>'
+        + '<td><input type="email" class="ht-quyen-email" value="'+escapeHtml(u.email || '')+'" placeholder="ten@gmail.com" style="width:100%;font-size:12px;"></td>'
+        + '<td><input type="text" class="ht-quyen-hoten" value="'+escapeHtml(u.hoTen || '')+'" placeholder="Họ tên" style="width:100%;font-size:12px;"></td>'
         + '<td><select class="ht-quyen-vaitro" style="font-size:12px;">'
-          + '<option value="NHANVIEN"'+(vaiTro !== 'ADMIN' && vaiTro !== 'CHIXEM' ? ' selected' : '')+'>Nhân viên</option>'
-          + '<option value="CHIXEM"'+(vaiTro === 'CHIXEM' ? ' selected' : '')+'>Chỉ xem</option>'
-          + '<option value="ADMIN"'+(vaiTro === 'ADMIN' ? ' selected' : '')+'>Quản trị</option>'
+          + HT_VAI_TRO.map(v => '<option value="'+v[0]+'"'+(v[0] === vaiTro ? ' selected' : '')+'>'+v[1]+'</option>').join('')
+          + '</select></td>'
+        + '<td><select class="ht-quyen-trangthai" style="font-size:12px;">'
+          + '<option value="Hoạt động"'+(khoa ? '' : ' selected')+'>✅ Hoạt động</option>'
+          + '<option value="Khóa"'+(khoa ? ' selected' : '')+'>🔒 Khóa</option>'
           + '</select></td>'
         + '<td><select class="ht-quyen-drive" style="font-size:12px;" title="Quyền trên Google Sheet/Drive khi bấm Chia sẻ tự động">'
-          + '<option value="VIEWER"'+(quyenDrive === 'VIEWER' ? ' selected' : '')+'>👁️ Xem</option>'
-          + '<option value="COMMENTER"'+(quyenDrive === 'COMMENTER' ? ' selected' : '')+'>💬 Bình luận</option>'
-          + '<option value="EDITOR"'+(quyenDrive !== 'VIEWER' && quyenDrive !== 'COMMENTER' ? ' selected' : '')+'>✏️ Chỉnh sửa</option>'
+          + '<option value="VIEWER"'+(u.quyenDrive === 'VIEWER' ? ' selected' : '')+'>👁️ Xem</option>'
+          + '<option value="COMMENTER"'+(u.quyenDrive === 'COMMENTER' ? ' selected' : '')+'>💬 Bình luận</option>'
+          + '<option value="EDITOR"'+(u.quyenDrive !== 'VIEWER' && u.quyenDrive !== 'COMMENTER' ? ' selected' : '')+'>✏️ Chỉnh sửa</option>'
           + '</select></td>'
         + '<td><button class="btn btn-ghost btn-sm ht-quyen-xoa" type="button" title="Xóa">🗑️</button></td>'
         + '</tr>';
@@ -4861,14 +4871,17 @@
         const res = await runServer('HT_layDanhSachQuyen');
         if (res.status !== 'success') { toast(res.message, false); return; }
         const body = document.getElementById('ht_quyenBody');
-        body.innerHTML = res.data.map(u => htVeDongQuyen(u.email, u.vaiTro, u.quyenDrive)).join('');
+        body.innerHTML = res.data.map(u => htVeDongQuyen(u)).join('');
+        const coDinh = document.getElementById('ht_quanTriCoDinh');
+        if (coDinh) coDinh.innerHTML = (res.quanTriCoDinh && res.quanTriCoDinh.length)
+          ? '<br>Quản trị cố định (luôn là Quản trị, không khóa được từ đây): <b>' + res.quanTriCoDinh.map(escapeHtml).join(', ') + '</b>.' : '';
         body.querySelectorAll('.ht-quyen-xoa').forEach(btn => btn.addEventListener('click', () => btn.closest('tr').remove()));
       } catch(err){ toast('Lỗi tải danh sách người dùng: ' + err, false); }
     }
     document.getElementById('btnTaiLaiDanhSachQuyen').addEventListener('click', htLoadDanhSachQuyen);
     document.getElementById('btnThemNguoiDung').addEventListener('click', ()=>{
       const body = document.getElementById('ht_quyenBody');
-      body.insertAdjacentHTML('beforeend', htVeDongQuyen('', 'NHANVIEN', 'EDITOR'));
+      body.insertAdjacentHTML('beforeend', htVeDongQuyen({ vaiTro: 'NHANVIEN', trangThai: 'Hoạt động', quyenDrive: 'EDITOR' }));
       const rows = body.querySelectorAll('tr');
       const lastRow = rows[rows.length - 1];
       lastRow.querySelector('.ht-quyen-xoa').addEventListener('click', () => lastRow.remove());
@@ -4878,11 +4891,13 @@
       const rows = document.querySelectorAll('#ht_quyenBody tr');
       const danhSach = Array.from(rows).map(row => ({
         email: row.querySelector('.ht-quyen-email').value.trim(),
+        hoTen: row.querySelector('.ht-quyen-hoten').value.trim(),
         vaiTro: row.querySelector('.ht-quyen-vaitro').value,
+        trangThai: row.querySelector('.ht-quyen-trangthai').value,
         quyenDrive: row.querySelector('.ht-quyen-drive').value
       })).filter(u => u.email);
       if (danhSach.length === 0) { toast('Danh sách người dùng không được để trống.', false); return; }
-      if (!confirm('Lưu danh sách ' + danhSach.length + ' người dùng? Email KHÔNG có trong danh sách sau khi lưu sẽ mất quyền truy cập ngay lập tức.')) return;
+      if (!confirm('Lưu danh sách ' + danhSach.length + ' người dùng? Email KHÔNG có trong danh sách hoặc đang Khóa sẽ mất quyền truy cập ngay lập tức.')) return;
       showOverlay('Đang lưu danh sách người dùng…');
       try {
         const res = await runServer('HT_luuDanhSachQuyen', danhSach);

@@ -11,9 +11,7 @@ const BAOGIA_SPREADSHEET_ID = '1SIhfjP5-6ouRPDj265lAMmI5yWs1XcnedjqpzDwaIC0';
 describe('HT_chiaSeTaiNguyenChoDanhSachQuyen() - tự động share Sheet/Drive cho danh sách quyền', () => {
   test('CHỈ ADMIN mới gọi được', () => {
     const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
-    const res = env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
-    expect(res.status).toBe('error');
-    expect(res.message).toMatch(/quyền Quản trị/);
+    expect(() => env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen')).toThrow(/\[QUYEN\].*không có quyền/);
   });
 
   test('chia sẻ đúng ID (sheet dùng getFileById, folder dùng getFolderById) cho TỪNG người trong danh sách quyền, không trùng lặp ID', () => {
@@ -54,11 +52,11 @@ describe('HT_chiaSeTaiNguyenChoDanhSachQuyen() - tự động share Sheet/Drive 
     expect(dongOkKhac.length).toBeGreaterThan(0);
   });
 
-  test('chưa từng lưu danh sách quyền -> DS_QUYEN_() fallback về Admin bootstrap, vẫn chia sẻ được cho đúng người đó', () => {
+  test('chưa từng lưu danh sách người dùng -> chia sẻ cho các Quản trị cố định', () => {
     const env = createGasEnv({ email: ADMIN_EMAIL });
     const res = env.call('HT_chiaSeTaiNguyenChoDanhSachQuyen');
     expect(res.status).toBe('success');
-    expect(res.data.every((r) => r.email === ADMIN_EMAIL)).toBe(true);
+    expect(res.data.every((r) => [ADMIN_EMAIL, 'phuthuy.apple@gmail.com'].includes(r.email))).toBe(true);
     expect(res.data.length).toBeGreaterThan(0);
   });
 
@@ -99,9 +97,7 @@ describe('HT_chiaSeTaiNguyenChoDanhSachQuyen() - tự động share Sheet/Drive 
 describe('HT_layTinhTrangChiaSeTaiNguyen() - xem CHÍNH XÁC email nào đang có quyền gì trên từng tài nguyên', () => {
   test('CHỈ ADMIN mới xem được', () => {
     const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
-    const res = env.call('HT_layTinhTrangChiaSeTaiNguyen');
-    expect(res.status).toBe('error');
-    expect(res.message).toMatch(/quyền Quản trị/);
+    expect(() => env.call('HT_layTinhTrangChiaSeTaiNguyen')).toThrow(/\[QUYEN\].*không có quyền/);
   });
 
   test('liệt kê đúng từng (tài nguyên, email, quyền) sau khi chia sẻ - phân biệt đúng Chỉnh sửa vs Xem/Bình luận', () => {
@@ -136,8 +132,8 @@ describe('HT_layTinhTrangChiaSeTaiNguyen() - xem CHÍNH XÁC email nào đang c�
 describe('HT_thuHoiQuyenTaiNguyen() / HT_thuHoiToanBoQuyenDriveChoEmail() - thu hồi quyền Drive', () => {
   test('CHỈ ADMIN mới thu hồi được', () => {
     const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
-    expect(env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', 'nv@gmail.com').status).toBe('error');
-    expect(env.call('HT_thuHoiToanBoQuyenDriveChoEmail', 'nv@gmail.com').status).toBe('error');
+    expect(() => env.call('HT_thuHoiQuyenTaiNguyen', CONFIG_SPREADSHEET_ID, 'sheet', 'nv@gmail.com')).toThrow(/\[QUYEN\].*không có quyền/);
+    expect(() => env.call('HT_thuHoiToanBoQuyenDriveChoEmail', 'nv@gmail.com')).toThrow(/\[QUYEN\].*không có quyền/);
   });
 
   test('thu hồi trên 1 tài nguyên cụ thể -> chỉ mất quyền ĐÚNG tài nguyên đó, các tài nguyên khác của cùng email vẫn còn', () => {

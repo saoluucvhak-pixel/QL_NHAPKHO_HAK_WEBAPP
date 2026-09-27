@@ -77,9 +77,7 @@ describe('REGION_FORMAT() / MISA_FORMAT() - cấu hình vùng miền', () => {
 
   test('NHÂN VIÊN thường (không phải Admin) KHÔNG đổi được cấu hình vùng miền', () => {
     const env = createGasEnv({ email: 'nhanvien@gmail.com', vaiTro: 'NHANVIEN' });
-    const res = env.call('HT_luuCauHinhVungMien', 'US', 'VN');
-    expect(res.status).toBe('error');
-    expect(res.message).toMatch(/quyền Quản trị/);
+    expect(() => env.call('HT_luuCauHinhVungMien', 'US', 'VN')).toThrow(/\[QUYEN\].*không có quyền/);
     // Và cấu hình vẫn giữ nguyên mặc định VN, không bị đổi.
     expect(env.call('REGION_FORMAT').MIEN).toBe('VN');
   });
@@ -111,8 +109,7 @@ describe('MISA_DEFAULTS() - giá trị mặc định báo cáo Misa', () => {
 
   test('NHÂN VIÊN thường không lưu được giá trị mặc định Misa', () => {
     const env = createGasEnv({ email: 'ai-do@gmail.com', vaiTro: 'NHANVIEN' });
-    const res = env.call('HT_luuMisaDefaults', { maHang: 'HACK' });
-    expect(res.status).toBe('error');
+    expect(() => env.call('HT_luuMisaDefaults', { maHang: 'HACK' })).toThrow(/\[QUYEN\].*không có quyền/);
     expect(env.call('MISA_DEFAULTS').maHang).toBe('621A.001');
   });
 });
