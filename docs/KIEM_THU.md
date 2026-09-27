@@ -3,7 +3,7 @@
 ## 1. Kiểm thử tự động (đã có — PASS 100%)
 | Bộ | Lệnh | Số ca |
 |---|---|---|
-| Máy chủ / bảo mật / API / dữ liệu / sao lưu / nhật ký | `npm test` | 90 |
+| Máy chủ / bảo mật / API / dữ liệu / sao lưu / nhật ký / khóa sổ ĐNTT | `npm test` | 100 |
 | Giao diện / vai trò / nhúng Portal / sao lưu / nhật ký | `npm run test:ui` | 46 |
 
 Chi tiết từng ca: xem tên ca trong `tests/*.test.js` (mỗi `check('…')` là 1 ca).
@@ -34,6 +34,12 @@ Chi tiết từng ca: xem tên ca trong `tests/*.test.js` (mỗi `check('…')` 
 - [ ] Kỳ vét bãi: chỉ nút xóa kỳ mới nhất hoạt động
 - [ ] Tên khách hàng `=1+1` → lưu & xuất Excel hiển thị đúng chữ `=1+1`
 - [ ] Phiếu thuộc kỳ vét bãi cũ → không sửa/xóa được
+
+### Khóa Sổ Năm (webapp ĐNTT) — sau khi khóa sổ 1 năm
+- [ ] Báo cáo tổng hợp kho chọn khoảng ngày thuộc năm đã khóa sổ → vẫn đủ phiếu (đọc thêm sheet `PhieuCan_DN_<năm>`)
+- [ ] Import lại file phiếu cân đã được chuyển lưu trữ → báo "Bỏ qua (đã khóa)", không tạo phiếu trùng
+- [ ] Phiếu chưa trả của năm cũ vẫn nằm ở sheet chính, vẫn sửa/tính giá được
+- [ ] Hệ thống › Sao lưu dữ liệu: không còn nút Chốt sổ
 
 ### Sao lưu & Nhật ký (Quản trị)
 - [ ] Bấm "Sao lưu ngay" → thư mục "HAK - Sao lưu dữ liệu hệ thống" có thư mục con mới với đủ các Google Sheet

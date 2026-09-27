@@ -41,8 +41,8 @@ Trong Portal: **Quản trị** → mục "Kho gỗ keo" (`URL_KHO`) → dán lin
 ### B5. Sau khi cài
 - **Thu hồi quyền Sheet trực tiếp** của nhân viên (Hệ thống › Quản lý người dùng › Tình trạng chia sẻ): webapp không cần, còn giữ thì họ sửa được Sheet ngoài hệ thống.
 - Không chia sẻ **dự án Cổng** cho ai (chứa khóa bí mật). Nghi lộ: **Đổi khóa bí mật** → dán mã mới vào Cổng → triển khai phiên bản mới.
-- Bật **Sao lưu tự động** (Hệ thống › Lưu trữ & Sao lưu → tích "Tự động sao lưu hằng đêm" → Lưu cài đặt) rồi bấm **Sao lưu ngay** 1 lần để kiểm tra.
-- Định kỳ **Chốt sổ năm** (Hệ thống › Lưu trữ & Sao lưu) để sheet chính luôn nhẹ.
+- Bật **Sao lưu tự động** (Hệ thống › Sao lưu dữ liệu → tích "Tự động sao lưu hằng đêm" → Lưu cài đặt) rồi bấm **Sao lưu ngay** 1 lần để kiểm tra.
+- Lưu trữ phiếu cân năm cũ: dùng **webapp ĐNTT › Hệ Thống › Khóa Sổ Năm** (webapp này không còn nút Chốt sổ riêng, chỉ tự đọc sheet `PhieuCan_DN_<năm>`). Chạy vào lúc không ai đang Import/Tính giá phiếu cân.
 - Định kỳ xem **Nhật ký hoạt động** (lọc Trạng thái = TU_CHOI / ERROR) để phát hiện truy cập bất thường.
 
 ## C. Khôi phục sự cố

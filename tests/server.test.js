@@ -317,5 +317,68 @@ reset(); const nkX = ctx.API(phienMoi, 'HT_xuatNhatKyExcel', [{ tuKhoa: 'PN-49' 
 const kyVongXuat = auditRows.slice(1).filter(r => r[0] >= new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 6) && String(r[3]).includes('PN-49')).length;
 check('log: export to Excel file (' + (tempRows && tempRows.length) + '/' + kyVongXuat + ')', nkX.status === 'success' && !!nkX.fileBase64 && tempRows && tempRows.length === kyVongXuat && Object.prototype.toString.call(tempRows[0][0]) === '[object Date]');
 ctx.SpreadsheetApp.openById = ssGoc;
+
+// ===================== 17. KHÓA SỔ NĂM DO WEBAPP ĐNTT THỰC HIỆN =====================
+reset(); check('chốt sổ removed: HT_chotSoNam / HT_layThongKeNamPhieuCan gone', typeof ctx.HT_chotSoNam === 'undefined' && typeof ctx.HT_layThongKeNamPhieuCan === 'undefined' && throwsWith(()=>ctx.API(phienMoi, 'HT_chotSoNam', [2025]), 'Không được phép'));
+// Sheet giả đầy đủ (đọc/ghi/xóa + móc sự kiện để giả lập webapp ĐNTT xóa dòng xen giữa)
+function MockSheet(ten, rows) {
+  const sh = { ten, data: rows.map(r => r.slice()), writes: [], onRead: null,
+    getName: () => ten, getLastRow: () => sh.data.length, getLastColumn: () => Math.max(0, ...sh.data.map(r => r.length)),
+    getDataRange: () => sh.getRange(1, 1, sh.data.length, sh.getLastColumn()),
+    deleteRow: r => { sh.data.splice(r - 1, 1); }, deleteRows: (r, n) => { sh.data.splice(r - 1, n); },
+    appendRow: row => { sh.data.push(row.slice()); }, setFrozenRows(){},
+    getRange: (r, c, nr, nc) => { nr = nr || 1; nc = nc || 1; const rg = {
+      getValues: () => { const v = Array.from({ length: nr }, (_, i) => sh.data[r - 1 + i] || []).map(row => Array.from({ length: nc }, (_, j) => row[c - 1 + j] === undefined ? '' : row[c - 1 + j])); if (sh.onRead) sh.onRead(r, c, nr, nc); return v; },
+      getValue: () => rg.getValues()[0][0],
+      setValues: v => { v.forEach((row, i) => { while (sh.data.length < r + i) sh.data.push([]); row.forEach((x, j) => { sh.data[r - 1 + i][c - 1 + j] = x; }); }); sh.writes.push([r, c, v]); return rg; },
+      setValue: x => rg.setValues([[x]]),
+      setNumberFormat: () => rg, setNumberFormats: () => rg, setFontWeight: () => rg };
+      return rg; } };
+  return sh;
+}
+// Dòng phiếu cân 26 cột: A=Số phiếu, B=Ngày cân, J=KL, Q=mã giá, V=Mã CT, Y=trạng thái
+const dongPC = (so, ma, trangThai) => { const r = new Array(26).fill(''); r[0] = so; r[1] = new Date(2026, 5, 10); r[9] = 20000; r[16] = 'DL_NG_Y'; r[21] = ma; r[24] = trangThai || ''; return r; };
+const tieuDePC = new Array(26).fill('H');
+const shPC = MockSheet('PhieuCan_DN', [tieuDePC, dongPC('P1', 'P1/2026/NK'), dongPC('P2', 'P2/2026/NK'), dongPC('P3', 'P3/2026/NK', 'OK')]);
+check('re-locate row: still in place', JSON.stringify(ctx.PC_timLaiDongPhieu_(shPC, 3, 'P2/2026/NK')) === JSON.stringify({ rowNum: 3, status: '' }));
+shPC.deleteRow(2); // ĐNTT vừa chuyển P1 đi -> P2 dịch lên dòng 2
+check('re-locate row: shifted row found', ctx.PC_timLaiDongPhieu_(shPC, 3, 'P2/2026/NK').rowNum === 2);
+check('re-locate row: archived phiếu -> null', ctx.PC_timLaiDongPhieu_(shPC, 2, 'P1/2026/NK') === null);
+check('re-locate row: reports current OK status', ctx.PC_timLaiDongPhieu_(shPC, 3, 'P3/2026/NK').status === 'OK');
+const truoc = [dongPC('X1', 'X1/2026/NK'), dongPC('X2', 'X2/2026/NK'), dongPC('X3', 'X3/2026/NK')];
+const shKT = MockSheet('PhieuCan_DN', [tieuDePC].concat(truoc));
+check('rows-still-in-place check: unchanged -> true', ctx.PC_cacDongConDungCho_(shKT, [2, 4], truoc) === true);
+shKT.deleteRow(2);
+check('rows-still-in-place check: after delete -> false', ctx.PC_cacDongConDungCho_(shKT, [2, 3], truoc) === false);
+
+// Tính giá: ĐNTT xóa 1 dòng ĐÚNG LÚC đang đọc báo giá -> dừng, không ghi gì
+function moiTruongTinhGia(xoaXenGiua) {
+  const pc = MockSheet('PhieuCan_DN', [tieuDePC, dongPC('A1', 'A1/2026/NK'), dongPC('A2', 'A2/2026/NK'), dongPC('A3', 'A3/2026/NK')]);
+  const bg = MockSheet('Baogia_DN_SAVE', [['h'], ['', new Date(2026, 0, 1), new Date(2027, 0, 1), 'DL_NG_Y', 0, 100, 1500]]);
+  bg.onRead = () => { if (xoaXenGiua && pc.data.length === 4) pc.deleteRow(2); };
+  const audit = MockSheet('Audit', [['Thời gian']]);
+  ctx.SpreadsheetApp.openById = id => ({ getSheetByName: n => n === 'PhieuCan_DN' ? pc : n === 'Baogia_DN_SAVE' ? bg : n === 'Audit' ? audit : null, getSheets: () => [pc] });
+  return { pc, audit };
+}
+run('PHIEN_HIEN_TAI_ = timNguoiDungTheoEmail_("saoluucvhak@gmail.com")');
+let mt = moiTruongTinhGia(false);
+let kqGia = ctx.runCalculatePrice_core();
+check('price calc: normal run writes prices', kqGia.status === 'success' && mt.pc.data.slice(1).every(r => r[24] === 'Test giá' && r[19] === 1500));
+mt = moiTruongTinhGia(true);
+kqGia = ctx.runCalculatePrice_core();
+check('price calc: rows shifted mid-run -> aborts, writes nothing', kqGia.status === 'error' && /thực hiện lại/.test(kqGia.message) && mt.pc.writes.length === 0 && mt.audit.data.some(r => r[1] === 'TINH_GIA'));
+
+// Import: ĐNTT xóa dòng sau khi đã đọc danh sách trùng -> vẫn cập nhật ĐÚNG phiếu
+const pcImp = MockSheet('PhieuCan_DN', [tieuDePC, dongPC('B1', 'B1/2026/NK'), dongPC('B2', 'B2/2026/NK')]);
+let daXoa = false;
+pcImp.onRead = (r, c, nr, nc) => { if (!daXoa && r === 2 && c === 1 && nc === 25) { daXoa = true; pcImp._xoaSau = true; } };
+const origGetRange = pcImp.getRange;
+pcImp.getRange = (r, c, nr, nc) => { if (pcImp._xoaSau && !(r === 2 && c === 1 && nc === 25)) { pcImp._xoaSau = false; pcImp.deleteRow(2); } return origGetRange(r, c, nr, nc); };
+ctx.SpreadsheetApp.openById = () => ({ getSheetByName: n => n === 'PhieuCan_DN' ? pcImp : null, getSheets: () => [pcImp], insertSheet: () => MockSheet('Audit', []) });
+const itemImp = { uniqueKey: 'B2/2026/NK', soPhieu: 'B2', soXe: '43C-999', khGoc: 'KH moi', dlGoc: 'dl', ngGoc: 'ng', rawDateC: new Date(2026, 5, 11).toISOString(), rawDateD: '', klCan1: 30000, klCan2: 10000, klHangGoc: 20000, isError: false };
+let kqImp; try { kqImp = ctx.step1_ConfirmImport([itemImp], false); } catch (e) { kqImp = { status: 'throw', message: String(e) }; }
+const dongB2 = pcImp.data.find(r => r[21] === 'B2/2026/NK');
+check('import: rows shifted before update -> correct phiếu updated (' + (kqImp && kqImp.status) + ')', daXoa && pcImp.data.length === 2 && dongB2 && dongB2[5] === '43C-999' && dongB2[11] === 'KH moi');
+ctx.SpreadsheetApp.openById = ssGoc;
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

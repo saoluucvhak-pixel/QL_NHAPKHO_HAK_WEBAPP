@@ -116,7 +116,7 @@ Từ giờ nút **"Đăng nhập bằng Gmail"** trên webapp và Portal sẽ tr
 4. Cột **Vai trò**: chọn
    | Chọn | Dùng cho | Thấy / làm được |
    |---|---|---|
-   | **Quản trị** | Giám đốc, kế toán trưởng, IT | Tất cả, kể cả Cấu hình hệ thống, Quản lý người dùng, Lưu trữ & Sao lưu, Nhật ký hoạt động |
+   | **Quản trị** | Giám đốc, kế toán trưởng, IT | Tất cả, kể cả Cấu hình hệ thống, Quản lý người dùng, Sao lưu dữ liệu, Nhật ký hoạt động |
    | **Nhân viên** | Nhân viên cân, thủ kho, kế toán | Dashboard, Import, Nhập liệu, Báo cáo, Báo giá, xuất Excel/PDF. Không thấy mục cấu hình/người dùng/sao lưu/nhật ký |
    | **Chỉ xem** | Ban lãnh đạo, kiểm soát, đối tác | Dashboard, Báo cáo, danh sách báo giá, xuất Excel/PDF. **Không** thấy Import, Nhập liệu, Nhập báo giá; không có nút sửa/xóa; mọi thao tác ghi bị máy chủ chặn |
 5. Cột **Quyền Drive**: **bỏ qua** (chỉ dùng cho nút chia sẻ Sheet thủ công, không liên quan việc đăng nhập).

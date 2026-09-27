@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 2.2.0 — 27/09/2026
+
+### Thay đổi
+- **Gỡ chức năng "Chốt sổ năm"** của webapp kho. Lưu trữ phiếu cân năm cũ nay do **webapp ĐNTT › Hệ Thống › Khóa Sổ Năm** đảm nhận (chuyển phiếu **đã trả** theo hồ sơ thanh toán; phiếu chưa trả ở lại làm công nợ). Lý do: 2 công cụ cùng chuyển dòng trên 1 sheet `PhieuCan_DN` theo 2 tiêu chí khác nhau ("OK" và "đã trả") — phiếu "OK" nhưng thanh toán năm sau bị webapp kho chuyển sớm thì báo cáo năm đang mở của ĐNTT không còn thấy phiếu đó.
+- Webapp kho **vẫn đọc** các sheet `PhieuCan_DN_<năm>` (cùng tên, cùng thứ tự cột với ĐNTT) cho báo cáo và chặn nhập trùng phiếu đã lưu trữ.
+- Tab "Lưu trữ & Sao lưu" đổi tên thành **"Sao lưu dữ liệu"**, kèm ghi chú về Khóa Sổ Năm bên ĐNTT.
+
+### An toàn dữ liệu khi chạy song song với ĐNTT
+- **Import phiếu cân**: trước khi cập nhật 1 phiếu đã có, xác định lại đúng dòng theo Mã chứng từ; phiếu vừa được chuyển sang lưu trữ hoặc vừa khóa "OK" thì bỏ qua, không ghi đè.
+- **Tính giá**: nếu vị trí dòng thay đổi trong lúc tính (VD ĐNTT đang Khóa sổ năm) thì dừng, không ghi giá/trạng thái sang phiếu khác, báo người dùng chạy lại.
+
+### Kiểm thử
+- 100 ca máy chủ + 46 ca giao diện, PASS 100%.
+
 ## 2.1.0 — 26/09/2026
 
 ### Tính năng mới (chỉ Quản trị)

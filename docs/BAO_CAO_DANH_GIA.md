@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ KỸ THUẬT — HỆ THỐNG QUẢN LÝ CÂN / NHẬP–XUẤT KHO HAKGROUP
 
-Phiên bản đánh giá: 2.1.0 (nhánh `claude/fix-webapp-cleanup-p8wzjn`) · Ngày: 26/09/2026
+Phiên bản đánh giá: 2.2.0 (nhánh `claude/fix-webapp-cleanup-p8wzjn`) · Ngày: 26/09/2026
 
 > Phạm vi: toàn bộ mã nguồn trong repo — `Code.gs` (≈4.950 dòng), `Config.gs` (≈1.150 dòng),
 > `Index.html` (≈4.900 dòng: HTML + CSS + JS), `appsscript.json`, cùng Portal `MAIN_HAK` (chỉ đọc để
@@ -169,7 +169,7 @@ Mức độ: 🔴 Nghiêm trọng · 🟠 Cao · 🟡 Trung bình · 🟢 Thấp
 | 100 | < 3 giây | < 2 giây | < 2 giây | |
 | 1.000 | 3–6 giây | 2–4 giây | 2–4 giây | |
 | 10.000 | 5–15 giây | 4–10 giây | 4–10 giây | Bình thường |
-| 100.000 | 15–40 giây | 15–45 giây | 15–45 giây | Chạy được trong giới hạn 6 phút nhưng chậm; **nên Chốt sổ năm** (lưu trữ) để sheet chính < 30.000 dòng |
+| 100.000 | 15–40 giây | 15–45 giây | 15–45 giây | Chạy được trong giới hạn 6 phút nhưng chậm; **nên Khóa Sổ Năm bên webapp ĐNTT** (lưu trữ) để sheet chính < 30.000 dòng |
 
 Giới hạn cứng của Google: 10 triệu ô / spreadsheet (≈ 370.000 dòng × 27 cột, tính cả sheet lưu trữ vì lưu trữ nằm cùng file), 6 phút / lần thực thi, 30 lượt thực thi đồng thời / người. Đây là giới hạn nền tảng — vượt ngưỡng cần chuyển CSDL (xem Lộ trình giai đoạn 3).
 
@@ -221,7 +221,7 @@ Rủi ro còn lại: (1) Người có quyền **sửa dự án Apps Script** xem
 | Thay đổi | Lý do |
 |---|---|
 | `HAM_API_` — danh sách hàm API tường minh | Tách rõ **hàm công khai cho giao diện** và **hàm nội bộ** (Interface Segregation); chặn đường vòng qua khóa/nhật ký |
-| `xoaCacDong_` — tiện ích dùng chung | DRY: gộp logic xóa khối dòng (Chốt sổ năm + Xóa báo giá) |
+| `xoaCacDong_` — tiện ích dùng chung | DRY: gộp logic xóa khối dòng (Xóa báo giá; trước đây cả Chốt sổ năm — đã gỡ ở 2.2.0) |
 | `chongCongThuc_ / chongCongThucBang_` | Một điểm duy nhất bảo vệ dữ liệu ghi ra file/nhật ký |
 | `XH_timDongDonHang_` | Một hàm xác định dòng dùng chung cho Xem/Sửa/Xóa đơn hàng |
 | `apDungVaiTro` (client) | Áp giao diện theo vai trò 2 chiều (ẩn/hiện) — đổi người dùng không cần tải lại |
@@ -254,7 +254,7 @@ Chạy: `npm test` (máy chủ) và `npm run test:ui` (giao diện) — xem `doc
 
 | Bộ | Số ca | Kết quả | Nội dung |
 |---|---|---|---|
-| Máy chủ (`tests/server.test.js`) | 90 | **90/90 PASS** | Cài đặt Cổng; vé hợp lệ/giả/sai khóa/hết hạn/quá xa/dùng lại/rác; phiên, hết hạn 12h, đăng xuất, thu hồi tức thì; API chặn eval/hàm riêng/hàm nội bộ/doGet; mọi hàm giao diện gọi đều có trong `HAM_API_`; Admin/Nhân viên/Chỉ xem; đổi khóa Cổng; tải file xuất; chống công thức; xác định dòng đơn hàng (lệch dòng, đã xóa, trùng STT); xóa kỳ vét bãi (tiêu đề, kỳ cũ, dòng khác, kỳ mới nhất); gom khối xóa dòng; nhật ký nguyên tử; **sao lưu** (chặn nhân viên/chỉ xem, trigger giả mạo, bật 2 lần vẫn 1 trigger, giữ N bản, báo lỗi từng file, không chạy chồng); **nhật ký** (7 ngày mặc định, chỉ đọc khối cần thiết trên 5.000 dòng, lọc kết hợp, từ khóa, phân trang, xuất Excel, phân quyền) |
+| Máy chủ (`tests/server.test.js`) | 100 | **100/100 PASS** | Cài đặt Cổng; vé hợp lệ/giả/sai khóa/hết hạn/quá xa/dùng lại/rác; phiên, hết hạn 12h, đăng xuất, thu hồi tức thì; API chặn eval/hàm riêng/hàm nội bộ/doGet; mọi hàm giao diện gọi đều có trong `HAM_API_`; Admin/Nhân viên/Chỉ xem; đổi khóa Cổng; tải file xuất; chống công thức; xác định dòng đơn hàng (lệch dòng, đã xóa, trùng STT); xóa kỳ vét bãi (tiêu đề, kỳ cũ, dòng khác, kỳ mới nhất); gom khối xóa dòng; nhật ký nguyên tử; **sao lưu** (chặn nhân viên/chỉ xem, trigger giả mạo, bật 2 lần vẫn 1 trigger, giữ N bản, báo lỗi từng file, không chạy chồng); **nhật ký** (7 ngày mặc định, chỉ đọc khối cần thiết trên 5.000 dòng, lọc kết hợp, từ khóa, phân trang, xuất Excel, phân quyền); **song song với Khóa Sổ Năm của ĐNTT** (import xác định lại đúng dòng khi dòng bị dịch, tính giá dừng khi dòng bị dịch, đã gỡ Chốt sổ) |
 | Giao diện (`tests/ui.test.js`, Chromium) | 46 | **46/46 PASS** | Màn đăng nhập, thông báo, phiên mới/đã lưu/hết hạn, đăng xuất, xếp hàng lời gọi, escape XSS, tải file; Chỉ xem (ẩn menu/tab/nút); Admin (Cổng, vai trò); **nhúng Portal**: đăng nhập cửa sổ bật lên, khung không bị chuyển trang, nhận phiên, đóng cửa sổ; đổi người dùng ngay trong trang; trang Sao lưu & Nhật ký (escape, lọc, phân trang, ẩn với nhân viên) |
 | Kiểm tra tĩnh | — | PASS | Cú pháp 3 file; mọi hàm công khai mở đầu bằng `yeuCauPhien_()`; mọi lời gọi `runServer` có hàm tương ứng; không còn hàm chết |
 
@@ -280,7 +280,8 @@ Xem `CHANGELOG.md`.
 |---|---|---|---|
 | Lộ khóa Cổng (chia sẻ nhầm dự án Cổng) | Thấp | Cao — giả mạo đăng nhập | Không chia sẻ dự án Cổng; nút Đổi khóa; nhật ký đăng nhập |
 | Nhân viên còn quyền Sửa trực tiếp trên Sheet (quyền cũ) | TB | Cao — sửa dữ liệu ngoài hệ thống | Công cụ Thu hồi quyền trong trang Người dùng |
-| Đạt giới hạn 10 triệu ô | Thấp–TB (sau 3–5 năm) | Cao | Chốt sổ năm sang **file** lưu trữ riêng (Lộ trình) |
+| Đạt giới hạn 10 triệu ô | Thấp–TB (sau 3–5 năm) | Cao | Khóa Sổ Năm (ĐNTT) đang chuyển phiếu cân sang sheet lưu trữ **cùng file** — nên đổi sang **file** lưu trữ riêng như sổ ĐNTT (DATA&lt;năm&gt;) |
+| Webapp ĐNTT và webapp kho cùng ghi/xóa dòng `PhieuCan_DN` (2 dự án, khóa riêng) | Thấp (khóa sổ 1 lần/năm) | Cao — ghi nhầm dòng | Từ 2.2.0 webapp kho kiểm tra lại dòng trước khi ghi (Import, Tính giá) và dừng nếu dòng đã dịch; chạy Khóa sổ ngoài giờ nhập liệu |
 | Google đổi chính sách cookie bên thứ 3 | TB | TB — Portal trên tên miền ngoài google.com | Portal hiện cùng google.com nên không ảnh hưởng |
 | Dán thiếu/sai file khi cập nhật thủ công | TB | Cao | `clasp` + CI (GĐ1) |
 | Một người vừa là Admin vừa là chủ dự án | — | Điểm lỗi đơn | Thêm Admin dự phòng |

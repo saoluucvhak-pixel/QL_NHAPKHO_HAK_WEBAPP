@@ -877,7 +877,7 @@ function xacThucPhien_(maPhien) {
 // dùng thì thêm cả vào HAM_CHO_PHEP_CHI_XEM_.
 const HAM_API_ = [
   // Hệ thống / phân quyền / cổng đăng nhập
-  "HT_layThongTinNguoiDungHienTai", "HT_layDashboard", "HT_layThongKeNamPhieuCan", "HT_chotSoNam",
+  "HT_layThongTinNguoiDungHienTai", "HT_layDashboard",
   "HT_layCauHinhVungMien", "HT_luuCauHinhVungMien", "HT_layLocaleThatCuaSheet", "HT_xacNhanCauTrucSheetHienTai",
   "HT_layLienKetDuLieu", "HT_luuLienKetDuLieu", "HT_layMisaDefaults", "HT_luuMisaDefaults",
   "HT_layDanhSachQuyen", "HT_luuDanhSachQuyen", "HT_chiaSeTaiNguyenChoDanhSachQuyen", "HT_layTinhTrangChiaSeTaiNguyen",

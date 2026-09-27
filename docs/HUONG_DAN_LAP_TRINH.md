@@ -31,7 +31,7 @@
 
 ```bash
 npm install            # cài Playwright (chỉ cần cho test giao diện)
-npm test               # 90 ca máy chủ (Node, giả lập Apps Script)
+npm test               # 100 ca máy chủ (Node, giả lập Apps Script)
 npm run test:ui        # 46 ca giao diện (Chromium). Dùng Chrome có sẵn: CHROME_PATH=/duong/dan/chrome npm run test:ui
 ```
 - `tests/server.test.js` nạp `Config.gs + Code.gs` vào `vm` với các dịch vụ giả (PropertiesService, CacheService, Utilities (HMAC thật), UrlFetchApp, SpreadsheetApp, HtmlService...), đồng thời **chạy chính mã nguồn Cổng** do `taoMaNguonCong_` sinh ra để kiểm tra đăng nhập đầu–cuối.
@@ -57,6 +57,6 @@ npm run test:ui        # 46 ca giao diện (Chromium). Dùng Chrome có sẵn: C
 | Các khóa liên kết dữ liệu / vùng miền / Misa mặc định | Ghi đè cấu hình trong Config.gs (trang Cấu hình hệ thống) |
 
 ## 6. Lịch chạy tự động (trigger)
-- Duy nhất 1 trigger: `TRIGGER_saoLuuHangDem` (hằng ngày 1–2 giờ sáng), bật/tắt ở trang Lưu trữ & Sao lưu — không tạo tay trong trình soạn thảo.
+- Duy nhất 1 trigger: `TRIGGER_saoLuuHangDem` (hằng ngày 1–2 giờ sáng), bật/tắt ở trang Sao lưu dữ liệu — không tạo tay trong trình soạn thảo.
 - Hàm trigger là hàm công khai (trigger không gọi được hàm có `_` cuối) nên tự kiểm tra `e.triggerUid` khớp trigger đã cài; không nằm trong `HAM_API_`.
 - Khi thêm trigger mới: làm theo đúng mẫu này, và nhớ quyền `script.scriptapp` đã có trong `appsscript.json`.
