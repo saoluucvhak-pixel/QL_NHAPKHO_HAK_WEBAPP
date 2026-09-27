@@ -23,7 +23,7 @@ Sắp theo mức rủi ro nếu không làm. "Cần bạn" = cần quyết đị
 
 | # | Việc | Ai quyết |
 |---|---|---|
-| 8 | ARCH-01: chốt sổ năm ra **file Google Sheet riêng** mỗi năm (hiện cùng file → trần 10 triệu ô) | Cần bạn (đổi nơi lưu dữ liệu) |
+| 8 | ARCH-01: phiếu cân đã khóa sổ (ĐNTT) ra **file Google Sheet riêng** mỗi năm (hiện cùng file Phiếu Cân → trần 10 triệu ô cho cả file) | Cần bạn — sửa ở cả ĐNTT và webapp này |
 | 9 | ARCH-02: phân trang phía máy chủ cho báo cáo chi tiết (API mới, giữ API cũ) | Cần bạn |
 | 10 | Bảng tổng hợp theo ngày cho Dashboard / báo cáo nhiều năm | Kỹ thuật |
 
@@ -35,10 +35,11 @@ Sắp theo mức rủi ro nếu không làm. "Cần bạn" = cần quyết đị
 | 12 | Tách `Index.html` thành nhiều file `include()` theo module; bảng hằng chỉ số cột (`COT_PC.MA_CT`…) |
 | 13 | UX: chế độ tối, `aria-label`, phím tắt cho thao tác lặp (Lọc, Xuất Excel) |
 
-## Cập nhật 27/09/2026 — Bỏ chức năng "Chốt sổ năm" (theo yêu cầu)
+## Cập nhật 27/09/2026 — Bỏ "Chốt sổ năm" ở đây, đồng bộ với Khóa sổ năm của ĐNTT
 
-- Đã gỡ: nút/bảng "Lưu trữ phiếu cân theo năm (Chốt sổ)" trong Hệ thống › Lưu trữ & Sao lưu; hàm máy chủ `HT_chotSoNam`, `HT_layThongKeNamPhieuCan`, `LT_locDongChuaLuuTru_` và 2 mục tương ứng trong `HAM_API_`. Phần Sao lưu tự động giữ nguyên.
-- Giữ lại phần **đọc** sheet `PhieuCan_DN_<năm>` nếu trước đây từng tạo, để báo cáo / kiểm tra trùng khi import / tra cứu vẫn thấy dữ liệu đó. Không có sheet nào như vậy thì chỉ tốn 1 lệnh `getSheets()`.
-- STUCK-01 không còn áp dụng (chức năng liên quan đã bỏ).
-- Hệ quả cần biết: toàn bộ lịch sử phiếu cân nằm mãi trong `PhieuCan_DN`. Import (kiểm tra trùng) và Tính giá đọc toàn bộ sheet này, nên thời gian các thao tác đó sẽ tăng dần theo số năm dữ liệu; trần 10 triệu ô/file (~370.000 phiếu với 27 cột) áp dụng trực tiếp cho sheet này.
-- Test: 204/204 đạt (bỏ 11 test của chức năng đã gỡ).
+- Đã gỡ chức năng Chốt sổ của webapp này (giao diện + `HT_chotSoNam`, `HT_layThongKeNamPhieuCan`, `LT_locDongChuaLuuTru_`). Khóa sổ năm chỉ làm ở ĐNTT (repo `HAK_WEBAPP_DNTT_DRAFT`, Hệ Thống › Khóa Sổ Năm).
+- ĐNTT chuyển phiếu cân **đã thanh toán** sang `PhieuCan_DN_<năm cân>` trong cùng file Phiếu Cân, chép nguyên 28 cột. Webapp này vẫn đọc các sheet đó (báo cáo theo năm, kiểm tra trùng khi import, nhập tay, danh sách lọc, tra mã báo giá) — đã kiểm chứng bằng dữ liệu dựng đúng như ĐNTT tạo.
+- Vì ĐNTT chuyển phiếu đã trả ra khỏi `PhieuCan_DN` mỗi năm, sheet chính **không** phình mãi; cảnh báo "import/tính giá chậm dần theo số năm" ở bản trước là không đúng.
+- **CONCUR-01**: trước khi ghi theo số dòng (cập nhật khi import lại, tính giá), đọc lại cột A + V của đúng các dòng đích; lệch (ĐNTT vừa xóa dòng) thì không ghi gì và báo thực hiện lại.
+- **CONCUR-02**: khi ĐNTT khóa sổ chạy thật, file Phiếu Cân mang cờ Developer Metadata `HAK_KHOA_SO_NAM_DANG_CHAY` (ĐNTT v2026.9.7); webapp này thấy cờ (< 10 phút) thì tạm dừng import / nhập tay / tính giá (kể cả trigger).
+- Quy trình: khóa sổ ở ĐNTT vào đầu tháng 1, ngoài giờ nhập liệu.

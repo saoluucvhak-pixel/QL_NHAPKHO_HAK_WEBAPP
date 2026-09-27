@@ -326,11 +326,58 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
   }
 }
 
+// CONCUR-02: cờ "ĐNTT đang Khóa sổ năm" - ĐNTT (repo HAK_WEBAPP_DNTT_DRAFT) gắn
+// Developer Metadata khóa CO_KHOA_SO_DNTT_KEY_ (hiển thị DOCUMENT, để dự án này
+// đọc được) lên file Phiếu Cân trong lúc Khóa sổ chạy, gỡ khi xong. Thấy cờ còn
+// mới (< 10 phút) thì tạm dừng mọi thao tác ghi PhieuCan_DN. Cờ cũ hơn = ĐNTT bị
+// dừng đột ngột, bỏ qua để không kẹt mãi (lớp CONCUR-01 vẫn bảo vệ). Đổi khóa
+// hoặc định dạng giá trị thì phải đổi đồng thời ở cả 2 repo.
+const CO_KHOA_SO_DNTT_KEY_ = "HAK_KHOA_SO_NAM_DANG_CHAY";
+const CO_KHOA_SO_HET_HAN_MS_ = 10 * 60 * 1000;
+function KS_thongBaoDNTTDangKhoaSo_() {
+  try {
+    const ds = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).createDeveloperMetadataFinder().withKey(CO_KHOA_SO_DNTT_KEY_).find();
+    for (let i = 0; i < ds.length; i++) {
+      let co = {};
+      try { co = JSON.parse(ds[i].getValue() || "{}"); } catch (e) { co = {}; }
+      const batDau = Number(co.batDau) || 0;
+      if (Date.now() - batDau < CO_KHOA_SO_HET_HAN_MS_) {
+        return "⏳ ĐNTT đang Khóa sổ năm " + (co.nam || "") + " (bắt đầu lúc " + Utilities.formatDate(new Date(batDau), "GMT+7", "HH:mm")
+          + ") - tạm dừng ghi phiếu cân để tránh ghi nhầm dòng. Vui lòng thử lại sau vài phút.";
+      }
+    }
+  } catch (e) { /* không đọc được cờ -> không chặn; CONCUR-01 vẫn kiểm tra dòng trước khi ghi */ }
+  return "";
+}
+
+// CONCUR-01: ĐNTT (dự án Apps Script KHÁC, khóa hệ thống riêng - LockService
+// không chặn chéo giữa 2 dự án) XÓA dòng khỏi PhieuCan_DN khi Khóa sổ năm. Mọi
+// chỗ GHI THEO SỐ DÒNG đã đọc từ trước phải đọc lại cột A (Số phiếu) + V (Mã
+// chứng từ) của đúng các dòng đích ngay trước khi ghi: lệch -> KHÔNG ghi gì.
+const TB_PHIEU_CAN_DA_DOI_ = "Dữ liệu phiếu cân vừa thay đổi vị trí dòng (có thể ĐNTT đang Khóa sổ năm) - chưa ghi gì, vui lòng thực hiện lại sau ít phút.";
+function PC_chuKy_(soPhieu, maCT) {
+  return String(soPhieu == null ? "" : soPhieu).trim() + "|" + String(maCT == null ? "" : maCT).trim();
+}
+function PC_chuKyDong_(row) { return PC_chuKy_(row[0], row[21]); }
+function PC_kiemTraDongConDung_(sheet, mongDoi) {
+  if (!mongDoi || mongDoi.size === 0) return;
+  let tu = Infinity, den = 0;
+  mongDoi.forEach(function (ck, r) { if (r < tu) tu = r; if (r > den) den = r; });
+  if (den > sheet.getLastRow()) throw new Error(TB_PHIEU_CAN_DA_DOI_);
+  const cotA = sheet.getRange(tu, 1, den - tu + 1, 1).getValues();
+  const cotV = sheet.getRange(tu, 22, den - tu + 1, 1).getValues();
+  mongDoi.forEach(function (ck, r) {
+    const i = r - tu;
+    if (PC_chuKy_(cotA[i][0], cotV[i][0]) !== ck) throw new Error(TB_PHIEU_CAN_DA_DOI_);
+  });
+}
+
 // PERF-05: ghi các phiếu cập nhật khi re-import - mỗi khối dòng liền nhau 1 lệnh
 // setValues (cột B..S) + định dạng Ngày/Giờ/Số gom vào 3 lệnh RangeList cho cả
 // lượt import (trước đây 8 lệnh ghi riêng lẻ cho MỖI phiếu).
-function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf) {
+function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf, chuKyMongDoi) {
   if (capNhatTheoDong.size === 0) return;
+  PC_kiemTraDongConDung_(sheet, chuKyMongDoi);
   const dongs = Array.from(capNhatTheoDong.keys()).sort(function (a, b) { return a - b; });
   const vungNgay = [], vungGio = [], vungSo = [];
   let i = 0;
@@ -362,6 +409,8 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
   }
 
   try {
+    const _dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
+    if (_dnttKhoaSo) return { status: "error", message: _dnttKhoaSo };
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const dataSheet = ss.getSheetByName(CONFIG.DATA_SHEET);
     const lastRow = dataSheet.getLastRow();
@@ -384,6 +433,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
 
     let countNew = 0, countUpdate = 0, countSkip = 0; const batchNew = [];
     const capNhatTheoDong = new Map(); // PERF-05: rowNum -> 18 giá trị cột B..S, ghi gộp sau vòng lặp
+    const chuKyDongCapNhat = new Map(); // CONCUR-01: rowNum -> Số phiếu|Mã CT lúc đọc
     // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
     // đã tồn tại lẫn nhánh ghi dòng mới bên dưới), tránh gọi PropertiesService lặp lại.
     const _rfLoop = REGION_FORMAT();
@@ -457,6 +507,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
         // PERF-05: chỉ GOM giá trị (ghi 1 lần sau vòng lặp). Các cột G, M, P, R
         // KHÔNG thuộc diện cập nhật được ghi lại đúng giá trị vừa đọc (trong khóa).
         const cu = info.row;
+        chuKyDongCapNhat.set(info.rowNum, PC_chuKyDong_(cu));
         capNhatTheoDong.set(info.rowNum, [
           dateC ? toDateOnly_(dateC) : "", dateC ? toTimeOnly_(dateC) : "",
           dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : "",
@@ -488,7 +539,7 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       countNew++;
     }
 
-    ghiCapNhatPhieuCanGop_(dataSheet, capNhatTheoDong, _rfLoop);
+    ghiCapNhatPhieuCanGop_(dataSheet, capNhatTheoDong, _rfLoop, chuKyDongCapNhat);
 
     if (batchNew.length > 0) {
       const startRow = dataSheet.getLastRow() + 1;
@@ -556,6 +607,8 @@ function addManualPhieuCan(fields) {
   }
 
   try {
+    const _dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
+    if (_dnttKhoaSo) return { status: "error", message: _dnttKhoaSo };
     if (!fields || !String(fields.soPhieu || "").trim()) return { status: "error", message: "Vui lòng nhập Số phiếu." };
     if (!String(fields.soXe || "").trim()) return { status: "error", message: "Vui lòng nhập Số xe." };
 
@@ -888,6 +941,8 @@ function runCalculatePrice(e) {
     return { status: "error", message: "Hệ thống đang bận xử lý một yêu cầu khác, vui lòng thử lại sau ít giây." };
   }
   try {
+    const _dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
+    if (_dnttKhoaSo) return { status: "error", message: _dnttKhoaSo };
     return runCalculatePrice_core();
   } finally {
     lock.releaseLock();
@@ -976,6 +1031,10 @@ function runCalculatePrice_core() {
     // PERF-04: X,Y,Z liền nhau -> ghi chung 1 lệnh; định dạng "#,##0" của cột X/Z
     // gom vào 1 RangeList duy nhất sau vòng lặp. Cùng ô, cùng giá trị, cùng định
     // dạng như trước - chỉ giảm từ 6 xuống 2 lệnh ghi cho mỗi khối dòng.
+    // CONCUR-01: dòng đích vẫn đúng phiếu đã đọc lúc đầu (xem PC_kiemTraDongConDung_).
+    const chuKyMongDoi = new Map();
+    capNhat.forEach(function (c) { chuKyMongDoi.set(c.rowNum, PC_chuKyDong_(data[c.rowNum - 2])); });
+    PC_kiemTraDongConDung_(sheet, chuKyMongDoi);
     const vungDinhDang = [];
     let idx = 0;
     while (idx < capNhat.length) {

@@ -6,7 +6,7 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 |---|:-:|---|---|:-:|
 | TRIGGER-01 | **Critical** | Logic | `runCalculatePrice()` và `runCalculatePrice_core()` gọi `yeuCauPhien_()` ngay dòng đầu. Trigger theo giờ (code ghi rõ hàm này dùng cho "trigger theo giờ") **không bao giờ có phiên đăng nhập**, nên mọi lần chạy đều lỗi `PHIEN_HET_HAN` và giá không được tính tự động. Phát hiện bằng phân tích đồ thị lời gọi từ các điểm vào không có phiên (`doGet`, trigger). | ✅ |
 | REGRESS-01 | **Critical** | Quy trình | Commit `7c4ae3b` (26/09) ghi đè `Code.gs` bằng bản cũ, làm mất toàn bộ bản sửa PERF-01..04, STUCK-01/02, BUG-002 đã đưa lên main ở `64a3add`. | ✅ Áp lại |
-| STUCK-01 | **Critical** | Toàn vẹn dữ liệu | "Chốt sổ năm" bị ngắt giữa chừng (timeout Sheets / quá 6 phút) → phiếu nằm ở CẢ sheet chính lẫn sheet lưu trữ → báo cáo cộng trùng; chạy lại còn chép trùng thêm. (Mất do REGRESS-01.) | ✅ |
+| STUCK-01 | **Critical** | Toàn vẹn dữ liệu | "Chốt sổ năm" bị ngắt giữa chừng (timeout Sheets / quá 6 phút) → phiếu nằm ở CẢ sheet chính lẫn sheet lưu trữ → báo cáo cộng trùng; chạy lại còn chép trùng thêm. (Mất do REGRESS-01.) | ✅ → sau đó bỏ hẳn chức năng |
 | PERF-05 | High | Hiệu năng | Re-import: mỗi phiếu cập nhật tốn 16 lệnh Sheets (8 `getRange` + 8 ghi) → file 300 phiếu sửa = 4.800 lệnh, dễ vượt 6 phút khi đang giữ khóa. | ✅ |
 | PERF-01 | High | Hiệu năng | `getFilterOptions()` (mỗi lần mở trang) đọc 17 cột toàn bộ lịch sử: 1,7 triệu ô với 100.000 phiếu. | ✅ |
 | PERF-08 | High | Giao diện | 5 báo cáo vẽ toàn bộ dòng vào DOM: 100.000 dòng → tab treo 25,7 giây, 1,4 triệu phần tử DOM, 100.000 listener. | ✅ |
@@ -29,10 +29,11 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 
 **STUCK-01** — Trước khi chép sang sheet lưu trữ, bỏ qua phiếu có Mã chứng từ (cột V) đã có sẵn trong lưu trữ, nhưng vẫn xóa khỏi sheet chính. Chạy lại "Chốt sổ" sau sự cố sẽ tự hết trùng (có test mô phỏng lỗi ở lần `deleteRows` thứ 3).
 
-## Cập nhật 27/09/2026 — Bỏ chức năng "Chốt sổ năm" (theo yêu cầu)
+## Cập nhật 27/09/2026 — Bỏ "Chốt sổ năm" ở đây, đồng bộ với Khóa sổ năm của ĐNTT
 
-- Đã gỡ: nút/bảng "Lưu trữ phiếu cân theo năm (Chốt sổ)" trong Hệ thống › Lưu trữ & Sao lưu; hàm máy chủ `HT_chotSoNam`, `HT_layThongKeNamPhieuCan`, `LT_locDongChuaLuuTru_` và 2 mục tương ứng trong `HAM_API_`. Phần Sao lưu tự động giữ nguyên.
-- Giữ lại phần **đọc** sheet `PhieuCan_DN_<năm>` nếu trước đây từng tạo, để báo cáo / kiểm tra trùng khi import / tra cứu vẫn thấy dữ liệu đó. Không có sheet nào như vậy thì chỉ tốn 1 lệnh `getSheets()`.
-- STUCK-01 không còn áp dụng (chức năng liên quan đã bỏ).
-- Hệ quả cần biết: toàn bộ lịch sử phiếu cân nằm mãi trong `PhieuCan_DN`. Import (kiểm tra trùng) và Tính giá đọc toàn bộ sheet này, nên thời gian các thao tác đó sẽ tăng dần theo số năm dữ liệu; trần 10 triệu ô/file (~370.000 phiếu với 27 cột) áp dụng trực tiếp cho sheet này.
-- Test: 204/204 đạt (bỏ 11 test của chức năng đã gỡ).
+- Đã gỡ chức năng Chốt sổ của webapp này (giao diện + `HT_chotSoNam`, `HT_layThongKeNamPhieuCan`, `LT_locDongChuaLuuTru_`). Khóa sổ năm chỉ làm ở ĐNTT (repo `HAK_WEBAPP_DNTT_DRAFT`, Hệ Thống › Khóa Sổ Năm).
+- ĐNTT chuyển phiếu cân **đã thanh toán** sang `PhieuCan_DN_<năm cân>` trong cùng file Phiếu Cân, chép nguyên 28 cột. Webapp này vẫn đọc các sheet đó (báo cáo theo năm, kiểm tra trùng khi import, nhập tay, danh sách lọc, tra mã báo giá) — đã kiểm chứng bằng dữ liệu dựng đúng như ĐNTT tạo.
+- Vì ĐNTT chuyển phiếu đã trả ra khỏi `PhieuCan_DN` mỗi năm, sheet chính **không** phình mãi; cảnh báo "import/tính giá chậm dần theo số năm" ở bản trước là không đúng.
+- **CONCUR-01**: trước khi ghi theo số dòng (cập nhật khi import lại, tính giá), đọc lại cột A + V của đúng các dòng đích; lệch (ĐNTT vừa xóa dòng) thì không ghi gì và báo thực hiện lại.
+- **CONCUR-02**: khi ĐNTT khóa sổ chạy thật, file Phiếu Cân mang cờ Developer Metadata `HAK_KHOA_SO_NAM_DANG_CHAY` (ĐNTT v2026.9.7); webapp này thấy cờ (< 10 phút) thì tạm dừng import / nhập tay / tính giá (kể cả trigger).
+- Quy trình: khóa sổ ở ĐNTT vào đầu tháng 1, ngoài giờ nhập liệu.
