@@ -51,3 +51,7 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 
 ## BUG-BG-02 — Danh sách báo giá và nút Xóa lệch nhau ở đúng mốc kết thúc hiệu lực (đã sửa)
 - `BG_getQuoteListWithStatus_` dùng `ts <= đến`, kiểm tra xóa thật dùng `ts < đến` → nay dùng chung `_tsTrongKhoangHieuLuc_`.
+
+## BUG-BG-03 — Sửa dòng báo giá có thể đổi giá phiếu cân đang dùng báo giá khác (đã chặn)
+- Trước đây chỉ kiểm tra "đã có phiếu cân áp dụng" theo mã và khoảng hiệu lực CŨ. Thêm mã mới, dời ngày hiệu lực sớm hơn hoặc đổi mã khối lượng có thể làm dòng báo giá phủ lên phiếu cân đang tính theo báo giá khác.
+- Sửa: `BG_kiemTraSauKhiSua_` xem trước hiệu lực SAU KHI SỬA (`BG_coreLogicProcessor_` trên dữ liệu giả lập), có phiếu cân (mọi năm, kể cả lưu trữ) trong khoảng mới -> không cho sửa, báo mã + số phiếu + ngày cân. Test: `test/baoGiaToiUu.test.js`.

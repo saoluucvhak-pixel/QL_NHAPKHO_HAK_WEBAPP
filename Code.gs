@@ -2523,6 +2523,10 @@ function BG_updateBaogiaRow_(payload) {
     // giữa lúc mở form sửa và lúc bấm Lưu) — kiểm tra cả danh sách mã CŨ lẫn MỚI
     const checkOld = BG_checkRowEditable_(idBgct, oldMaList);
     if (!checkOld.editable) return { status: "error", message: "Không thể sửa: " + checkOld.reason };
+    // Kiểm tra cả SAU KHI SỬA: mã thêm mới, dời ngày hiệu lực sớm hơn, đổi mã khối
+    // lượng... có thể làm dòng này "phủ" lên phiếu cân đang dùng báo giá khác -> chặn.
+    const checkMoi = BG_kiemTraSauKhiSua_(sheet, rowIndex, idBgct, [hieuLucDate, maList.join(" , "), klCode, gia]);
+    if (!checkMoi.editable) return { status: "error", message: "Không thể sửa: " + checkMoi.reason };
 
     const sheetRow = rowIndex + 2;
     // TỐI ƯU: gộp 4 lệnh setValue riêng lẻ (cột B/C/D/E liền nhau, cùng 1 dòng)
@@ -2539,6 +2543,38 @@ function BG_updateBaogiaRow_(payload) {
     return { status: "success", message: BG_lamMoiSaveSauGhi_("Đã cập nhật báo giá " + idBgct + "." + (_canhBaoHeader ? " | " + _canhBaoHeader : "")) };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
+}
+
+// Xem trước hiệu lực của dòng idBgct SAU KHI SỬA (giaTriMoi = cột B..E mới) bằng
+// BG_coreLogicProcessor_ trên dữ liệu giả lập, rồi đếm phiếu cân (mọi năm, kể cả
+// lưu trữ) có Mã ĐG thuộc dòng và Ngày cân 1 trong khoảng hiệu lực MỚI [từ, đến).
+// Có phiếu -> không cho sửa (cùng quy tắc "đã có phiếu cân áp dụng" như mã cũ).
+function BG_kiemTraSauKhiSua_(sheet, rowIndex, idBgct, giaTriMoi) {
+  const srcGiaLap = sheet.getDataRange().getValues();
+  const dong = srcGiaLap[rowIndex + 1].slice();
+  for (let c = 0; c < 4; c++) dong[1 + c] = giaTriMoi[c];
+  srcGiaLap[rowIndex + 1] = dong;
+  const cacDong = BG_coreLogicProcessor_(new Set(), srcGiaLap).finalRows
+    .filter(function (r) { return String(r[0] || "").trim() === idBgct; });
+  if (!cacDong.length) return { editable: true, reason: "" };
+  let tuSomNhat = Infinity;
+  cacDong.forEach(function (r) { tuSomNhat = Math.min(tuSomNhat, r[1].getTime()); });
+  const byMa = BG_getPhieuCanByMaDG_(tuSomNhat);
+  const canDuoi = function (ds, x) { let lo = 0, hi = ds.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ds[m] < x) lo = m + 1; else hi = m; } return lo; };
+  const ngay = function (ts) { return Utilities.formatDate(new Date(ts), "GMT+7", "dd/MM/yyyy"); };
+  for (const r of cacDong) {
+    const ds = byMa[r[3]] || [];
+    const tu = canDuoi(ds, r[1].getTime()), den = canDuoi(ds, r[2].getTime());
+    if (den > tu) {
+      return {
+        editable: false,
+        reason: "sau khi sửa, mã \"" + r[3] + "\" (hiệu lực từ " + ngay(r[1].getTime()) + ") sẽ áp dụng cho " + (den - tu)
+          + " phiếu cân đã có (ngày cân " + ngay(ds[tu]) + (den - tu > 1 ? " – " + ngay(ds[den - 1]) : "")
+          + ") đang tính theo báo giá khác. Không cho sửa để không làm thay đổi giá các phiếu đó - hãy lập báo giá mới với ngày hiệu lực sau các phiếu này."
+      };
+    }
+  }
+  return { editable: true, reason: "" };
 }
 
 function BG_deleteBaogiaRow_(idBgct) {
@@ -2822,9 +2858,11 @@ function BG_showAllData_() {
 
 // Giữ NGUYÊN VẸN logic gốc (chỉ đổi tên hàm + trỏ về BAOGIA_CONFIG) để không
 // làm thay đổi cách xác định "Còn/Chưa/Hết hiệu lực" đang vận hành thực tế.
-function BG_coreLogicProcessor_(blockedIDs) {
+// srcDataGiaLap (tùy chọn): dữ liệu Baogia_DN (kèm dòng tiêu đề) dùng THAY cho sheet
+// - để xem trước kết quả hiệu lực của 1 thao tác sửa TRƯỚC khi ghi thật.
+function BG_coreLogicProcessor_(blockedIDs, srcDataGiaLap) {
   const ss = BG_ss_();
-  const srcData = ss.getSheetByName(BAOGIA_CONFIG.SRC_SHEET).getDataRange().getValues();
+  const srcData = srcDataGiaLap || ss.getSheetByName(BAOGIA_CONFIG.SRC_SHEET).getDataRange().getValues();
   const maData = ss.getSheetByName(BAOGIA_CONFIG.MA_SHEET).getDataRange().getValues();
   const now = new Date();
   const currentTS = now.getTime();
