@@ -5225,3 +5225,284 @@ function HT_xuatNhatKyExcel_(boLoc) {
     return { status: "success", url: getExportUrl_(tempSS, "xlsx") };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
+
+/* =========================================================================
+ * TRA CỨU PHIẾU CÂN (chỉ đọc): tìm phiếu cân NHẬP (PhieuCan_DN + các sheet
+ * lưu trữ PhieuCan_DN_<năm>) và phiếu cân XUẤT (NL_PC_XH) theo từ khóa +
+ * khoảng ngày cân lần 1; bấm 1 phiếu để xem CHI TIẾT đủ mọi cột.
+ * Không ghi gì xuống Sheet, không chiếm khóa.
+ * ========================================================================= */
+const TC_GIOI_HAN_KET_QUA_ = 500; // tối đa số dòng trả về 1 lần tìm (mới nhất trước)
+
+// Tiêu đề 27 cột A..AA của PhieuCan_DN - dùng khi ô tiêu đề trong sheet để trống.
+const TC_TIEU_DE_NHAP_ = ["Số phiếu", "Ngày cân 1", "Giờ cân 1", "Ngày cân 2", "Giờ cân 2", "Biển số 1", "Biển số 2",
+  "Cân lần 1", "Cân lần 2", "KL Hàng (KG)", "Nguồn gốc", "Khách hàng", "Mã hàng", "ĐL", "NG", "Hình ảnh",
+  "Mã ĐG", "Giảm giá", "Timestamp", "ĐG_AD", "Picture", "ID_PC (Mã chứng từ)", "Số CT",
+  "Đơn giá", "Trạng thái giá", "Thành tiền", "ID_DNTT"];
+const TC_TIEU_DE_XUAT_ = ["Số phiếu", "Ngày giờ cân 1", "Ngày giờ cân 2", "Biển số 1", "Cân lần 1", "Cân lần 2",
+  "KL Hàng (KG)", "Đơn vị vận chuyển", "Tên tài xế", "Khối lượng (Tấn)", "Ngày xuất", "Số BKLS",
+  "Khối lượng (M3)", "NGƯỜI CÂN", "SỐ TKHQ", "Kho xuất", "Kho nhập"];
+
+// Chữ thường, bỏ dấu tiếng Việt - gõ "nguyen van a" vẫn khớp "Nguyễn Văn A".
+function TC_chuanHoa_(s) {
+  return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").trim();
+}
+
+function TC_khopTuKhoa_(row, cacCot, tuKhoa) {
+  if (!tuKhoa) return true;
+  for (let i = 0; i < cacCot.length; i++) {
+    if (TC_chuanHoa_(row[cacCot[i]]).indexOf(tuKhoa) !== -1) return true;
+  }
+  return false;
+}
+
+function TC_khoangNgay_(boLoc) {
+  return {
+    tu: boLoc.tuNgay ? new Date(boLoc.tuNgay + "T00:00:00+07:00") : null,
+    den: boLoc.denNgay ? new Date(boLoc.denNgay + "T23:59:59+07:00") : null
+  };
+}
+
+// Giá trị 1 ô -> chuỗi hiển thị (ngày/giờ theo GMT+7); số giữ nguyên để giao diện định dạng.
+function TC_giaTriHienThi_(v) {
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return "";
+    if (v.getFullYear() < 1901) return Utilities.formatDate(v, "GMT+7", "HH:mm:ss"); // ô chỉ có giờ
+    const gio = Utilities.formatDate(v, "GMT+7", "HH:mm:ss");
+    return Utilities.formatDate(v, "GMT+7", "dd/MM/yyyy") + (gio === "00:00:00" ? "" : " " + gio);
+  }
+  if (typeof v === "number" || typeof v === "boolean") return v;
+  return String(v == null ? "" : v);
+}
+
+// Ghép "Ngày cân" (Date) + "Giờ cân" (Date chỉ có giờ) của phiếu nhập -> Date đầy đủ.
+function TC_ngayGioNhap_(ngay, gio) {
+  if (!(ngay instanceof Date) || isNaN(ngay.getTime())) return null;
+  if (!(gio instanceof Date) || isNaN(gio.getTime())) return ngay;
+  const hms = Utilities.formatDate(gio, "GMT+7", "HH:mm:ss");
+  return new Date(Utilities.formatDate(ngay, "GMT+7", "yyyy-MM-dd") + "T" + hms + "+07:00");
+}
+
+// Các nguồn dữ liệu phiếu nhập cần quét theo khoảng ngày: sheet đang hoạt động
+// + đúng các sheet lưu trữ năm liên quan (cùng quy tắc với báo cáo).
+function TC_nguonPhieuNhap_(ss, tuNgay, denNgay) {
+  const nguon = [{ sheet: ss.getSheetByName(CONFIG.DATA_SHEET), nhan: "Đang theo dõi" }];
+  LT_capNamCanDoc_(ss, tuNgay, denNgay).forEach(function (nam) {
+    const sh = ss.getSheetByName(LT_tenSheetLuuTru_(nam));
+    if (sh) nguon.push({ sheet: sh, nhan: "Lưu trữ " + nam });
+  });
+  return nguon.filter(function (n) { return n.sheet; });
+}
+
+// boLoc = {tuKhoa, tuNgay, denNgay} (ngày dạng yyyy-MM-dd, có thể để trống)
+function TC_traCuuPhieuNhap_(boLoc) {
+  try {
+    boLoc = boLoc || {};
+    const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
+    const kn = TC_khoangNgay_(boLoc);
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    // Số phiếu, Biển số 1-2, Khách hàng, ĐL, NG, Mã ĐG, Mã chứng từ, Số CT, ID_DNTT
+    const COT_TIM = [0, 5, 6, 11, 13, 14, 16, 21, 22, 26];
+    const ketQua = []; let tongKL = 0; let tongTien = 0;
+    TC_nguonPhieuNhap_(ss, boLoc.tuNgay, boLoc.denNgay).forEach(function (n) {
+      const lastRow = n.sheet.getLastRow();
+      if (lastRow <= 1) return;
+      n.sheet.getRange(2, 1, lastRow - 1, 27).getValues().forEach(function (row) {
+        const maCT = String(row[21] || "").trim();
+        if (!maCT && !String(row[0] || "").trim()) return; // dòng trống
+        const ngay1 = row[1];
+        if (kn.tu || kn.den) {
+          if (!(ngay1 instanceof Date) || isNaN(ngay1.getTime())) return;
+          if (kn.tu && ngay1 < kn.tu) return;
+          if (kn.den && ngay1 > kn.den) return;
+        }
+        if (!TC_khopTuKhoa_(row, COT_TIM, tuKhoa)) return;
+        const t = TC_ngayGioNhap_(ngay1, row[2]);
+        const klHang = parseFloat(row[9]) || 0;
+        const thanhTien = parseFloat(row[25]) || 0;
+        const idDntt = String(row[26] || "").trim();
+        tongKL += klHang; tongTien += thanhTien;
+        ketQua.push({
+          maChungTu: maCT,
+          soPhieu: String(row[0] == null ? "" : row[0]),
+          ngayGioCan1: t ? Utilities.formatDate(t, "GMT+7", "dd/MM/yyyy HH:mm") : "",
+          soXe: String(row[5] || "").trim(),
+          khachHang: String(row[11] || "").trim(),
+          daiLy: String(row[13] || "").trim(),
+          nguonGoc: String(row[14] || "").trim(),
+          klHang: klHang,
+          donGia: parseFloat(row[23]) || 0,
+          thanhTien: thanhTien,
+          trangThaiGia: String(row[24] || "").trim(),
+          trangThaiThanhToan: idDntt || "Chưa lập ĐNTT",
+          noiLuu: n.nhan,
+          ts: t ? t.getTime() : 0
+        });
+      });
+    });
+    ketQua.sort(function (a, b) { return b.ts - a.ts; }); // mới nhất trước
+    return {
+      status: "success",
+      data: ketQua.slice(0, TC_GIOI_HAN_KET_QUA_),
+      tongSoDong: ketQua.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
+      summary: { soLuong: ketQua.length, tongKL: tongKL, tongTien: tongTien }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+function TC_tieuDe_(sheet, soCot, macDinh) {
+  const h = sheet.getRange(1, 1, 1, soCot).getValues()[0];
+  return h.map(function (x, i) { return String(x || "").trim() || macDinh[i] || ("Cột " + (i + 1)); });
+}
+
+// Tìm 1 phiếu nhập theo Mã chứng từ: sheet đang hoạt động trước, rồi sheet lưu
+// trữ đúng năm trong mã ("<Số phiếu>/<Năm>/NK"), cuối cùng mới quét các năm còn lại.
+function TC_timPhieuNhap_(ss, maCT) {
+  const dsSheet = [ss.getSheetByName(CONFIG.DATA_SHEET)];
+  const namTrongMa = maCT.match(/\/(\d{4})\/NK$/);
+  let cacNam = LT_layDanhSachNamDaLuuTru_(ss).sort(function (a, b) { return b - a; });
+  if (namTrongMa) {
+    const nam = parseInt(namTrongMa[1], 10);
+    if (cacNam.indexOf(nam) !== -1) cacNam = [nam].concat(cacNam.filter(function (n) { return n !== nam; }));
+  }
+  cacNam.forEach(function (nam) { dsSheet.push(ss.getSheetByName(LT_tenSheetLuuTru_(nam))); });
+  for (let i = 0; i < dsSheet.length; i++) {
+    const sh = dsSheet[i];
+    if (!sh || sh.getLastRow() <= 1) continue;
+    const ma = sh.getRange(2, 22, sh.getLastRow() - 1, 1).getValues();
+    for (let r = 0; r < ma.length; r++) {
+      if (String(ma[r][0] || "").trim() === maCT) return { sheet: sh, dong: r + 2 };
+    }
+  }
+  return null;
+}
+
+function TC_chiTietPhieuNhap_(maChungTu) {
+  try {
+    const maCT = String(maChungTu || "").trim();
+    if (!maCT) throw new Error("Thiếu Mã chứng từ.");
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const vt = TC_timPhieuNhap_(ss, maCT);
+    if (!vt) return { status: "error", message: "Không tìm thấy phiếu cân nhập " + maCT };
+    const soCot = Math.max(27, vt.sheet.getLastColumn());
+    const row = vt.sheet.getRange(vt.dong, 1, 1, soCot).getValues()[0];
+    const tieuDe = TC_tieuDe_(vt.sheet, soCot, TC_TIEU_DE_NHAP_);
+    const ten = vt.sheet.getName();
+    const idDntt = String(row[26] || "").trim();
+    return {
+      status: "success",
+      data: {
+        loai: "NHAP",
+        maChungTu: maCT,
+        noiLuu: ten === CONFIG.DATA_SHEET ? "Đang theo dõi (" + ten + ")" : "Lưu trữ (" + ten + ")",
+        tomTat: {
+          soPhieu: TC_giaTriHienThi_(row[0]),
+          ngayGioCan1: TC_giaTriHienThi_(TC_ngayGioNhap_(row[1], row[2]) || ""),
+          ngayGioCan2: TC_giaTriHienThi_(TC_ngayGioNhap_(row[3], row[4]) || ""),
+          soXe: String(row[5] || "").trim() + (String(row[6] || "").trim() ? " / " + String(row[6]).trim() : ""),
+          khachHang: String(row[11] || "").trim(),
+          daiLy: String(row[13] || "").trim(), nguonGoc: String(row[14] || "").trim(),
+          klCan1: parseFloat(row[7]) || 0, klCan2: parseFloat(row[8]) || 0, klHang: parseFloat(row[9]) || 0,
+          maDonGia: String(row[16] || "").trim(),
+          donGia: parseFloat(row[23]) || 0, thanhTien: parseFloat(row[25]) || 0,
+          trangThaiGia: String(row[24] || "").trim(),
+          trangThaiThanhToan: idDntt || "Chưa lập ĐNTT"
+        },
+        truong: tieuDe.map(function (t, i) { return [t, TC_giaTriHienThi_(row[i])]; })
+      }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Cột tìm của phiếu xuất: Số phiếu, Biển số, ĐVVC, Tài xế, Số BKLS, Người cân, Số TKHQ, Kho xuất, Kho nhập
+function TC_traCuuPhieuXuat_(boLoc) {
+  try {
+    boLoc = boLoc || {};
+    const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
+    const kn = TC_khoangNgay_(boLoc);
+    const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH);
+    const lastRow = sheet ? sheet.getLastRow() : 0;
+    const ketQua = []; let tongKL = 0; let tongTan = 0;
+    if (lastRow > 1) {
+      const COT_TIM = [0, 3, 7, 8, 11, 13, 14, 15, 16];
+      sheet.getRange(2, 1, lastRow - 1, 17).getValues().forEach(function (row) {
+        const soPhieu = String(row[0] == null ? "" : row[0]).trim();
+        if (!soPhieu && !String(row[3] || "").trim()) return;
+        // "Ngày giờ cân 1" trong NL_PC_XH là chuỗi "dd/MM/yyyy HH:mm:ss" hoặc Date
+        const t = toDateObj_(row[1]);
+        const coNgay = t && !isNaN(t.getTime());
+        if (kn.tu || kn.den) {
+          if (!coNgay) return;
+          if (kn.tu && t < kn.tu) return;
+          if (kn.den && t > kn.den) return;
+        }
+        if (!TC_khopTuKhoa_(row, COT_TIM, tuKhoa)) return;
+        const klHang = parseFloat(row[6]) || 0;
+        const tan = parseFloat(row[9]) || 0;
+        tongKL += klHang; tongTan += tan;
+        ketQua.push({
+          soPhieu: soPhieu,
+          ngayGioCan1: coNgay ? Utilities.formatDate(t, "GMT+7", "dd/MM/yyyy HH:mm") : String(row[1] || ""),
+          bienSo: String(row[3] || "").trim(),
+          klHang: klHang, khoiLuongTan: tan,
+          donViVanChuyen: String(row[7] || "").trim(),
+          tenTaiXe: String(row[8] || "").trim(),
+          soTKHQ: String(row[14] || "").trim(),
+          khoXuat: String(row[15] || "").trim(),
+          khoNhap: String(row[16] || "").trim(),
+          ts: coNgay ? t.getTime() : 0
+        });
+      });
+    }
+    ketQua.sort(function (a, b) { return b.ts - a.ts; });
+    return {
+      status: "success",
+      data: ketQua.slice(0, TC_GIOI_HAN_KET_QUA_),
+      tongSoDong: ketQua.length, gioiHan: TC_GIOI_HAN_KET_QUA_,
+      summary: { soLuong: ketQua.length, tongKLHang: tongKL, tongTan: tongTan }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// Chi tiết 1 phiếu xuất: khớp Số phiếu (+ thời điểm cân lần 1 nếu có, vì số
+// phiếu xuất có thể lặp lại giữa các trạm cân/năm).
+function TC_chiTietPhieuXuat_(soPhieu, ts) {
+  try {
+    const so = String(soPhieu == null ? "" : soPhieu).trim();
+    if (!so) throw new Error("Thiếu Số phiếu.");
+    const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH);
+    const lastRow = sheet ? sheet.getLastRow() : 0;
+    if (lastRow <= 1) return { status: "error", message: "Không tìm thấy phiếu cân xuất " + so };
+    const soCot = Math.max(17, sheet.getLastColumn());
+    const data = sheet.getRange(2, 1, lastRow - 1, soCot).getValues();
+    const tsSo = Number(ts) || 0;
+    let row = null; let dongDauTien = null;
+    for (let i = 0; i < data.length && !row; i++) {
+      if (String(data[i][0] == null ? "" : data[i][0]).trim() !== so) continue;
+      if (!dongDauTien) dongDauTien = data[i];
+      const t = toDateObj_(data[i][1]);
+      if (!tsSo || (t && t.getTime() === tsSo)) row = data[i];
+    }
+    row = row || dongDauTien;
+    if (!row) return { status: "error", message: "Không tìm thấy phiếu cân xuất " + so };
+    const t1 = toDateObj_(row[1]); const t2 = toDateObj_(row[2]);
+    return {
+      status: "success",
+      data: {
+        loai: "XUAT",
+        noiLuu: XUATHANG_CONFIG.SHEET_NLPCXH,
+        tomTat: {
+          soPhieu: so,
+          ngayGioCan1: t1 && !isNaN(t1.getTime()) ? TC_giaTriHienThi_(t1) : String(row[1] || ""),
+          ngayGioCan2: t2 && !isNaN(t2.getTime()) ? TC_giaTriHienThi_(t2) : String(row[2] || ""),
+          bienSo: String(row[3] || "").trim(),
+          canLan1: parseFloat(row[4]) || 0, canLan2: parseFloat(row[5]) || 0, klHang: parseFloat(row[6]) || 0,
+          khoiLuongTan: parseFloat(row[9]) || 0,
+          donViVanChuyen: String(row[7] || "").trim(), tenTaiXe: String(row[8] || "").trim(),
+          soTKHQ: String(row[14] || "").trim(), khoXuat: String(row[15] || "").trim(), khoNhap: String(row[16] || "").trim()
+        },
+        truong: TC_tieuDe_(sheet, soCot, TC_TIEU_DE_XUAT_).map(function (tieuDe, i) { return [tieuDe, TC_giaTriHienThi_(row[i])]; })
+      }
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}

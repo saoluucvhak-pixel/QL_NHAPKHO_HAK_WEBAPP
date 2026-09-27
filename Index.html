@@ -35,6 +35,26 @@
       -webkit-font-smoothing:antialiased;
     }
     .mono{font-family:'JetBrains Mono',monospace;}
+    /* Tra cứu phiếu cân - cửa sổ chi tiết */
+    .tc-modal{display:none;position:fixed;inset:0;background:rgba(31,41,55,.45);z-index:9990;align-items:center;justify-content:center;padding:16px;}
+    .tc-modal.show{display:flex;}
+    .tc-modal-box{background:var(--surface);border-radius:var(--radius);box-shadow:0 10px 40px rgba(0,0,0,.2);width:100%;max-width:880px;max-height:92vh;display:flex;flex-direction:column;}
+    .tc-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);}
+    .tc-modal-head h2{margin:0;font-size:18px;}
+    .tc-modal-phu{font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+    .tc-modal-body{padding:16px 20px;overflow:auto;}
+    .tc-modal-foot{padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;margin:0;}
+    .tc-the{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
+    .tc-the div{background:var(--bg);border-radius:8px;padding:8px 10px;}
+    .tc-the .k{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;}
+    .tc-the .v{font-size:14px;font-weight:600;margin-top:2px;word-break:break-word;}
+    .tc-the .v.lon{font-size:17px;color:var(--brand);}
+    .tc-bang-truong{width:100%;border-collapse:collapse;font-size:13px;}
+    .tc-bang-truong th,.tc-bang-truong td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top;}
+    .tc-bang-truong th{width:38%;color:var(--ink-soft);font-weight:500;background:transparent;position:static;}
+    .tc-bang-truong td{word-break:break-word;}
+    tr[data-tc-mo]{cursor:pointer;}
+    tr[data-tc-mo]:hover td{background:var(--accent-soft);}
     .app{display:flex;min-height:100vh;}
 
     /* ---------- SIDEBAR ---------- */
@@ -417,6 +437,15 @@
           <div class="sub-group-label">Báo cáo tồn kho dăm gỗ</div>
           <div class="sub-item" data-route-view="view-khodam" data-route-kd="baocao|kho" data-group="bck">Theo kho</div>
           <div class="sub-item" data-route-view="view-khodam" data-route-kd="baocao|kyvetbai" data-group="bck">Theo kỳ vét bãi</div>
+        </li>
+
+        <li class="menu-item" data-view="view-tracuu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          Tra cứu phiếu cân
+        </li>
+        <li class="sub-menu" id="submenu-tracuu">
+          <div class="sub-item active" data-tab="tc-tab-nhap" data-group="tracuu">Phiếu cân nhập</div>
+          <div class="sub-item" data-tab="tc-tab-xuat" data-group="tracuu">Phiếu cân xuất</div>
         </li>
 
         <li class="menu-item" data-view="view-baogia">
@@ -931,7 +960,7 @@
                   <tr>
                     <th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Số xe</th>
                     <th class="num">KL Hàng (Kg)</th><th class="num">KL (Tấn)</th>
-                    <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Số TKHQ</th><th>Kho xuất</th><th>Kho nhập</th>
+                    <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Số TKHQ</th><th>Kho xuất</th><th>Kho nhập</th><th></th>
                   </tr>
                 </thead>
                 <tbody id="xk_tableBody"></tbody>
@@ -979,6 +1008,105 @@
           </div>
         </div>
       </section>
+
+      <!-- ============ VIEW: TRA CỨU PHIẾU CÂN (chỉ xem) ============ -->
+      <section id="view-tracuu" class="view">
+        <div class="page-head">
+          <h1>Tra cứu phiếu cân</h1>
+          <p>Tìm nhanh phiếu cân nhập / xuất theo số phiếu, mã chứng từ, biển số, khách hàng, đơn vị vận chuyển… · Bấm vào 1 phiếu để xem đầy đủ chi tiết.</p>
+        </div>
+
+        <div class="tabbar">
+          <div class="tabbtn active" data-pane="tc-tab-nhap">📥 Phiếu cân nhập</div>
+          <div class="tabbtn" data-pane="tc-tab-xuat">📤 Phiếu cân xuất</div>
+        </div>
+
+        <!-- TAB: PHIẾU CÂN NHẬP -->
+        <div class="tabpane active" id="tc-tab-nhap">
+          <div class="card">
+            <div class="field-grid">
+              <div class="field" style="grid-column:span 2;"><label>Từ khóa</label><input id="tcn_tuKhoa" placeholder="Số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc, mã ĐG…"></div>
+              <div class="field"><label>Từ ngày cân</label><input type="date" id="tcn_tuNgay"></div>
+              <div class="field"><label>Đến ngày cân</label><input type="date" id="tcn_denNgay"></div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnTraCuuNhap">🔍 Tìm</button>
+            </div>
+            <p style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;">Không phân biệt hoa thường, có dấu hay không dấu. Để trống cả 2 ô ngày để tìm trên toàn bộ dữ liệu (kể cả các năm đã khóa sổ). Hiển thị tối đa 500 phiếu mới nhất.</p>
+          </div>
+          <div class="summary-row">
+            <div class="stat"><div class="label">SỐ PHIẾU TÌM THẤY</div><div class="value" id="tcn_sumSoLuong">0</div></div>
+            <div class="stat"><div class="label">TỔNG KL HÀNG (KG)</div><div class="value" id="tcn_sumKL">0</div></div>
+            <div class="stat"><div class="label">TỔNG THÀNH TIỀN</div><div class="value" id="tcn_sumTien">0</div></div>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mã chứng từ</th><th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Biển số</th><th>Khách hàng</th>
+                    <th>Đại lý</th><th class="num">KL Hàng (Kg)</th><th class="num">Thành tiền</th><th>Thanh toán</th><th>Nơi lưu</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="tcn_tableBody"><tr><td colspan="11" class="empty-state">Nhập từ khóa hoặc chọn ngày rồi bấm Tìm.</td></tr></tbody>
+              </table>
+            </div>
+            <div id="tcn_ghiChu" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <!-- TAB: PHIẾU CÂN XUẤT -->
+        <div class="tabpane" id="tc-tab-xuat">
+          <div class="card">
+            <div class="field-grid">
+              <div class="field" style="grid-column:span 2;"><label>Từ khóa</label><input id="tcx_tuKhoa" placeholder="Số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/nhập…"></div>
+              <div class="field"><label>Từ ngày cân</label><input type="date" id="tcx_tuNgay"></div>
+              <div class="field"><label>Đến ngày cân</label><input type="date" id="tcx_denNgay"></div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-primary" id="btnTraCuuXuat">🔍 Tìm</button>
+            </div>
+            <p style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;">Không phân biệt hoa thường, có dấu hay không dấu. Để trống cả 2 ô ngày để tìm trên toàn bộ dữ liệu. Hiển thị tối đa 500 phiếu mới nhất.</p>
+          </div>
+          <div class="summary-row">
+            <div class="stat"><div class="label">SỐ PHIẾU TÌM THẤY</div><div class="value" id="tcx_sumSoLuong">0</div></div>
+            <div class="stat"><div class="label">TỔNG KL HÀNG (KG)</div><div class="value" id="tcx_sumKL">0</div></div>
+            <div class="stat"><div class="label">TỔNG KHỐI LƯỢNG (TẤN)</div><div class="value" id="tcx_sumTan">0</div></div>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Biển số</th><th class="num">KL Hàng (Kg)</th><th class="num">KL (Tấn)</th>
+                    <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Số TKHQ</th><th>Kho xuất</th><th>Kho nhập</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="tcx_tableBody"><tr><td colspan="11" class="empty-state">Nhập từ khóa hoặc chọn ngày rồi bấm Tìm.</td></tr></tbody>
+              </table>
+            </div>
+            <div id="tcx_ghiChu" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CỬA SỔ CHI TIẾT PHIẾU CÂN (dùng chung: Tra cứu + các báo cáo phiếu cân) -->
+      <div id="tcModal" class="tc-modal" role="dialog" aria-modal="true" aria-labelledby="tcModalTieuDe">
+        <div class="tc-modal-box">
+          <div class="tc-modal-head">
+            <div>
+              <h2 id="tcModalTieuDe">Chi tiết phiếu cân</h2>
+              <div id="tcModalPhu" class="tc-modal-phu"></div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="tcModalDong" aria-label="Đóng">✕</button>
+          </div>
+          <div id="tcModalNoiDung" class="tc-modal-body"></div>
+          <div class="btnrow tc-modal-foot">
+            <button type="button" class="btn btn-accent" id="tcModalIn" style="display:none;">🖨️ In Phiếu Nhập Kho</button>
+            <button type="button" class="btn btn-ghost" id="tcModalDong2">Đóng</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ============ VIEW 4: QUẢN LÝ BÁO GIÁ ============ -->
       <section id="view-baogia" class="view">
@@ -1355,6 +1483,18 @@
                   <li><b>Báo cáo dăm gỗ xuất qua cân</b>: lọc theo đơn vị vận chuyển, số xe, số tờ khai hải quan, khoảng ngày; phân trang 20 dòng/trang.</li>
                   <li><b>Báo cáo xuất kho dăm gỗ kết xuất Misa</b>: tổng hợp theo đơn hàng xuất bán, tính sẵn thành tiền USD.</li>
                   <li><b>Báo cáo tồn kho dăm gỗ</b>: xem tồn kho hiện tại theo từng kho hoặc theo kỳ vét bãi.</li>
+                </ul>
+              </div>
+            </details>
+
+            <details>
+              <summary>🔍 Tra cứu phiếu cân</summary>
+              <div class="guide-body">
+                <ul>
+                  <li><b>Phiếu cân nhập</b>: gõ số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc hoặc mã đơn giá (không cần gõ dấu) rồi bấm <b>Tìm</b> hoặc Enter. Mặc định tìm trong 90 ngày gần nhất; xóa trống 2 ô ngày để tìm toàn bộ, kể cả các năm đã khóa sổ (cột "Nơi lưu" cho biết phiếu đang ở sheet nào).</li>
+                  <li><b>Phiếu cân xuất</b>: tìm theo số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/kho nhập.</li>
+                  <li>Bấm vào 1 dòng (hoặc nút <b>🔍 Xem</b>) để mở <b>chi tiết phiếu</b>: thông tin chính + toàn bộ các cột trên sheet; phiếu nhập có nút <b>In Phiếu Nhập Kho</b>. Nút <b>🔍 Chi tiết</b> cũng có sẵn trên từng dòng của các báo cáo phiếu cân nhập/xuất.</li>
+                  <li>Chỉ xem, không sửa dữ liệu - mọi vai trò (kể cả Chỉ xem) đều dùng được.</li>
                 </ul>
               </div>
             </details>
@@ -1819,6 +1959,7 @@
         document.getElementById(viewId).classList.add('active');
 
         if (viewId === 'view-baogia' && !state.loadedBaoGia) { state.loadedBaoGia = true; bgInitView(); }
+        if (viewId === 'view-tracuu' && !state.loadedTraCuuNhap) { state.loadedTraCuuNhap = true; tcTimNhap(); }
       });
     });
 
@@ -1884,6 +2025,8 @@
         if (paneId === 'nk-tab-misa' && !state.loadedMisa) { state.loadedMisa = true; locMisa(); }
         if (paneId === 'tab-xh-donhang' && !state.loadedDonHangXB) { state.loadedDonHangXB = true; xhInitDonHang(); }
         if (paneId === 'xk-tab-misa' && !state.loadedXuatMisa) { state.loadedXuatMisa = true; locXuatMisa(); }
+        if (paneId === 'tc-tab-nhap' && !state.loadedTraCuuNhap) { state.loadedTraCuuNhap = true; tcTimNhap(); }
+        if (paneId === 'tc-tab-xuat' && !state.loadedTraCuuXuat) { state.loadedTraCuuXuat = true; tcTimXuat(); }
         if (paneId === 'ht-tab-cauhinh' && !state.loadedCauHinh) { state.loadedCauHinh = true; htLoadCauHinh(); }
         if (paneId === 'ht-tab-quyen' && !state.loadedQuyen) { state.loadedQuyen = true; htLoadCong(); htLoadDanhSachQuyen(); }
         if (paneId === 'ht-tab-luutru' && !state.loadedLuuTru) { state.loadedLuuTru = true; htLoadSaoLuu(); }
@@ -1904,7 +2047,8 @@
       bgHieuLucData: [], bgViewType: 'FINAL', bgUncheckedIds: new Set(), loadedKhoDam: false,
       loadedDonHangXB: false, xhPreviewData: [], dhEditingRow: null, dhEditingStt: null,
       loadedXuatKho: false, loadedXuatMisa: false, xkTrangHienTai: 1, loadedCauHinh: false, loadedQuyen: false,
-      loadedLuuTru: false, loadedNhatKy: false, nkTrang: 1, currentUser: null
+      loadedLuuTru: false, loadedNhatKy: false, nkTrang: 1, currentUser: null,
+      loadedTraCuuNhap: false, loadedTraCuuXuat: false
     };
 
     // ---------------------------------------------------------------
@@ -1922,6 +2066,7 @@
         if (el) el.value = t;
       });
       document.getElementById('bg_hieuLuc').value = nowDatetimeLocalStr();
+      tcKhoiTao();
       // Các lời gọi dưới đây tự xếp hàng chờ đăng nhập xong (xem runServer).
       loadFilterOptions();
       initUserInfo();
@@ -2456,7 +2601,7 @@
           + '<td class="num">'+fmtNum(r.donGia)+'</td>'
           + '<td class="num">'+fmtNum(r.thanhTien)+'</td>'
           + '<td><span class="badge '+badgeClass+'">'+escapeHtml(r.trangThaiThanhToan)+'</span></td>'
-          + '<td><button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
+          + '<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-tc-nhap="'+escapeHtml(r.maChungTu)+'">🔍 Chi tiết</button> <button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
           + '</tr>';
       }, 11);
 
@@ -2567,6 +2712,177 @@
     }
 
     // ---------------------------------------------------------------
+    // TRA CỨU PHIẾU CÂN NHẬP / XUẤT + CỬA SỔ CHI TIẾT (chỉ xem)
+    // Cửa sổ chi tiết dùng chung cho màn Tra cứu và nút "🔍 Chi tiết" trong các
+    // báo cáo phiếu cân (nhập qua cân, nhập Misa, xuất qua cân).
+    // ---------------------------------------------------------------
+    function fmtSo(n){ return Number(n||0).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
+    function ngayTruocStr(soNgay){
+      const d = new Date(Date.now() - soNgay*86400000);
+      return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    }
+    function tcKhoiTao(){
+      ['tcn','tcx'].forEach(p=>{
+        document.getElementById(p + '_tuNgay').value = ngayTruocStr(90);
+        document.getElementById(p + '_denNgay').value = todayStr();
+      });
+    }
+    function tcBoLoc(p){
+      return {
+        tuKhoa: document.getElementById(p + '_tuKhoa').value.trim(),
+        tuNgay: document.getElementById(p + '_tuNgay').value,
+        denNgay: document.getElementById(p + '_denNgay').value
+      };
+    }
+    function tcGhiChu(p, res){
+      document.getElementById(p + '_ghiChu').textContent = res.tongSoDong > res.data.length
+        ? 'Tìm thấy ' + fmtNum(res.tongSoDong) + ' phiếu, đang hiển thị ' + fmtNum(res.data.length) + ' phiếu mới nhất - thu hẹp từ khóa hoặc khoảng ngày để xem các phiếu còn lại.'
+        : '';
+    }
+    async function tcTimNhap(){
+      const body = document.getElementById('tcn_tableBody');
+      body.innerHTML = '<tr><td colspan="11" class="empty-state">Đang tìm…</td></tr>';
+      try {
+        const res = await runServer('TC_traCuuPhieuNhap', tcBoLoc('tcn'));
+        if (res.status !== 'success') { body.innerHTML = '<tr><td colspan="11" class="empty-state">' + escapeHtml(res.message) + '</td></tr>'; return; }
+        document.getElementById('tcn_sumSoLuong').textContent = fmtNum(res.summary.soLuong);
+        document.getElementById('tcn_sumKL').textContent = fmtNum(res.summary.tongKL);
+        document.getElementById('tcn_sumTien').textContent = fmtNum(res.summary.tongTien);
+        tcGhiChu('tcn', res);
+        if (!res.data.length) { body.innerHTML = '<tr><td colspan="11" class="empty-state">Không tìm thấy phiếu cân nhập nào.</td></tr>'; return; }
+        veBangTheoLo(body, res.data, r=>{
+          const daLap = r.trangThaiThanhToan !== 'Chưa lập ĐNTT';
+          return '<tr data-tc-mo data-tc-nhap-dong="' + escapeHtml(r.maChungTu) + '">'
+            + '<td class="mono">' + escapeHtml(r.maChungTu) + '</td>'
+            + '<td>' + escapeHtml(r.soPhieu) + '</td>'
+            + '<td>' + escapeHtml(r.ngayGioCan1) + '</td>'
+            + '<td>' + escapeHtml(r.soXe) + '</td>'
+            + '<td>' + escapeHtml(r.khachHang) + '</td>'
+            + '<td>' + escapeHtml(r.daiLy) + '</td>'
+            + '<td class="num">' + fmtNum(r.klHang) + '</td>'
+            + '<td class="num">' + fmtNum(r.thanhTien) + '</td>'
+            + '<td><span class="badge ' + (daLap ? 'badge-ok' : 'badge-warn') + '">' + escapeHtml(r.trangThaiThanhToan) + '</span></td>'
+            + '<td>' + escapeHtml(r.noiLuu) + '</td>'
+            + '<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-tc-nhap="' + escapeHtml(r.maChungTu) + '">🔍 Xem</button></td>'
+            + '</tr>';
+        }, 11);
+      } catch(err){ body.innerHTML = '<tr><td colspan="11" class="empty-state">Lỗi tra cứu: ' + escapeHtml(err) + '</td></tr>'; }
+    }
+    async function tcTimXuat(){
+      const body = document.getElementById('tcx_tableBody');
+      body.innerHTML = '<tr><td colspan="11" class="empty-state">Đang tìm…</td></tr>';
+      try {
+        const res = await runServer('TC_traCuuPhieuXuat', tcBoLoc('tcx'));
+        if (res.status !== 'success') { body.innerHTML = '<tr><td colspan="11" class="empty-state">' + escapeHtml(res.message) + '</td></tr>'; return; }
+        document.getElementById('tcx_sumSoLuong').textContent = fmtNum(res.summary.soLuong);
+        document.getElementById('tcx_sumKL').textContent = fmtNum(res.summary.tongKLHang);
+        document.getElementById('tcx_sumTan').textContent = fmtSo(res.summary.tongTan);
+        tcGhiChu('tcx', res);
+        if (!res.data.length) { body.innerHTML = '<tr><td colspan="11" class="empty-state">Không tìm thấy phiếu cân xuất nào.</td></tr>'; return; }
+        veBangTheoLo(body, res.data, r=>(
+          '<tr data-tc-mo data-tc-xuat-dong="' + escapeHtml(r.soPhieu) + '" data-tc-ts="' + (Number(r.ts)||0) + '">'
+          + '<td class="mono">' + escapeHtml(r.soPhieu) + '</td><td>' + escapeHtml(r.ngayGioCan1) + '</td><td>' + escapeHtml(r.bienSo) + '</td>'
+          + '<td class="num">' + fmtNum(r.klHang) + '</td><td class="num">' + fmtSo(r.khoiLuongTan) + '</td>'
+          + '<td>' + escapeHtml(r.donViVanChuyen) + '</td><td>' + escapeHtml(r.tenTaiXe) + '</td>'
+          + '<td>' + (r.soTKHQ ? escapeHtml(r.soTKHQ) : '—') + '</td>'
+          + '<td>' + (r.khoXuat ? escapeHtml(r.khoXuat) : '—') + '</td><td>' + (r.khoNhap ? escapeHtml(r.khoNhap) : '—') + '</td>'
+          + '<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-tc-xuat="' + escapeHtml(r.soPhieu) + '" data-tc-ts="' + (Number(r.ts)||0) + '">🔍 Xem</button></td></tr>'
+        ), 11);
+      } catch(err){ body.innerHTML = '<tr><td colspan="11" class="empty-state">Lỗi tra cứu: ' + escapeHtml(err) + '</td></tr>'; }
+    }
+    document.getElementById('btnTraCuuNhap').addEventListener('click', tcTimNhap);
+    document.getElementById('btnTraCuuXuat').addEventListener('click', tcTimXuat);
+    ['tcn','tcx'].forEach(p=>{
+      ['_tuKhoa','_tuNgay','_denNgay'].forEach(id=>{
+        document.getElementById(p + id).addEventListener('keydown', e=>{
+          if (e.key === 'Enter') { e.preventDefault(); (p === 'tcn' ? tcTimNhap : tcTimXuat)(); }
+        });
+      });
+    });
+
+    // --- Cửa sổ chi tiết ---
+    let tcMaDangXem = '';
+    function tcTheHtml(ds){
+      return '<div class="tc-the">' + ds.map(x=>(
+        '<div><div class="k">' + escapeHtml(x[0]) + '</div><div class="v' + (x[2] ? ' lon' : '') + '">' + (x[1] === '' || x[1] == null ? '—' : escapeHtml(x[1])) + '</div></div>'
+      )).join('') + '</div>';
+    }
+    // Số của cột khối lượng / tiền -> có dấu phân cách; số khác (Số phiếu…) giữ nguyên.
+    function tcGiaTriTruong(ten, v){
+      if (v === '' || v == null) return '<span style="color:var(--ink-soft);">—</span>';
+      if (typeof v === 'number') return /cân lần|kl|khối lượng|giá|tiền|giảm/i.test(ten) ? fmtSo(v) : escapeHtml(String(v));
+      const s = String(v);
+      if (/^https?:\/\/\S+$/i.test(s)) return '<a href="' + escapeHtml(s) + '" target="_blank" rel="noopener">Mở liên kết ↗</a>';
+      return escapeHtml(s);
+    }
+    function tcBangTruongHtml(truong){
+      return '<h3 style="font-size:14px;margin:4px 0 8px;">Toàn bộ thông tin trên sheet</h3>'
+        + '<table class="tc-bang-truong"><tbody>'
+        + truong.map(t=>'<tr><th>' + escapeHtml(t[0]) + '</th><td>' + tcGiaTriTruong(t[0], t[1]) + '</td></tr>').join('')
+        + '</tbody></table>';
+    }
+    function tcMoModal(tieuDe, phu, html, maIn){
+      document.getElementById('tcModalTieuDe').textContent = tieuDe;
+      document.getElementById('tcModalPhu').textContent = phu || '';
+      document.getElementById('tcModalNoiDung').innerHTML = html;
+      tcMaDangXem = maIn || '';
+      document.getElementById('tcModalIn').style.display = maIn ? '' : 'none';
+      document.getElementById('tcModal').classList.add('show');
+    }
+    function tcDongModal(){ document.getElementById('tcModal').classList.remove('show'); }
+    document.getElementById('tcModalDong').addEventListener('click', tcDongModal);
+    document.getElementById('tcModalDong2').addEventListener('click', tcDongModal);
+    document.getElementById('tcModal').addEventListener('click', e=>{ if (e.target.id === 'tcModal') tcDongModal(); });
+    document.addEventListener('keydown', e=>{ if (e.key === 'Escape') tcDongModal(); });
+    document.getElementById('tcModalIn').addEventListener('click', ()=>{ if (tcMaDangXem) inPhieuCan(tcMaDangXem); });
+
+    async function tcMoChiTietNhap(maCT){
+      showOverlay('Đang tải chi tiết phiếu cân nhập…');
+      try {
+        const res = await runServer('TC_chiTietPhieuNhap', maCT);
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        const d = res.data, t = d.tomTat;
+        const html = tcTheHtml([
+          ['Số phiếu', t.soPhieu], ['Mã chứng từ', d.maChungTu], ['Biển số', t.soXe],
+          ['Ngày giờ cân 1', t.ngayGioCan1], ['Ngày giờ cân 2', t.ngayGioCan2], ['Khách hàng', t.khachHang],
+          ['Đại lý', t.daiLy], ['Nguồn gốc', t.nguonGoc], ['Mã đơn giá', t.maDonGia],
+          ['Cân lần 1 (Kg)', fmtSo(t.klCan1)], ['Cân lần 2 (Kg)', fmtSo(t.klCan2)], ['KL hàng (Kg)', fmtSo(t.klHang), true],
+          ['Đơn giá', fmtSo(t.donGia)], ['Thành tiền', fmtNum(t.thanhTien), true], ['Trạng thái giá', t.trangThaiGia],
+          ['Thanh toán (ĐNTT)', t.trangThaiThanhToan]
+        ]) + tcBangTruongHtml(d.truong);
+        tcMoModal('Phiếu cân nhập ' + (t.soPhieu || d.maChungTu), 'Mã chứng từ ' + d.maChungTu + ' · Nơi lưu: ' + d.noiLuu, html, d.maChungTu);
+      } catch(err){ toast('Lỗi tải chi tiết: ' + err, false); } finally { hideOverlay(); }
+    }
+    async function tcMoChiTietXuat(soPhieu, ts){
+      showOverlay('Đang tải chi tiết phiếu cân xuất…');
+      try {
+        const res = await runServer('TC_chiTietPhieuXuat', soPhieu, Number(ts) || 0);
+        if (res.status !== 'success') { toast(res.message, false); return; }
+        const d = res.data, t = d.tomTat;
+        const html = tcTheHtml([
+          ['Số phiếu', t.soPhieu], ['Biển số', t.bienSo], ['Đơn vị vận chuyển', t.donViVanChuyen],
+          ['Ngày giờ cân 1', t.ngayGioCan1], ['Ngày giờ cân 2', t.ngayGioCan2], ['Tên tài xế', t.tenTaiXe],
+          ['Cân lần 1 (Kg)', fmtSo(t.canLan1)], ['Cân lần 2 (Kg)', fmtSo(t.canLan2)], ['KL hàng (Kg)', fmtSo(t.klHang), true],
+          ['Khối lượng (Tấn)', fmtSo(t.khoiLuongTan), true], ['Số TKHQ', t.soTKHQ], ['Kho xuất', t.khoXuat], ['Kho nhập', t.khoNhap]
+        ]) + tcBangTruongHtml(d.truong);
+        tcMoModal('Phiếu cân xuất ' + t.soPhieu, 'Nơi lưu: ' + d.noiLuu, html, '');
+      } catch(err){ toast('Lỗi tải chi tiết: ' + err, false); } finally { hideOverlay(); }
+    }
+    // 1 listener ủy quyền: nút "🔍 Chi tiết" ở mọi bảng + bấm vào dòng của bảng Tra cứu.
+    document.addEventListener('click', e=>{
+      if (!e.target.closest) return;
+      const nutNhap = e.target.closest('[data-tc-nhap]');
+      if (nutNhap) { tcMoChiTietNhap(nutNhap.getAttribute('data-tc-nhap')); return; }
+      const nutXuat = e.target.closest('[data-tc-xuat]');
+      if (nutXuat) { tcMoChiTietXuat(nutXuat.getAttribute('data-tc-xuat'), nutXuat.getAttribute('data-tc-ts')); return; }
+      if (e.target.closest('button, a, input, select')) return;
+      const dong = e.target.closest('tr[data-tc-mo]');
+      if (!dong) return;
+      if (dong.hasAttribute('data-tc-nhap-dong')) tcMoChiTietNhap(dong.getAttribute('data-tc-nhap-dong'));
+      else if (dong.hasAttribute('data-tc-xuat-dong')) tcMoChiTietXuat(dong.getAttribute('data-tc-xuat-dong'), dong.getAttribute('data-tc-ts'));
+    });
+
+    // ---------------------------------------------------------------
     // BÁO CÁO IMPORT MISA
     // ---------------------------------------------------------------
     function readMisaFilters(){
@@ -2606,7 +2922,7 @@
           + '<td class="num">'+fmtNum(r.thanhTien)+'</td>'
           + '<td>'+escapeHtml(r.tenNCC)+'</td>'
           + '<td><span class="badge '+badgeClass+'">'+escapeHtml(r.trangThaiThanhToan)+'</span></td>'
-          + '<td><button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
+          + '<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-tc-nhap="'+escapeHtml(r.maChungTu)+'">🔍 Chi tiết</button> <button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
           + '</tr>';
       }, 9);
     }
@@ -4577,15 +4893,16 @@
 
       const body = document.getElementById('xk_tableBody');
       if (res.data.length === 0){
-        body.innerHTML = '<tr><td colspan="10" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>';
+        body.innerHTML = '<tr><td colspan="11" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>';
       } else {
         veBangTheoLo(body, res.data, r=>(
           '<tr><td class="mono">'+escapeHtml(r.soPhieu)+'</td><td>'+escapeHtml(r.ngayGioCan1)+'</td><td>'+escapeHtml(r.bienSo)+'</td>'
           + '<td class="num">'+fmtNum(r.klHang)+'</td><td class="num">'+fmtNum(r.khoiLuongTan)+'</td>'
           + '<td>'+escapeHtml(r.donViVanChuyen)+'</td><td>'+escapeHtml(r.tenTaiXe)+'</td>'
           + '<td>'+(r.soTKHQ ? escapeHtml(r.soTKHQ) : '—')+'</td>'
-          + '<td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td><td>'+(r.khoNhap ? escapeHtml(r.khoNhap) : '—')+'</td></tr>'
-        ), 10);
+          + '<td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td><td>'+(r.khoNhap ? escapeHtml(r.khoNhap) : '—')+'</td>'
+          + '<td><button class="btn btn-ghost btn-sm" data-tc-xuat="'+escapeHtml(r.soPhieu)+'" data-tc-ts="'+(Number(r.ngayTS)||0)+'">🔍 Chi tiết</button></td></tr>'
+        ), 11);
       }
 
       // Phân trang 20 dòng/trang
