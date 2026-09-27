@@ -292,6 +292,7 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
 
     const _rf = REGION_FORMAT();
     const rowsThemMoi = [];
+    const dongGhiDe = [];
 
     rowsMoiNK.forEach(row => {
       const key = String(row[21] || "").trim();
@@ -300,14 +301,16 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
         // TRÙNG Mã chứng từ đã có sẵn trong Draft -> GHI ĐÈ đúng dòng đó (không tạo dòng trùng)
         const dongThat = mapDongCu.get(key);
         sheet.getRange(dongThat, 1, 1, row.length).setValues([row]);
-        sheet.getRange(dongThat, 2, 1, 1).setNumberFormat(_rf.DATE_FMT);
-        sheet.getRange(dongThat, 3, 1, 1).setNumberFormat(_rf.TIME_FMT);
-        sheet.getRange(dongThat, 4, 1, 1).setNumberFormat(_rf.DATE_FMT);
-        sheet.getRange(dongThat, 5, 1, 1).setNumberFormat(_rf.TIME_FMT);
+        dongGhiDe.push(dongThat);
       } else {
         rowsThemMoi.push(row);
       }
     });
+    // PERF-06: định dạng Ngày/Giờ các dòng ghi đè gom vào 2 lệnh RangeList (trước: 4 lệnh/dòng).
+    if (dongGhiDe.length > 0) {
+      sheet.getRangeList([].concat.apply([], dongGhiDe.map(function (r) { return ["B" + r, "D" + r]; }))).setNumberFormat(_rf.DATE_FMT);
+      sheet.getRangeList([].concat.apply([], dongGhiDe.map(function (r) { return ["C" + r, "E" + r]; }))).setNumberFormat(_rf.TIME_FMT);
+    }
 
     if (rowsThemMoi.length > 0) {
       const startRow = sheet.getLastRow() + 1;
@@ -321,6 +324,29 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
   } catch (e) {
     logAudit_('DRAFT_CHUATT', 'ERROR', e.toString());
   }
+}
+
+// PERF-05: ghi các phiếu cập nhật khi re-import - mỗi khối dòng liền nhau 1 lệnh
+// setValues (cột B..S) + định dạng Ngày/Giờ/Số gom vào 3 lệnh RangeList cho cả
+// lượt import (trước đây 8 lệnh ghi riêng lẻ cho MỖI phiếu).
+function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf) {
+  if (capNhatTheoDong.size === 0) return;
+  const dongs = Array.from(capNhatTheoDong.keys()).sort(function (a, b) { return a - b; });
+  const vungNgay = [], vungGio = [], vungSo = [];
+  let i = 0;
+  while (i < dongs.length) {
+    let j = i;
+    while (j + 1 < dongs.length && dongs[j + 1] === dongs[j] + 1) j++;
+    const tu = dongs[i], den = dongs[j];
+    sheet.getRange(tu, 2, den - tu + 1, 18).setValues(dongs.slice(i, j + 1).map(function (r) { return capNhatTheoDong.get(r); }));
+    vungNgay.push("B" + tu + ":B" + den, "D" + tu + ":D" + den);
+    vungGio.push("C" + tu + ":C" + den, "E" + tu + ":E" + den);
+    vungSo.push("H" + tu + ":J" + den);
+    i = j + 1;
+  }
+  sheet.getRangeList(vungNgay).setNumberFormat(rf.DATE_FMT);
+  sheet.getRangeList(vungGio).setNumberFormat(rf.TIME_FMT);
+  sheet.getRangeList(vungSo).setNumberFormat("#,##0");
 }
 
 function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
@@ -350,13 +376,14 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       const existingData = dataSheet.getRange(2, 1, lastRow - 1, 25).getValues();
       existingData.forEach((row, index) => {
         const keyMaCT = String(row[21] || "").trim();
-        if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim() });
+        if (keyMaCT) duplicateMap.set(keyMaCT, { rowNum: index + 2, status: String(row[24] || "").trim(), row: row });
       });
     }
     // FIX (an toàn Lưu trữ theo năm - PHẦN 1C): xem giải thích ở step1_PreviewDraft.
     LT_bosungMaChungTuDaLuuTru_(duplicateMap);
 
     let countNew = 0, countUpdate = 0, countSkip = 0; const batchNew = [];
+    const capNhatTheoDong = new Map(); // PERF-05: rowNum -> 18 giá trị cột B..S, ghi gộp sau vòng lặp
     // Đọc REGION_FORMAT() 1 lần trước vòng lặp (dùng cho cả nhánh cập nhật dòng
     // đã tồn tại lẫn nhánh ghi dòng mới bên dưới), tránh gọi PropertiesService lặp lại.
     const _rfLoop = REGION_FORMAT();
@@ -427,24 +454,15 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
         // cập nhật - từ 13 lệnh xuống còn 7 lệnh) - GIỮ NGUYÊN 100% giá trị và
         // định dạng ghi vào từng cột, chỉ đổi CÁCH gộp lệnh gọi.
         // Cột B..F (Ngày/Giờ cân 1, Ngày/Giờ cân 2, Số xe) - 1 lệnh ghi giá trị duy nhất.
-        dataSheet.getRange(info.rowNum, 2, 1, 5).setValues([[
+        // PERF-05: chỉ GOM giá trị (ghi 1 lần sau vòng lặp). Các cột G, M, P, R
+        // KHÔNG thuộc diện cập nhật được ghi lại đúng giá trị vừa đọc (trong khóa).
+        const cu = info.row;
+        capNhatTheoDong.set(info.rowNum, [
           dateC ? toDateOnly_(dateC) : "", dateC ? toTimeOnly_(dateC) : "",
           dateD ? toDateOnly_(dateD) : "", dateD ? toTimeOnly_(dateD) : "",
-          valF_Dich
-        ]]);
-        // Cột B..E cần ĐỊNH DẠNG khác nhau xen kẽ (Ngày/Giờ/Ngày/Giờ) - setNumberFormats
-        // (số nhiều) nhận mảng 2 chiều, gán được nhiều định dạng khác nhau trong 1 lệnh
-        // duy nhất (khác setNumberFormat số ít chỉ nhận 1 định dạng áp cho cả vùng).
-        dataSheet.getRange(info.rowNum, 2, 1, 4).setNumberFormats([[
-          _rfLoop.DATE_FMT, _rfLoop.TIME_FMT, _rfLoop.DATE_FMT, _rfLoop.TIME_FMT
-        ]]);
-        dataSheet.getRange(info.rowNum, 8, 1, 3).setValues([[item.klCan1, item.klCan2, item.klHangGoc]]);
-        dataSheet.getRange(info.rowNum, 8, 1, 3).setNumberFormat("#,##0");
-        // Cột K..L (Khách hàng ghép mã + Khách hàng) liền nhau - gộp 1 lệnh.
-        dataSheet.getRange(info.rowNum, 11, 1, 2).setValues([[valK_Dich, valL_Dich]]);
-        dataSheet.getRange(info.rowNum, 14, 1, 2).setValues([[valN_Dich, valO_Dich]]);
-        dataSheet.getRange(info.rowNum, 17).setValue(valQ_Dich);
-        dataSheet.getRange(info.rowNum, 19).setValue(now);
+          valF_Dich, cu[6], item.klCan1, item.klCan2, item.klHangGoc,
+          valK_Dich, valL_Dich, cu[12], valN_Dich, valO_Dich, cu[15], valQ_Dich, cu[17], now
+        ]);
         countUpdate++; continue;
       }
 
@@ -469,6 +487,8 @@ function step1_ConfirmImport(confirmedDataList, luuDraftChuaTT) {
       duplicateMap.set(uniqueKeyMaCT, { status: "", batchIndex: batchNew.length - 1 });
       countNew++;
     }
+
+    ghiCapNhatPhieuCanGop_(dataSheet, capNhatTheoDong, _rfLoop);
 
     if (batchNew.length > 0) {
       const startRow = dataSheet.getLastRow() + 1;

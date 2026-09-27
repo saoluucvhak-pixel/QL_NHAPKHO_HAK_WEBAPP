@@ -136,3 +136,16 @@ describe('Liên kết dữ liệu (LIENKET) - ghi đè ID Spreadsheet/Thư mục
     expect(ssBG.getId()).toBe(idBaoGiaMoi);
   });
 });
+
+describe('PERF-07 apDungOverrideLienKet_: 1 lần đọc thuộc tính cho mỗi lượt gọi máy chủ', () => {
+  test('nạp script chỉ gọi getProperties 1 lần, không gọi getProperty lặp theo từng liên kết', () => {
+    const mocks = require('./gasMocks');
+    const env = createGasEnv();
+    env.maPhien(); // đăng nhập trước, ngoài phạm vi đo
+    mocks.resetApiCounter_();
+    env.call('apDungOverrideLienKet_'); // lần nạp context (top-level) + lần gọi trực tiếp
+    const c = mocks.getApiCounter_().calls;
+    expect(c.getProperty || 0).toBeLessThanOrEqual(2); // phiên đăng nhập (nếu có) - không phải 10/lượt
+    expect(c.getProperties).toBe(2);
+  });
+});

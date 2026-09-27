@@ -390,9 +390,10 @@ function _layObjectTheoNhom_(nhom) {
 // ứng - gọi hàm này ngay khi script được nạp (global scope, cuối file) VÀ gọi
 // lại ở đầu doGet() để đảm bảo luôn dùng đúng giá trị mới nhất.
 function apDungOverrideLienKet_() {
-  const props = PropertiesService.getScriptProperties();
+  // PERF-07: đọc TẤT CẢ thuộc tính 1 lần (hàm này chạy ở MỌI lượt gọi máy chủ) thay vì 10 lần getProperty.
+  const tatCa = PropertiesService.getScriptProperties().getProperties() || {};
   LIENKET_DANH_SACH.forEach(function (item) {
-    const gtOverride = props.getProperty("LIENKET_" + item.key);
+    const gtOverride = tatCa["LIENKET_" + item.key];
     if (gtOverride) {
       const obj = _layObjectTheoNhom_(item.nhom);
       if (obj) obj[item.truong] = gtOverride;
@@ -405,11 +406,11 @@ function HT_layLienKetDuLieu() {
   yeuCauPhien_();
   try {
     yeuCauQuyenAdmin_(); // FIX (phân quyền): trước đây AI có link đăng nhập Google cũng xem/đổi được ID Spreadsheet/Thư mục toàn hệ thống
-    const props = PropertiesService.getScriptProperties();
+    const tatCa = PropertiesService.getScriptProperties().getProperties() || {};
     const data = LIENKET_DANH_SACH.map(function (item) {
       const obj = _layObjectTheoNhom_(item.nhom);
       const giaTriHienTai = obj ? String(obj[item.truong] || "") : "";
-      const daGhiDe = !!props.getProperty("LIENKET_" + item.key);
+      const daGhiDe = !!tatCa["LIENKET_" + item.key];
       const link = item.loai === "sheet"
         ? "https://docs.google.com/spreadsheets/d/" + giaTriHienTai + "/edit"
         : "https://drive.google.com/drive/folders/" + giaTriHienTai;

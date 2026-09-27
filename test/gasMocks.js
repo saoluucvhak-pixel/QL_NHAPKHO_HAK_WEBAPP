@@ -68,10 +68,10 @@ function kiemTraTiemLoi_(ten) {
 function makeFakePropertiesService() {
   const store = new Map();
   const properties = {
-    getProperty: (key) => (store.has(key) ? store.get(key) : null),
-    setProperty: (key, value) => { store.set(key, String(value)); },
+    getProperty: (key) => { demApi_('getProperty'); return store.has(key) ? store.get(key) : null; },
+    setProperty: (key, value) => { demApi_('setProperty'); store.set(key, String(value)); },
     deleteProperty: (key) => { store.delete(key); },
-    getProperties: () => Object.fromEntries(store),
+    getProperties: () => { demApi_('getProperties'); return Object.fromEntries(store); },
   };
   return {
     getScriptProperties: () => properties,

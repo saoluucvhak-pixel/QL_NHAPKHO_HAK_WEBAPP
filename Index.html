@@ -2190,6 +2190,52 @@
       sel.innerHTML = '<option value="">Tất cả</option>' + list.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
       sel.value = current;
     }
+    // ---------------------------------------------------------------
+    // BẢNG LỚN: vẽ theo lô để trình duyệt không bị treo với hàng chục nghìn dòng
+    // (PERF-08). Vẽ trước LO_DONG_BANG dòng; cuối bảng có nút vẽ thêm. Đo thực tế
+    // trên Chromium: vẽ 1 lần 100.000 dòng treo tab ~26 giây, nên chỉ cho "Hiển
+    // thị tất cả" khi còn ≤ LO_DONG_LON dòng - danh sách đầy đủ hơn nên Xuất Excel.
+    // Số liệu tổng cộng và file Excel/PDF vẫn tính trên TOÀN BỘ dữ liệu.
+    // ---------------------------------------------------------------
+    const LO_DONG_BANG = 500;
+    const LO_DONG_LON = 5000;
+    function veBangTheoLo(body, rows, veDong, soCot){
+      const tong = rows.length;
+      let daVe = 0;
+      function veThem(n){
+        const den = Math.min(tong, daVe + n);
+        const hangNut = body.querySelector('tr[data-ve-them]');
+        if (hangNut) hangNut.remove();
+        body.insertAdjacentHTML('beforeend', rows.slice(daVe, den).map(veDong).join(''));
+        daVe = den;
+        const conLai = tong - daVe;
+        if (conLai > 0) {
+          body.insertAdjacentHTML('beforeend', '<tr data-ve-them><td colspan="' + soCot + '" class="empty-state">'
+            + 'Đang hiển thị ' + fmtNum(daVe) + ' / ' + fmtNum(tong) + ' dòng · '
+            + '<button type="button" class="btn btn-ghost btn-sm" data-ve-them-so="' + LO_DONG_BANG + '">Hiển thị thêm ' + fmtNum(Math.min(LO_DONG_BANG, conLai)) + '</button> '
+            + (conLai > LO_DONG_BANG
+              ? '<button type="button" class="btn btn-ghost btn-sm" data-ve-them-so="' + LO_DONG_LON + '">'
+                + (conLai <= LO_DONG_LON ? 'Hiển thị tất cả' : 'Hiển thị thêm ' + fmtNum(LO_DONG_LON)) + '</button> '
+              : '')
+            + (conLai > LO_DONG_LON ? '<span style="font-size:12px;">· Muốn xem đầy đủ ' + fmtNum(tong) + ' dòng: dùng nút Xuất Excel</span>' : '')
+            + '</td></tr>');
+        }
+      }
+      body.__veThem = veThem;
+      body.innerHTML = '';
+      veThem(LO_DONG_BANG);
+    }
+    // 1 listener ủy quyền cho MỌI bảng lớn (thay vì 1 listener cho mỗi dòng).
+    document.addEventListener('click', e=>{
+      const nut = e.target.closest && e.target.closest('[data-ve-them-so]');
+      if (nut) {
+        const body = nut.closest('tbody');
+        if (body && body.__veThem) body.__veThem(parseInt(nut.getAttribute('data-ve-them-so'), 10) || LO_DONG_BANG);
+        return;
+      }
+      const nutIn = e.target.closest && e.target.closest('#th_tableBody [data-print], #ms_tableBody [data-print]');
+      if (nutIn) inPhieuCan(nutIn.getAttribute('data-print'));
+    });
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     // Dùng khi chèn dữ liệu (có thể do người dùng nhập) làm THAM SỐ chuỗi bên trong
     // 1 lệnh gọi hàm JS nằm trong thuộc tính onclick="..." (VD: onclick="foo('${jsAttr(x)}')").
@@ -2401,7 +2447,7 @@
         foot.innerHTML = '';
         return;
       }
-      body.innerHTML = res.data.map(r=>{
+      veBangTheoLo(body, res.data, r=>{
         // Dùng idDntt (giá trị thô cột AA) để xác định màu, vì trangThaiThanhToan
         // giờ hiển thị đúng nội dung thật (vd "Đóng TT") thay vì chuỗi cố định.
         const badgeClass = r.idDntt ? 'badge-ok' : 'badge-warn';
@@ -2418,10 +2464,7 @@
           + '<td><span class="badge '+badgeClass+'">'+escapeHtml(r.trangThaiThanhToan)+'</span></td>'
           + '<td><button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
           + '</tr>';
-      }).join('');
-      body.querySelectorAll('[data-print]').forEach(btn=>{
-        btn.addEventListener('click', ()=> inPhieuCan(btn.getAttribute('data-print')));
-      });
+      }, 11);
 
       // Dòng Tổng cộng dưới view, dính đáy bảng khi cuộn
       foot.innerHTML = '<tr>'
@@ -2482,7 +2525,7 @@
         foot.innerHTML = '';
         return;
       }
-      body.innerHTML = res.data.map(r=>{
+      veBangTheoLo(body, res.data, r=>{
         let badgeClass = 'badge-neutral';
         if (r.trangThaiGia === 'OK' || r.trangThaiGia === 'Test giá' || r.trangThaiGia === 'Test Giá') badgeClass = 'badge-ok';
         else if (r.trangThaiGia) badgeClass = 'badge-warn';
@@ -2498,7 +2541,7 @@
           + '<td><span class="badge '+badgeClass+'">'+(escapeHtml(r.trangThaiGia) || '—')+'</span></td>'
           + '<td class="num">'+fmtNum(r.thanhTien)+'</td>'
           + '</tr>';
-      }).join('');
+      }, 10);
 
       foot.innerHTML = '<tr>'
         + '<td colspan="9">TỔNG CỘNG (' + res.summary.soLuong + ' phiếu)</td>'
@@ -2558,7 +2601,7 @@
         body.innerHTML = '<tr><td colspan="9" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>';
         return;
       }
-      body.innerHTML = res.data.map(r=>{
+      veBangTheoLo(body, res.data, r=>{
         const badgeClass = r.trangThaiThanhToan === 'Đã lập ĐNTT' ? 'badge-ok' : 'badge-warn';
         return '<tr>'
           + '<td class="mono">'+escapeHtml(r.maChungTu)+'</td>'
@@ -2571,10 +2614,7 @@
           + '<td><span class="badge '+badgeClass+'">'+escapeHtml(r.trangThaiThanhToan)+'</span></td>'
           + '<td><button class="btn btn-ghost btn-sm" data-print="'+escapeHtml(r.maChungTu)+'">🖨️ In Phiếu Nhập Kho</button></td>'
           + '</tr>';
-      }).join('');
-      body.querySelectorAll('[data-print]').forEach(btn=>{
-        btn.addEventListener('click', ()=> inPhieuCan(btn.getAttribute('data-print')));
-      });
+      }, 9);
     }
     document.getElementById('btnLocMisa').addEventListener('click', locMisa);
     document.getElementById('btnExcelMisa').addEventListener('click', async ()=>{
@@ -4545,13 +4585,13 @@
       if (res.data.length === 0){
         body.innerHTML = '<tr><td colspan="10" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>';
       } else {
-        body.innerHTML = res.data.map(r=>(
+        veBangTheoLo(body, res.data, r=>(
           '<tr><td class="mono">'+escapeHtml(r.soPhieu)+'</td><td>'+escapeHtml(r.ngayGioCan1)+'</td><td>'+escapeHtml(r.bienSo)+'</td>'
           + '<td class="num">'+fmtNum(r.klHang)+'</td><td class="num">'+fmtNum(r.khoiLuongTan)+'</td>'
           + '<td>'+escapeHtml(r.donViVanChuyen)+'</td><td>'+escapeHtml(r.tenTaiXe)+'</td>'
           + '<td>'+(r.soTKHQ ? escapeHtml(r.soTKHQ) : '—')+'</td>'
           + '<td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td><td>'+(r.khoNhap ? escapeHtml(r.khoNhap) : '—')+'</td></tr>'
-        )).join('');
+        ), 10);
       }
 
       // Phân trang 20 dòng/trang
@@ -4601,12 +4641,12 @@
       document.getElementById('xm_sumTien').textContent = fmtNum(res.summary.tongThanhTienUSD);
       const body = document.getElementById('xm_tableBody');
       if (res.data.length === 0){ body.innerHTML = '<tr><td colspan="10" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>'; return; }
-      body.innerHTML = res.data.map(r=>(
+      veBangTheoLo(body, res.data, r=>(
         '<tr><td>'+escapeHtml(r.ngayDonHang)+'</td><td class="mono">'+escapeHtml(r.soTKHQ)+'</td><td>'+escapeHtml(r.tau)+'</td>'
         + '<td>'+escapeHtml(r.khachHang)+'</td><td>'+escapeHtml(r.tenHangHoa)+'</td>'
         + '<td class="num">'+fmtNum(r.donGiaUSD)+'</td><td class="num">'+fmtNum(r.klMT)+'</td><td class="num">'+fmtNum(r.klBDMT)+'</td>'
         + '<td class="num">'+fmtNum(r.thanhTienUSD)+'</td><td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td></tr>'
-      )).join('');
+      ), 10);
     }
     document.getElementById('btnLocXuatMisa').addEventListener('click', locXuatMisa);
     document.getElementById('btnExcelXuatMisa').addEventListener('click', async ()=>{
