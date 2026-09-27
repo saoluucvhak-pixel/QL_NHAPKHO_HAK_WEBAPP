@@ -945,6 +945,7 @@ function taoApiRoutes_() {
     TC_suaPhieuNhap: r(TC_suaPhieuNhap_, N),
     TC_tinhLaiGiaPhieu: r(TC_tinhLaiGiaPhieu_, N),
     TC_tinhLaiGiaTheoBoLoc: r(TC_tinhLaiGiaTheoBoLoc_, N),
+    TC_tinhLaiGiaCacPhieu: r(TC_tinhLaiGiaCacPhieu_, N),
 
     // --- Báo cáo xuất hàng (xem, xuất file) ---
     XH_getBaoCaoXuatQuaCan: r(XH_getBaoCaoXuatQuaCan_, X),
