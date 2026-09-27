@@ -62,3 +62,23 @@ Tổng cộng / Xuất Excel / Xuất PDF vẫn tính trên toàn bộ dữ li�
 | `SL_thucHienSaoLuu_`, các hàm chia sẻ Drive (`Config.gs`) | 1 lượt / tài nguyên (~10) |
 
 Số lệnh I/O nằm trong vòng lặp (so với main): **85 → 55**, và 0 lệnh còn lại tăng theo số dòng dữ liệu.
+
+
+## Module Quản lý báo giá (PERF-BG-01..03 + BUG-BG-01)
+
+Đo bằng `test/bgFixtures.js` + `perfFixtures.js`: 100.000 phiếu cân đang theo dõi + 3 năm lưu trữ × 30.000 phiếu, 40 phiếu báo giá × 10 nhóm (2.000 dòng hiệu lực).
+
+| Thao tác | Ô đọc trước | Ô đọc sau | Lời gọi trước → sau |
+|---|---|---|---|
+| Danh sách báo giá đã lập (kèm trạng thái) | 3.238.180 | 208.180 | 29 → 22 |
+| Cập nhật hiệu lực | 3.234.709 | 204.709 | 27 → 20 |
+| Xem toàn bộ lịch sử | 3.234.695 | 264.695 | 25 → 23 |
+| Mở form sửa 1 dòng | 3.237.975 | 207.975 | 25 → 18 |
+| Xóa cả phiếu báo giá 10 nhóm | 32.353.715 | 216.075 | 215 → 40 |
+
+- PERF-BG-01: `BG_getPhieuCanByMaDG_(tuTS)` chỉ đọc cột B (Ngày cân 1) + Q (Mã ĐG) thay vì A..Q, chỉ mở sheet lưu trữ từ năm của mốc hiệu lực sớm nhất cần xét; danh sách mốc thời gian được sắp xếp, `BG_daApDung_` tìm nhị phân.
+- PERF-BG-02: `BG_kiemTraSuaXoaNhieuNhom_` kiểm tra mọi nhóm của 1 phiếu báo giá trong 1 lượt (trước: mỗi nhóm quét lại toàn bộ phiếu cân).
+- PERF-BG-03: "Cập nhật hiệu lực" chỉ gắn Sửa/Xóa/Đã áp dụng cho dòng còn hiệu lực (đúng các dòng trả về).
+- Kết quả Sửa/Xóa/Đã áp dụng giống hệt từng dòng so với bản cũ (đối chiếu 2.404 dòng lịch sử, 61 phiếu báo giá) và khớp đáp án quét toàn bộ (`test/baoGiaToiUu.test.js`).
+- BUG-BG-01 (sai giá): engine tính giá đọc `Baogia_DN_SAVE`, trước đây chỉ được ghi lại khi bấm "Xem toàn bộ lịch sử" → tạo/sửa/xóa báo giá xong, tính giá vẫn theo bảng giá cũ. Nay tạo/sửa/xóa tự làm mới SAVE trong cùng khóa (thêm ~28.000 ô ghi mỗi lần lưu với 2.000 dòng hiệu lực).
+- Ranh giới: "Danh sách báo giá đã lập" dùng `<= đến` trong khi xóa thật dùng `< đến` → nay dùng chung `_tsTrongKhoangHieuLuc_`.
