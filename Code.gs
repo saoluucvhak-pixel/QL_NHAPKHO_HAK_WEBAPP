@@ -829,6 +829,23 @@ function HT_layThongKeNamPhieuCan() {
 // sau khi có thêm phiếu của năm đó vừa được chốt "OK"). Phiếu CHƯA "OK" của
 // đúng năm đó KHÔNG bị đụng tới - dù bấm nhầm năm hiện tại cũng không mất/khóa
 // nhầm dữ liệu đang hoạt động, vì chỉ dòng đã "OK" mới đủ điều kiện di chuyển.
+// STUCK-01: nếu lần chốt sổ trước bị ngắt (timeout Sheets / quá 6 phút) SAU khi
+// đã chép sang lưu trữ nhưng CHƯA xóa xong khỏi sheet chính, phiếu nằm ở CẢ 2
+// nơi -> báo cáo cộng trùng. Bỏ các dòng có Mã chứng từ (cột V) đã có sẵn trong
+// lưu trữ để lần chạy lại chỉ xóa nốt khỏi sheet chính -> tự hết trùng.
+function LT_locDongChuaLuuTru_(sheetLuuTru, dongCanChuyen) {
+  const daCo = new Set();
+  if (sheetLuuTru.getLastRow() > 1) {
+    sheetLuuTru.getRange(2, 22, sheetLuuTru.getLastRow() - 1, 1).getValues().forEach(function (r) {
+      const k = String(r[0] || "").trim(); if (k) daCo.add(k);
+    });
+  }
+  return dongCanChuyen.filter(function (d) {
+    const k = String(d.values[21] || "").trim();
+    return !k || !daCo.has(k);
+  });
+}
+
 function HT_chotSoNam(nam) {
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
@@ -872,21 +889,8 @@ function HT_chotSoNam(nam) {
       sheetLuuTru.setFrozenRows(1);
     }
 
-    // FIX (STUCK-01): nếu lần chốt sổ trước bị ngắt giữa chừng (timeout Sheets /
-    // quá 6 phút) SAU khi đã chép sang lưu trữ nhưng CHƯA xóa xong khỏi sheet
-    // chính, các phiếu đó nằm ở CẢ 2 nơi -> báo cáo cộng trùng. Chạy lại sẽ KHÔNG
-    // chép lại phiếu đã có trong lưu trữ (theo Mã chứng từ - cột V, khóa duy nhất
-    // import vẫn dùng), chỉ xóa nốt khỏi sheet chính -> tự hết trùng.
-    const daCoTrongLuuTru = new Set();
-    if (sheetLuuTru.getLastRow() > 1) {
-      sheetLuuTru.getRange(2, 22, sheetLuuTru.getLastRow() - 1, 1).getValues().forEach(function (r) {
-        const k = String(r[0] || "").trim(); if (k) daCoTrongLuuTru.add(k);
-      });
-    }
-    const dongCanGhi = dongCanChuyen.filter(function (d) {
-      const k = String(d.values[21] || "").trim();
-      return !k || !daCoTrongLuuTru.has(k);
-    });
+    // STUCK-01: lần chốt trước bị ngắt giữa chừng -> chỉ xóa nốt, không chép trùng.
+    const dongCanGhi = LT_locDongChuaLuuTru_(sheetLuuTru, dongCanChuyen);
 
     // Ghi thêm vào CUỐI sheet lưu trữ (append, không ghi đè dữ liệu đã lưu trữ từ lần chốt sổ trước).
     if (dongCanGhi.length > 0) {
@@ -1373,6 +1377,17 @@ function getBaoCaoTongHop(filters) {
 // lại logic đọc/lọc phiếu cân từ đầu - dữ liệu "Hôm nay"/"Tháng này" luôn khớp
 // 100% với báo cáo tổng hợp thật (không có 2 nguồn tính khác nhau). KHÔNG giới
 // hạn Admin - đây chỉ là xem số liệu tổng hợp, giống các báo cáo khác.
+// PERF-02: tổng "Hôm nay" lọc từ dữ liệu tháng đã đọc (ngày dạng yyyy-MM-dd, giờ GMT+7).
+function DB_tongHopMotNgay_(dataThang, ngayStr) {
+  const ngayHienThi = Utilities.formatDate(new Date(ngayStr + "T12:00:00+07:00"), "GMT+7", "dd/MM/yyyy");
+  const tong = { soLuong: 0, tongKL: 0, tongTien: 0 };
+  dataThang.forEach(function (r) {
+    if (r.ngayCan1 !== ngayHienThi) return;
+    tong.soLuong += 1; tong.tongKL += r.klHang; tong.tongTien += r.thanhTien;
+  });
+  return tong;
+}
+
 function HT_layDashboard() {
   yeuCauPhien_();
   try {
@@ -1386,14 +1401,7 @@ function HT_layDashboard() {
     if (bcThangNay.status !== "success") throw new Error(bcThangNay.message);
 
     const dataThang = bcThangNay.data;
-    const homNayHienThi = Utilities.formatDate(new Date(homNayStr + "T12:00:00+07:00"), "GMT+7", "dd/MM/yyyy");
-    const bcHomNay = { summary: { soLuong: 0, tongKL: 0, tongTien: 0 } };
-    dataThang.forEach(function (r) {
-      if (r.ngayCan1 !== homNayHienThi) return;
-      bcHomNay.summary.soLuong += 1;
-      bcHomNay.summary.tongKL += r.klHang;
-      bcHomNay.summary.tongTien += r.thanhTien;
-    });
+    const bcHomNay = { summary: DB_tongHopMotNgay_(dataThang, homNayStr) };
 
     // Top 5 khách hàng theo doanh số mua (thành tiền) tháng này - gộp trong bộ
     // nhớ tạm từ dữ liệu đã đọc ở trên, KHÔNG đọc lại Sheet lần nữa.
@@ -2072,6 +2080,12 @@ function createSimpleMap_(s,k,v) { const d=s.getDataRange().getValues(); let m={
 // (không chặn thao tác) nếu phát hiện tiêu đề đã đổi khác so với chuẩn đã lưu.
 // Nếu thay đổi cột là CHỦ Ý (admin thêm/sửa cột hợp lệ), gọi
 // HT_datLaiChuanHeaderSheet_ (bên dưới) để "chốt lại" chuẩn mới, tắt cảnh báo.
+// Nối các cảnh báo (bỏ chuỗi rỗng) vào sau thông báo thành công: "msg | cảnh báo 1 | cảnh báo 2".
+function noiCanhBao_(thongBao, dsCanhBao) {
+  const ds = [].concat(dsCanhBao || []).filter(Boolean);
+  return ds.length ? thongBao + " | " + ds.join(" | ") : thongBao;
+}
+
 function kiemTraLechHeaderSheet_(sheet, tenGoiSheet, soCotCanTheoDoi) {
   try {
     if (!sheet || sheet.getLastRow() < 1) return "";
@@ -2787,8 +2801,8 @@ function BG_createQuote(payload) {
     });
     srcSheet.getRange(srcSheet.getLastRow() + 1, 1, rowsToAppend.length, 8).setValues(rowsToAppend);
 
-    const _canhBaoHeader = [kiemTraLechHeaderSheet_(qlSheet, "QL_BaoGia", 5), kiemTraLechHeaderSheet_(srcSheet, "Baogia_DN", 8)].filter(Boolean).join(" | "); // BUG-002
-    return { status: "success", message: "Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá." + (_canhBaoHeader ? " | " + _canhBaoHeader : ""), soBaoGia: soBaoGiaMoi };
+    const _canhBaoHeader = [kiemTraLechHeaderSheet_(qlSheet, "QL_BaoGia", 5), kiemTraLechHeaderSheet_(srcSheet, "Baogia_DN", 8)]; // BUG-002
+    return { status: "success", message: noiCanhBao_("Đã lưu báo giá " + soBaoGiaMoi + " với " + groups.length + " nhóm giá.", _canhBaoHeader), soBaoGia: soBaoGiaMoi };
   } catch (e) { return { status: "error", message: e.toString() }; }
   finally { lock.releaseLock(); }
 }
