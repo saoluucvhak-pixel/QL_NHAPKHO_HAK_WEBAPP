@@ -504,8 +504,27 @@ Quy tắc của chủ hệ thống:
 
 **Còn mở – cần quyết định của chủ hệ thống:** M-11 (tách sheet Nhật ký sang file riêng), M-12 (sheet xem trước dùng chung), BUG-004 (2 người sửa cùng phiếu Kho Dăm), SEC-03 (vai trò Chỉ xem gọi hàm dựng lại sheet báo giá), ARCH-01/02 (giới hạn 10 triệu ô, phân trang báo cáo), L-05 (nonce vé đăng nhập – rủi ro rất thấp, chấp nhận).
 
+## Đợt sửa 3 (tiếp) — quyết định của chủ hệ thống (28/09/2026)
+
+| Mục | Quyết định | Kết quả |
+|---|---|---|
+| M-11 (sheet Nhật ký trong file Phiếu Cân) | **Giữ nguyên** – chốt năm (ĐNTT) sẽ xóa phiếu cân khỏi file nên dung lượng không tăng mãi. | Đóng, không sửa. |
+| BUG-004 (2 người sửa cùng phiếu) | **Chặn người lưu sau, yêu cầu tải lại.** | Đã sửa (bên dưới). |
+| SEC-03 (Chỉ xem gọi "Cập nhật hiệu lực"/"Xem toàn bộ lịch sử" báo giá) | **Được phép.** | Đóng, giữ nguyên thiết kế. |
+
+**BUG-004 – cách làm:** mỗi dòng danh sách mang "dấu phiên bản" (MD5 nội dung dòng lúc tải). Sửa/Xóa gửi kèm dấu này; máy chủ băm lại dòng hiện tại trên sheet, **khác → không ghi**, báo "đã bị người khác sửa hoặc xóa sau khi bạn mở. Vui lòng tải lại danh sách rồi thao tác lại (chưa ghi gì)". Áp dụng cho:
+- Phiếu Nhập/Xuất kho Dăm (Sửa, Xóa) – thêm: không cho Sửa phiếu đã bị xóa (trước đây Sửa làm "sống lại" phiếu người khác vừa xóa).
+- Độ khô (Sửa, Xóa) – thêm: nhập mới vào ngày **đã có** độ khô hợp lệ không còn ghi đè âm thầm, yêu cầu bấm "Sửa" trên danh sách.
+- Đơn hàng xuất bán (Sửa, Xóa) – cùng nguyên tắc.
+- Tương thích: lời gọi không kèm dấu phiên bản (bản giao diện cũ còn mở) vẫn chạy như trước.
+- Hàm: `KD_phienBan_`, `xuLySuaXoaGiaoDich_`, `xuLySuaXoaDoKho_`, `layDanhSachGiaoDichTheoBoLoc_`, `layDanhSachDoKhoTheoBoLoc_`, `XH_getDonHangList_`, `XH_getDonHangByRow_`, `XH_updateDonHang_`, `XH_deleteDonHang_(rowIndex, stt, phienBan)`; giao diện `chonSuaGiaoDich`, `thucHienXoaGiaoDich`, `chonSuaDoKho`, `thucHienXoaDoKho`, `luuDoKhoForm`, `xhEditDonHang`, `xhDeleteDonHangRow`.
+- **Test (sheet giả lập):** A và B cùng mở phiếu → A lưu được, B bị chặn, số liệu giữ theo A; Xóa bằng dấu cũ bị chặn, bằng dấu mới xóa được; Sửa phiếu đã xóa bị chặn; độ khô: nhập mới trùng ngày bị chặn, Sửa đúng dấu được, Sửa dấu cũ bị chặn, ngày mới thêm được. Các bộ test đợt 1–3 chạy lại đạt.
+
+**Còn mở:** ARCH-01/02 (quy mô > 300.000 phiếu: tách file phiếu đã khóa sổ theo năm + phân trang báo cáo) – cần làm cùng ĐNTT; M-12 (sheet xem trước dùng chung – chỉ ảnh hưởng hiển thị); L-05 (chấp nhận).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
 - 28/09/2026 — Đợt sửa 2: định dạng số/ngày/canh lề theo Locale hệ thống (webapp + Google Sheet) và Locale Misa (PDF/Excel/MISA).
 - 28/09/2026 — Đợt sửa 3: M-02, M-04, M-07, M-08, M-09, M-10, M-13, M-14, M-16, L-03, L-04, L-06, L-07, L-08, L-09, L-11.
+- 28/09/2026 — BUG-004: chặn người lưu sau (Kho Dăm, độ khô, đơn hàng xuất bán); đóng M-11, SEC-03 theo quyết định.

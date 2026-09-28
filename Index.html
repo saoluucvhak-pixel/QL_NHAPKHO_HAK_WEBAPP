@@ -4328,9 +4328,10 @@
             let safeNgay = jsAttr(item.ngay);
             let safeHinhThuc = jsAttr(item.hinhThuc);
             let safeDoKho = jsAttr(item.doKho);
+            let safePB = jsAttr(item.phienBan || ''); // BUG-004
             return item.isLocked ?
               `<tr class="locked-row"><td class="ngay"><b>${escapeHtml(ngayHT(item.ngay))}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td class="num">${fmtPT(item.doKho, 1)}</td><td class="num">${fmtPT(item.doAm, 1)}</td><td>🔒 Khóa</td></tr>` :
-              `<tr><td class="ngay"><b>${escapeHtml(ngayHT(item.ngay))}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td class="num">${fmtPT(item.doKho, 1)}</td><td class="num">${fmtPT(item.doAm, 1)}</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}')">Xóa</button></td></tr>`;
+              `<tr><td class="ngay"><b>${escapeHtml(ngayHT(item.ngay))}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td class="num">${fmtPT(item.doKho, 1)}</td><td class="num">${fmtPT(item.doAm, 1)}</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}', '${safePB}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}', '${safePB}')">Xóa</button></td></tr>`;
           }).join('');
 
           let phanTrangHTML = renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
@@ -4367,22 +4368,26 @@
         .layDanhSachDoKhoTheoBoLoc(tuNgay, denNgay, trang);
     }
     
-    function chonSuaDoKho(ngay, hinhThuc, doKho) {
+    // BUG-004: nhớ phiên bản dòng đang sửa - chỉ gửi kèm khi lưu đúng ngày đó.
+    let _doKhoDangSua = null;
+    function chonSuaDoKho(ngay, hinhThuc, doKho, phienBan) {
+      _doKhoDangSua = { ngay: ngay, phienBan: phienBan || '' };
       document.getElementById('ngayNhapDK').value = ngay;
       document.getElementById('hinhThucDoKho').value = hinhThuc;
       document.getElementById('doKho').value = doKho; tuDongQuyDoi('dokho');
     }
     
-    function thucHienXoaDoKho(ngay) {
-      if (!confirm("Xóa ngày " + ngay + "?")) return;
-      apiRun().withSuccessHandler(res => { thongBaoKD(res); taiDanhSachDoKho(); }).withFailureHandler(err => thongBaoKD("❌ Lỗi xóa độ khô: " + err.message)).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA' });
+    function thucHienXoaDoKho(ngay, phienBan) {
+      if (!confirm("Xóa ngày " + ngayHT(ngay) + "?")) return;
+      apiRun().withSuccessHandler(res => { thongBaoKD(res); taiDanhSachDoKho(); }).withFailureHandler(err => thongBaoKD("❌ Lỗi xóa độ khô: " + err.message)).processFormData('Nhapdokho', { ngay: ngay, hanhDong: 'XOA', phienBan: phienBan || '' });
     }
     
     function luuDoKhoForm(btn) {
       let data = { ngay: document.getElementById('ngayNhapDK').value, hinhThuc: document.getElementById('hinhThucDoKho').value, doKho: document.getElementById('doKho').value, doAm: document.getElementById('doAm').value, hanhDong: 'SUA' };
       if (!data.ngay) { thongBaoKD("Chọn ngày!"); return; }
+      data.phienBan = (_doKhoDangSua && _doKhoDangSua.ngay === data.ngay) ? _doKhoDangSua.phienBan : '';
       btn.disabled = true; btn.innerText = "Đang lưu...";
-      apiRun().withSuccessHandler(res => { thongBaoKD(res); taiDanhSachDoKho(); }).withFailureHandler(err => { thongBaoKD(err.message); btn.disabled = false; btn.innerText = "Lưu Lại"; }).processFormData('Nhapdokho', data);
+      apiRun().withSuccessHandler(res => { thongBaoKD(res); taiDanhSachDoKho(); }).withFailureHandler(err => { thongBaoKD(err.message); btn.disabled = false; btn.innerText = "Lưu Lại"; }).processFormData('Nhapdokho', data); _doKhoDangSua = null;
     }
 
     function moFormGiaoDich(loai, tab, tuNgayOverride, denNgayOverride, trangOverride, htTuNgayOverride, htDenNgayOverride) {
@@ -4466,11 +4471,12 @@
         let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
         let safeMt = jsAttr(item.mt);
         let safeDoKho = jsAttr(item.doKho);
+        let safePB = jsAttr(item.phienBan || ''); // BUG-004
         let dkStr = fmtPT(item.doKho, 1);
 
         return item.isLocked ?
           `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td>🔒 Khóa</td></tr>` :
-          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}', '${safePB}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safePB}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -4562,11 +4568,12 @@
         let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
         let safeMt = jsAttr(item.mt);
         let safeDoKho = jsAttr(item.doKho);
+        let safePB = jsAttr(item.phienBan || ''); // BUG-004
         let dkStr = fmtPT(item.doKho, 1);
 
         return item.isLocked ?
           `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td>🔒 Khóa</td></tr>` :
-          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}', '${safePB}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safePB}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -4814,7 +4821,10 @@
         });
     }
 
-    function chonSuaGiaoDich(loai, tab, maPhieu, ngay, hinhThuc, khoXuat, khoNhap, mt, doKho) {
+    // BUG-004: phiên bản dòng lúc mở sửa - máy chủ chặn nếu người khác đã sửa/xóa trước.
+    const _phienBanDangSua = {};
+    function chonSuaGiaoDich(loai, tab, maPhieu, ngay, hinhThuc, khoXuat, khoNhap, mt, doKho, phienBan) {
+      _phienBanDangSua[loai] = { maPhieu: maPhieu, phienBan: phienBan || '' };
       document.getElementById('editMaPhieu_' + loai).value = maPhieu;
       document.getElementById('ngayGiaoDich_' + loai).value = ngay.split(' ')[0];
       if (document.getElementById('hinhThuc_' + loai)) document.getElementById('hinhThuc_' + loai).value = hinhThuc;
@@ -4825,9 +4835,9 @@
       document.getElementById('lblFormMode_' + loai).innerText = "✏️ ĐANG SỬA MÃ: " + maPhieu;
     }
 
-    function thucHienXoaGiaoDich(loai, tab, maPhieu) {
+    function thucHienXoaGiaoDich(loai, tab, maPhieu, phienBan) {
       if (!confirm("Xóa phiếu " + maPhieu + "?")) return;
-      apiRun().withSuccessHandler(res => { thongBaoKD(res); moLaiTheoTab(loai, tab); }).withFailureHandler(err => thongBaoKD("❌ Lỗi xóa phiếu: " + err.message)).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA' });
+      apiRun().withSuccessHandler(res => { thongBaoKD(res); moLaiTheoTab(loai, tab); }).withFailureHandler(err => thongBaoKD("❌ Lỗi xóa phiếu: " + err.message)).processFormData(loai === 'NHẬP' ? 'Nhapkho' : 'Xuatkho', { maPhieu: maPhieu, hanhDong: 'XOA', phienBan: phienBan || '' });
     }
 
     function luuGiaoDichForm(loai, tab, btn) {
@@ -4898,7 +4908,8 @@
         khoXuat: khoXuatVal, khoNhap: khoNhapVal, 
         khoiLuongMT: mtVal, doKho: doKhoInputVal,
         dienGiaiDoKho: dienGiaiVal,
-        hanhDong: maPhieu ? 'SUA' : 'THEM' 
+        hanhDong: maPhieu ? 'SUA' : 'THEM',
+        phienBan: (maPhieu && _phienBanDangSua[loai] && _phienBanDangSua[loai].maPhieu === maPhieu) ? _phienBanDangSua[loai].phienBan : ''
       };
       
       guiPhieuGiaoDich(loai, tab, btn, data);
@@ -5124,7 +5135,7 @@
       showOverlay(state.dhEditingRow ? 'Đang cập nhật đơn hàng…' : 'Đang lưu đơn hàng…');
       try {
         const res = state.dhEditingRow
-          ? await runServer('XH_updateDonHang', state.dhEditingRow, payload, state.dhEditingStt)
+          ? await runServer('XH_updateDonHang', state.dhEditingRow, Object.assign({}, payload, { phienBan: state.dhEditingPB || '' }), state.dhEditingStt)
           : await runServer('XH_saveDonHang', payload);
         toast(res.message, res.status === 'success');
         if (res.status === 'success'){ xhResetDonHangForm(); await xhLoadDonHangList(); }
@@ -5153,6 +5164,7 @@
       document.getElementById('dh_loaiXe').value = 'Y';
       state.dhEditingRow = null;
       state.dhEditingStt = null;
+      state.dhEditingPB = null;
       document.getElementById('btnDhSave').textContent = '✔️ Lưu đơn hàng xuất bán';
     }
 
@@ -5182,16 +5194,17 @@
         xhCapNhatKLBDMT();
         state.dhEditingRow = res.rowIndex;
         state.dhEditingStt = res.stt;
+        state.dhEditingPB = res.phienBan || ''; // BUG-004
         document.getElementById('btnDhSave').textContent = '💾 Cập nhật đơn hàng';
         toast('Đã nạp đơn hàng để sửa. Chỉnh xong bấm "Cập nhật đơn hàng".', true);
       } catch(err){ toast('Lỗi tải dữ liệu: ' + err, false); } finally { hideOverlay(); }
     }
 
-    async function xhDeleteDonHangRow(rowIndex, stt){
+    async function xhDeleteDonHangRow(rowIndex, stt, phienBan){
       if (!confirm('Bạn có chắc muốn XÓA đơn hàng này? Hành động không thể hoàn tác.')) return;
       showOverlay('Đang xóa đơn hàng…');
       try {
-        const res = await runServer('XH_deleteDonHang', rowIndex, stt);
+        const res = await runServer('XH_deleteDonHang', rowIndex, stt, phienBan || '');
         toast(res.message, res.status === 'success');
         if (res.status === 'success') await xhLoadDonHangList();
       } catch(err){ toast('Lỗi xóa đơn hàng: ' + err, false); } finally { hideOverlay(); }
@@ -5214,14 +5227,14 @@
           + '<td>'+escapeHtml(d.loaiXe)+'</td>'
           + '<td><div class="btnrow" style="margin:0;gap:6px;">'
           + '<button class="btn btn-ghost btn-sm" data-editdh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'">✏️ Sửa</button>'
-          + '<button class="btn btn-danger btn-sm" data-deldh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'">🗑️ Xóa</button>'
+          + '<button class="btn btn-danger btn-sm" data-deldh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'" data-pb="'+escapeHtml(d.phienBan || '')+'">🗑️ Xóa</button>'
           + '</div></td></tr>'
         )).join('');
         body.querySelectorAll('[data-editdh]').forEach(btn=>{
           btn.addEventListener('click', ()=> xhEditDonHang(btn.getAttribute('data-editdh'), btn.getAttribute('data-stt')));
         });
         body.querySelectorAll('[data-deldh]').forEach(btn=>{
-          btn.addEventListener('click', ()=> xhDeleteDonHangRow(btn.getAttribute('data-deldh'), btn.getAttribute('data-stt')));
+          btn.addEventListener('click', ()=> xhDeleteDonHangRow(btn.getAttribute('data-deldh'), btn.getAttribute('data-stt'), btn.getAttribute('data-pb')));
         });
       } catch(err){ toast('Lỗi tải danh sách: ' + err, false); }
     }

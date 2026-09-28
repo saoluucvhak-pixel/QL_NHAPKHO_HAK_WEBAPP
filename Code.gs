@@ -3917,7 +3917,8 @@ function layDanhSachGiaoDichTheoBoLoc_(loaiPhieu, tabPhieu, tuNgay, denNgay, tra
       doKho: parseFloat(data[i][8]) || 0,
       bdmt: parseFloat(data[i][10]) || 0,
       nguonDK: data[i][13] || "Mặc định/Thủ công",
-      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache)
+      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache),
+      phienBan: KD_phienBan_(data[i].slice(0, 14)) // BUG-004
     };
   });
 
@@ -3930,6 +3931,17 @@ function layDanhSachGiaoDichTheoBoLoc_(loaiPhieu, tabPhieu, tuNgay, denNgay, tra
     denNgay: denNgayStr
   };
 }
+
+// BUG-004 - CHẶN NGƯỜI LƯU SAU (Kho Dăm): "dấu phiên bản" = băm nội dung dòng lúc tải
+// danh sách. Khi Sửa/Xóa, máy chủ băm lại dòng hiện tại trên sheet: khác nghĩa là người
+// khác đã sửa/xóa sau khi mình mở -> KHÔNG ghi, yêu cầu tải lại (trước đây người lưu
+// sau âm thầm ghi đè, kể cả làm "sống lại" phiếu người khác vừa xóa).
+function KD_phienBan_(dong) {
+  const chuan = (dong || []).map(function (v) { return v instanceof Date ? "D" + v.getTime() : String(v == null ? "" : v); }).join("\u0001");
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, chuan)
+    .map(function (b) { return ((b + 256) % 256).toString(16).padStart(2, "0"); }).join("").slice(0, 16);
+}
+const KD_TB_DA_DOI_ = " đã bị người khác sửa hoặc xóa sau khi bạn mở. Vui lòng tải lại danh sách rồi thao tác lại (chưa ghi gì).";
 
 function taoMaPhieuMoi_(prefix) {
   var tsp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss");
@@ -3949,6 +3961,11 @@ function xuLySuaXoaGiaoDich_(dataEdit) {
     }
   }
 
+  // BUG-004: Sửa/Xóa phiếu đã mở từ danh sách -> dòng trên sheet phải còn đúng như lúc mở.
+  if ((dataEdit.hanhDong === "SUA" || dataEdit.hanhDong === "XOA") && rowIdx > -1) {
+    if (dataEdit.phienBan && KD_phienBan_(data[rowIdx - 1].slice(0, 14)) !== String(dataEdit.phienBan)) return "❌ Phiếu " + dataEdit.maPhieu + KD_TB_DA_DOI_;
+    if (dataEdit.hanhDong === "SUA" && String(data[rowIdx - 1][11]).trim() === "Đã hủy") return "❌ Phiếu " + dataEdit.maPhieu + " đã bị xóa - không sửa được. Vui lòng tải lại danh sách.";
+  }
   var ngayCheck = dataEdit.ngay || (rowIdx > -1 ? data[rowIdx-1][1] : new Date());
   var arrKyCache = taiDanhSachKyVetBaiCache_();
   // FIX H-05: kiểm tra cả NGÀY GỐC của phiếu đang sửa/xóa (trước đây chỉ kiểm tra
@@ -4438,7 +4455,8 @@ function layDanhSachDoKhoTheoBoLoc_(tuNgay, denNgay, trang) {
       hinhThuc: data[i][1] || "NKSX",
       doKho: parseFloat(data[i][2]) || 0,
       doAm: parseFloat(data[i][3]) || 0,
-      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache)
+      isLocked: kiemTraKhoaKyVetBaiPure_(dObj, arrKyCache),
+      phienBan: KD_phienBan_(data[i].slice(0, 5)) // BUG-004
     };
   });
 
@@ -4462,6 +4480,19 @@ function xuLySuaXoaDoKho_(dataEdit) {
   var rowIdx = -1;
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] && Utilities.formatDate(new Date(data[i][0]), Session.getScriptTimeZone(), "yyyy-MM-dd") === target) { rowIdx = i + 1; break; }
+  }
+  // BUG-004: dòng độ khô đã mở từ danh sách phải còn đúng như lúc mở. Nhập mới (không bấm
+  // "Sửa") vào ngày ĐÃ CÓ độ khô hợp lệ -> không ghi đè, yêu cầu bấm "Sửa" trên danh sách.
+  if (rowIdx > -1) {
+    var dongDK = data[rowIdx - 1];
+    var _rfTB = REGION_FORMAT_();
+    var ngayTB = dinhDangGMT7_(new Date(target + "T12:00:00+07:00"), _rfTB.DATE_FMT);
+    if (dataEdit.phienBan && KD_phienBan_(dongDK.slice(0, 5)) !== String(dataEdit.phienBan)) return "❌ Độ khô ngày " + ngayTB + KD_TB_DA_DOI_;
+    if (!dataEdit.phienBan && dataEdit.hanhDong !== "XOA" && String(dongDK[4]).trim() !== "Đã hủy") {
+      var dkCu = parseFloat(dongDK[2]) || 0; if (dkCu <= 1) dkCu = dkCu * 100;
+      var dkTB = dkCu.toFixed(2).replace(".", _rfTB.MIEN === "US" ? "." : ",") + "%";
+      return "❌ Ngày " + ngayTB + " đã có độ khô (" + dkTB + ") - bấm \"Sửa\" trên danh sách để sửa (tránh ghi đè số người khác vừa nhập).";
+    }
   }
 
   if (dataEdit.hanhDong === "XOA") {
@@ -5319,7 +5350,8 @@ function XH_getDonHangList_() {
       soTKHQ: r[2], tau: r[3], khachHang: r[4], diaChiKH: r[5], tenHangHoa: r[6],
       donGiaUSD: parseFloat(r[7]) || 0, klMT: parseFloat(r[8]) || 0, klBDMT: parseFloat(r[9]) || 0,
       doKho: parseFloat(r[10]) || 0, doKhoNhaMay: parseFloat(r[11]) || 0,
-      tuNgay: layNgayHienThi(r[12]), denNgay: layNgayHienThi(r[13]), loaiXe: r[14], khoXuat: r[15]
+      tuNgay: layNgayHienThi(r[12]), denNgay: layNgayHienThi(r[13]), loaiXe: r[14], khoXuat: r[15],
+      phienBan: KD_phienBan_(r) // BUG-004: chặn người lưu/xóa sau
     })).filter(r => r.khachHang).reverse();
     return { status: "success", data: result };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -5363,7 +5395,8 @@ function XH_getDonHangByRow_(rowIndex, sttKyVong) {
       doKho: (parseFloat(row[10]) || 0) * 100, // trả về dạng % cho khớp ô nhập
       doKhoNhaMay: parseFloat(row[11]) || 0,
       tuNgay: layNgayInput(row[12]), denNgay: layNgayInput(row[13]),
-      loaiXe: row[14] || "Y", khoXuat: row[15] || ""
+      loaiXe: row[14] || "Y", khoXuat: row[15] || "",
+      phienBan: KD_phienBan_(row) // BUG-004
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -5378,6 +5411,10 @@ function XH_updateDonHang_(rowIndex, payload, sttKyVong) {
     payload = payload || {};
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
+    // BUG-004: đơn đã bị người khác sửa sau khi mở form -> không ghi đè, yêu cầu tải lại.
+    if (payload.phienBan && KD_phienBan_(sheet.getRange(r, 1, 1, 16).getValues()[0]) !== String(payload.phienBan)) {
+      return { status: "error", message: "Đơn hàng STT " + sttKyVong + KD_TB_DA_DOI_ };
+    }
     if (!payload.ngayDonHang) return { status: "error", message: "Vui lòng chọn Ngày đơn hàng." };
     if (!String(payload.khachHang || "").trim()) return { status: "error", message: "Vui lòng nhập Khách hàng." };
     const klMT = parseFloat(payload.klMT) || 0;
@@ -5411,7 +5448,7 @@ function XH_updateDonHang_(rowIndex, payload, sttKyVong) {
   }
 }
 
-function XH_deleteDonHang_(rowIndex, sttKyVong) {
+function XH_deleteDonHang_(rowIndex, sttKyVong, phienBan) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) {
     return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại." };
@@ -5419,6 +5456,9 @@ function XH_deleteDonHang_(rowIndex, sttKyVong) {
   try {
     const sheet = XH_ss_().getSheetByName(XUATHANG_CONFIG.SHEET_DHXB);
     const r = XH_timDongDonHang_(sheet, rowIndex, sttKyVong);
+    if (phienBan && KD_phienBan_(sheet.getRange(r, 1, 1, 16).getValues()[0]) !== String(phienBan)) {
+      return { status: "error", message: "Đơn hàng STT " + sttKyVong + KD_TB_DA_DOI_ }; // BUG-004
+    }
     const thongTin = sheet.getRange(r, 1, 1, 5).getValues()[0];
     sheet.deleteRow(r);
     logAudit_("XUATHANG_DONHANG", "OK", "Đã xóa đơn hàng xuất bán STT " + thongTin[0] + " (" + thongTin[4] + "), dòng " + r);
