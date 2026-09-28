@@ -156,3 +156,25 @@ test('L-10: kho nguồn trung chuyển tính cùng lượt đọc, giống hàm 
   assert.strictEqual(chay(`timKhoNguonTCLonNhat_("KhoXB",${tu},${den})`), 'KhoB');
   assert.strictEqual(chay(`tongHopSoLieuKhoXuatBan_("KhoXB",${tu},${den}).nhapTC_BDMT`), 12);
 });
+
+test('Giám sát: đếm lỗi 24 giờ qua, bỏ dòng cũ hơn 24 giờ và dòng OK', () => {
+  const { taoSheet } = require('./gasEnv');
+  const audit = taoSheet([['Thời gian', 'Hành động', 'Trạng thái', 'Nội dung', 'Người thực hiện']]);
+  const { chay, ctx } = taoMoiTruong({
+    SpreadsheetApp: { openById: () => ({ getSheetByName: n => (n === 'Audit' ? audit : null) }) },
+    ScriptApp: { getProjectTriggers: () => [{ getHandlerFunction: () => 'TRIGGER_saoLuuHangDem' }] }
+  });
+  ctx.audit = audit;
+  chay(`var bayGio = Date.now();
+        audit.rows.push([new Date(bayGio - 30*3600000), "IMPORT_PHIEUCAN", "ERROR", "cũ quá 24h", "a@x"]);
+        audit.rows.push([new Date(bayGio - 3*3600000), "IMPORT_PHIEUCAN", "ERROR", "lỗi 1", "a@x"]);
+        audit.rows.push([new Date(bayGio - 2*3600000), "DANG_NHAP", "TU_CHOI", "lạ", "b@x"]);
+        audit.rows.push([new Date(bayGio - 1*3600000), "IMPORT_PHIEUCAN", "OK", "ổn", "a@x"]);
+        PropertiesService.getScriptProperties().setProperty("SAO_LUU_KET_QUA_CUOI", JSON.stringify({thoiGian:"28/09/2026 01:10", soFile:6, loi:[]}));`);
+  const d = JSON.parse(chay('JSON.stringify(HT_layGiamSat_().data)'));
+  assert.strictEqual(d.soLoi24h, 2);
+  assert.deepStrictEqual(d.theoHanhDong.map(x => x.hanhDong).sort(), ['DANG_NHAP', 'IMPORT_PHIEUCAN']);
+  assert.strictEqual(d.saoLuu.soFile, 6);
+  assert.strictEqual(d.batSaoLuuTuDong, true);
+  assert.strictEqual(d.coTriggerTinhGia, false);
+});

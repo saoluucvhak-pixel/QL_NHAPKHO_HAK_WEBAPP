@@ -5832,12 +5832,18 @@ function SL_thucHienSaoLuu_(nguon) {
     const goc = SL_layThuMucGoc_(true);
     const thuMuc = goc.createFolder(SL_TIEN_TO_THU_MUC_ + nhan);
     const loi = [];
-    let soFile = 0;
+    let soFile = 0, kiemTraLoi = 0;
     _layDanhSachTaiNguyenDaGopId_().filter(function (tn) { return tn.loai === "sheet"; }).forEach(function (tn) {
       try {
         const f = DriveApp.getFileById(tn.id);
-        f.makeCopy(f.getName() + " (" + nhan + ")", thuMuc);
+        const banSao = f.makeCopy(f.getName() + " (" + nhan + ")", thuMuc);
         soFile++;
+        // Kiểm tra bản sao: mở được và đủ số sheet như file gốc (bản sao hỏng/thiếu -> báo lỗi).
+        try {
+          const soGoc = SpreadsheetApp.openById(tn.id).getSheets().length;
+          const soSao = SpreadsheetApp.openById(banSao.getId()).getSheets().length;
+          if (soGoc !== soSao) { kiemTraLoi++; loi.push(tn.ten + ": bản sao có " + soSao + " sheet, file gốc " + soGoc + " sheet"); }
+        } catch (eKT) { kiemTraLoi++; loi.push(tn.ten + ": không mở được bản sao để kiểm tra (" + (eKT.message || eKT) + ")"); }
       } catch (e) {
         loi.push(tn.ten + ": " + (e.message || e));
       }
@@ -5851,7 +5857,7 @@ function SL_thucHienSaoLuu_(nguon) {
     const tomTat = {
       thoiGian: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
       nguon: nguon, thuMuc: thuMuc.getName(), thuMucUrl: thuMuc.getUrl(),
-      soFile: soFile, loi: loi, soBanDaXoa: soBanDaXoa, soFileTamDaDon: soFileTamDaDon, giay: Math.round((Date.now() - batDau) / 1000)
+      soFile: soFile, loi: loi, kiemTraLoi: kiemTraLoi, soBanDaXoa: soBanDaXoa, soFileTamDaDon: soFileTamDaDon, giay: Math.round((Date.now() - batDau) / 1000)
     };
     PropertiesService.getScriptProperties().setProperty(SL_PROP_KET_QUA_, JSON.stringify(tomTat));
     logAudit_("SAO_LUU", loi.length ? (soFile ? "MOT_PHAN" : "ERROR") : "OK",
@@ -5947,6 +5953,42 @@ function HT_saoLuuNgay_() {
       data: kq,
       message: (kq.soFile > 0 ? "✅ Đã sao lưu " + kq.soFile + " file vào " + kq.thuMuc : "❌ Không sao lưu được file nào")
         + (kq.loi.length ? " — lỗi: " + kq.loi.join("; ") : "")
+    };
+  } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/* ---------- 9A-2. GIÁM SÁT (Monitoring) cho Dashboard - Quản trị + Tổng hợp ----------
+ * Lỗi / từ chối / cảnh báo trong 24 giờ qua (đọc Nhật ký từ dưới lên, dừng khi quá 24
+ * giờ), tình trạng sao lưu gần nhất và trigger tính giá theo giờ. Chỉ đọc. */
+const GS_TRANG_THAI_LOI_ = ["ERROR", "TU_CHOI", "MOT_PHAN", "WARNING"];
+function HT_layGiamSat_() {
+  try {
+    const bayGio = Date.now();
+    const kq = NK_loc_({ tuNgay: dinhDangGMT7_(new Date(bayGio - 86400000), "yyyy-MM-dd"), denNgay: dinhDangGMT7_(new Date(bayGio), "yyyy-MM-dd") });
+    const loi = kq.dong.filter(function (d) { return d.t.getTime() >= bayGio - 86400000 && GS_TRANG_THAI_LOI_.indexOf(d.trangThai) !== -1; });
+    const theoHanhDong = {};
+    loi.forEach(function (d) { theoHanhDong[d.hanhDong] = (theoHanhDong[d.hanhDong] || 0) + 1; });
+    let saoLuu = null;
+    try { saoLuu = JSON.parse(PropertiesService.getScriptProperties().getProperty(SL_PROP_KET_QUA_) || "null"); } catch (e) { saoLuu = null; }
+    let coTriggerGia = false, coTriggerSaoLuu = false;
+    try {
+      ScriptApp.getProjectTriggers().forEach(function (t) {
+        if (t.getHandlerFunction() === "runCalculatePrice") coTriggerGia = true;
+        if (t.getHandlerFunction() === SL_HAM_TRIGGER_) coTriggerSaoLuu = true;
+      });
+    } catch (e) { /* không đọc được trigger */ }
+    return {
+      status: "success",
+      data: {
+        soLoi24h: loi.length,
+        theoHanhDong: Object.keys(theoHanhDong).map(function (k) { return { hanhDong: k, so: theoHanhDong[k] }; }).sort(function (a, b) { return b.so - a.so; }),
+        ganNhat: loi.slice(0, 5).map(function (d) {
+          return { thoiGian: dinhDangGMT7_(d.t, "dd/MM/yyyy HH:mm:ss"), hanhDong: d.hanhDong, trangThai: d.trangThai, email: d.email, noiDung: d.noiDung.length > 200 ? d.noiDung.slice(0, 200) + "…" : d.noiDung };
+        }),
+        saoLuu: saoLuu ? { thoiGian: saoLuu.thoiGian, soFile: saoLuu.soFile, soLoi: (saoLuu.loi || []).length, kiemTraLoi: saoLuu.kiemTraLoi || 0 } : null,
+        batSaoLuuTuDong: coTriggerSaoLuu,
+        coTriggerTinhGia: coTriggerGia
+      }
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }

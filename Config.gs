@@ -1043,6 +1043,7 @@ function taoApiRoutes_() {
 
     // --- Hệ thống: Sao lưu, Nhật ký hoạt động (Quản trị + Tổng hợp) ---
     HT_layTinhTrangSaoLuu: r(HT_layTinhTrangSaoLuu_, H),
+    HT_layGiamSat: r(HT_layGiamSat_, H), // Giám sát lỗi 24h + sao lưu trên Dashboard
     HT_luuCauHinhSaoLuu: r(HT_luuCauHinhSaoLuu_, H),
     HT_saoLuuNgay: r(HT_saoLuuNgay_, H),
     HT_layNhatKy: r(HT_layNhatKy_, H),

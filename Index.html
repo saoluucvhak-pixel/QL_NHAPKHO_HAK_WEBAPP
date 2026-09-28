@@ -538,6 +538,17 @@
           <button class="btn btn-ghost btn-sm" id="btnLamMoiDashboard">🔄 Làm mới</button>
         </div>
 
+        <!-- GIÁM SÁT (chỉ Quản trị + Tổng hợp): lỗi 24 giờ qua, sao lưu, trigger -->
+        <div class="card" id="dash_giamSat" style="display:none;">
+          <h2>🩺 Giám sát hệ thống</h2>
+          <div class="summary-row">
+            <div class="stat"><div class="label">LỖI / TỪ CHỐI 24 GIỜ QUA</div><div class="value" id="gs_soLoi">0</div></div>
+            <div class="stat"><div class="label">SAO LƯU GẦN NHẤT</div><div class="value" id="gs_saoLuu" style="font-size:14px;">—</div></div>
+            <div class="stat"><div class="label">TỰ ĐỘNG</div><div class="value" id="gs_trigger" style="font-size:13px;">—</div></div>
+          </div>
+          <div id="gs_chiTiet" style="font-size:12.5px;color:var(--ink-soft);"></div>
+        </div>
+
         <h2 style="font-size:13.5px;margin:0 0 10px;color:var(--ink-soft);">HÔM NAY</h2>
         <div class="summary-row">
           <div class="stat"><div class="label">SỐ PHIẾU CÂN</div><div class="value" id="dash_homNaySoLuong">0</div></div>
@@ -2362,6 +2373,7 @@
           if (btn) btn.addEventListener('click', e => { e.preventDefault(); dangXuat(); });
         }
         apDungVaiTro(res.data);
+        htLoadGiamSat();
         if (coQuyen(res.data, 'QUAN_TRI')) nhacLuuLinkCong();
       }).catch(()=>{ /* không chặn tải trang nếu lỗi tạm thời - server vẫn tự chặn ở từng hàm */ });
     }
@@ -2570,7 +2582,30 @@
         }
       } catch(err){ toast('Lỗi tải Dashboard: ' + err, false); }
     }
-    document.getElementById('btnLamMoiDashboard').addEventListener('click', htLoadDashboard);
+    document.getElementById('btnLamMoiDashboard').addEventListener('click', ()=>{ htLoadDashboard(); htLoadGiamSat(); });
+    // Giám sát (Quản trị + Tổng hợp) - gọi sau khi biết quyền người dùng (initUserInfo).
+    async function htLoadGiamSat(){
+      const khung = document.getElementById('dash_giamSat');
+      if (!coQuyen(state.currentUser, 'HE_THONG')) { khung.style.display = 'none'; return; }
+      try {
+        const res = await runServer('HT_layGiamSat');
+        if (res.status !== 'success') return;
+        const d = res.data;
+        khung.style.display = '';
+        const soLoi = document.getElementById('gs_soLoi');
+        soLoi.textContent = fmtNum(d.soLoi24h);
+        soLoi.style.color = d.soLoi24h ? 'var(--danger)' : 'var(--success)';
+        document.getElementById('gs_saoLuu').textContent = d.saoLuu
+          ? ngayHT(d.saoLuu.thoiGian) + ' · ' + d.saoLuu.soFile + ' file' + (d.saoLuu.soLoi ? ' · ⚠️ ' + d.saoLuu.soLoi + ' lỗi' : ' · ✅')
+          : 'Chưa sao lưu lần nào';
+        document.getElementById('gs_trigger').textContent = (d.batSaoLuuTuDong ? '✅' : '⚠️ Chưa bật') + ' sao lưu đêm · ' + (d.coTriggerTinhGia ? '✅' : '— không có') + ' tính giá theo giờ';
+        document.getElementById('gs_chiTiet').innerHTML = d.soLoi24h
+          ? 'Theo hành động: ' + d.theoHanhDong.map(x => escapeHtml(x.hanhDong) + ' (' + x.so + ')').join(', ')
+            + '<br>Gần nhất: ' + d.ganNhat.map(x => '<div>• <span class="mono">' + escapeHtml(ngayHT(x.thoiGian)) + '</span> ' + escapeHtml(x.hanhDong) + ' [' + escapeHtml(x.trangThai) + '] ' + escapeHtml(x.email || '') + ': ' + escapeHtml(x.noiDung) + '</div>').join('')
+            + '<div style="margin-top:4px;">Xem đầy đủ: Hệ thống › Nhật ký hoạt động (lọc Trạng thái).</div>'
+          : 'Không có lỗi nào trong 24 giờ qua.';
+      } catch(err){ /* giám sát là phụ - không báo lỗi làm phiền */ }
+    }
 
     function nowDatetimeLocalStr(){
       const d = new Date();
@@ -2832,10 +2867,70 @@
       try {
         const res = await runServer('addManualPhieuCan', fields);
         toast(res.message, res.status === 'success');
-        if (res.status === 'success'){ resetManualForm(); loadFilterOptions(); }
+        if (res.status === 'success'){ xoaNhap('manual'); resetManualForm(); loadFilterOptions(); }
       } catch(err){ toast('Lỗi: ' + err, false); } finally { hideOverlay(); }
     });
-    document.getElementById('btnResetManual').addEventListener('click', resetManualForm);
+    document.getElementById('btnResetManual').addEventListener('click', ()=>{ xoaNhap('manual'); resetManualForm(); });
+    // ---------------------------------------------------------------
+    // TỰ LƯU NHÁP + KHÔI PHỤC (Auto Save / Crash Recovery): form đang nhập dở được lưu trên
+    // trình duyệt này (mỗi 0,5 giây sau khi gõ). Mở lại trang (lỡ tải lại, mất mạng, trình
+    // duyệt đóng) -> hiện thanh "Có bản nháp chưa lưu" để Khôi phục hoặc Bỏ. Lưu thành công
+    // hoặc bấm "Làm mới form" -> xóa nháp. Chỉ áp dụng khi TẠO MỚI (không lưu nháp khi đang sửa).
+    const NHAP_FORM = {
+      manual: { khoa: 'hak_nhap_manual_v1', neo: 'm_soPhieu',
+        ids: ['m_soPhieu','m_soXe','m_soXe2','m_khachHang','m_ngayCan1','m_gioCan1','m_ngayCan2','m_gioCan2','m_klCan1','m_klCan2','m_klHang','m_maKH','m_maNG'],
+        chk: ['m_luuDraftChuaTT'], duocLuu: () => true },
+      donhang: { khoa: 'hak_nhap_donhang_v1', neo: 'dh_ngayDonHang',
+        ids: ['dh_ngayDonHang','dh_soTKHQ','dh_tau','dh_khachHang','dh_diaChiKH','dh_tenHangHoa','dh_donGiaUSD','dh_klMT','dh_doKho','dh_tuNgay','dh_denNgay','dh_khoXuat','dh_loaiXe'],
+        chk: [], duocLuu: () => !state.dhEditingRow, sauKhoiPhuc: () => { try { xhCapNhatKLBDMT(); } catch(e) {} } },
+      baogia: { khoa: 'hak_nhap_baogia_v1', neo: 'bg_ngayBaoGia', ids: ['bg_ngayBaoGia','bg_hieuLuc'], chk: [],
+        duocLuu: () => !state.bgEditingId,
+        them: () => { try { bgSyncAllGroupsFromDOM(); } catch(e) {} return { groups: (state.bgGroups || []).map(g => ({ maList: g.maList, klCode: g.klCode, gia: g.gia })) }; },
+        coNoiDung: d => (d.them && d.them.groups || []).some(g => (g.maList && g.maList.length) || g.gia),
+        sauKhoiPhuc: d => { state.bgGroups = []; state.bgGroupSeq = 0; ((d.them && d.them.groups) || []).forEach(g => bgAddGroup(g)); if (!state.bgGroups.length) bgAddGroup(); bgRenderGroups(); } }
+    };
+    function docNhap(k){ try { return JSON.parse(localStorage.getItem(NHAP_FORM[k].khoa) || 'null'); } catch(e) { return null; } }
+    function xoaNhap(k){ try { localStorage.removeItem(NHAP_FORM[k].khoa); } catch(e) {} const tb = document.getElementById('nhapTB_' + k); if (tb) tb.remove(); }
+    function luuNhap(k){
+      const f = NHAP_FORM[k];
+      if (!f.duocLuu()) return;
+      const d = { luc: Date.now(), gt: {}, chk: {} };
+      f.ids.forEach(id => { const el = document.getElementById(id); if (el) d.gt[id] = el.value; });
+      f.chk.forEach(id => { const el = document.getElementById(id); if (el) d.chk[id] = el.checked; });
+      if (f.them) d.them = f.them();
+      const coGo = f.ids.some(id => d.gt[id] && !/NgayBaoGia|hieuLuc|loaiXe/.test(id)) || (f.coNoiDung && f.coNoiDung(d));
+      try { if (coGo) localStorage.setItem(f.khoa, JSON.stringify(d)); } catch(e) {}
+    }
+    const _hanLuuNhap = {};
+    function henLuuNhap(k){ clearTimeout(_hanLuuNhap[k]); _hanLuuNhap[k] = setTimeout(() => luuNhap(k), 500); }
+    function moiKhoiPhucNhap(k){
+      const d = docNhap(k), f = NHAP_FORM[k];
+      if (!d || document.getElementById('nhapTB_' + k)) return;
+      const neo = document.getElementById(f.neo); const the = neo && neo.closest('.card');
+      if (!the) return;
+      const tb = document.createElement('div');
+      tb.id = 'nhapTB_' + k; tb.className = 'tc-sua'; tb.setAttribute('role', 'status');
+      const luc = new Date(d.luc); const hai = n => String(n).padStart(2, '0');
+      tb.innerHTML = '📝 Có bản nháp chưa lưu lúc <b>' + hai(luc.getHours()) + ':' + hai(luc.getMinutes()) + ' ' + escapeHtml(ngayHT(hai(luc.getDate()) + '/' + hai(luc.getMonth() + 1) + '/' + luc.getFullYear())) + '</b> '
+        + '<button type="button" class="btn btn-primary btn-sm" data-khoi-phuc>Khôi phục</button> <button type="button" class="btn btn-ghost btn-sm" data-bo-nhap>Bỏ bản nháp</button>';
+      the.parentNode.insertBefore(tb, the);
+      tb.querySelector('[data-bo-nhap]').addEventListener('click', () => xoaNhap(k));
+      tb.querySelector('[data-khoi-phuc]').addEventListener('click', () => {
+        Object.keys(d.gt || {}).forEach(id => { const el = document.getElementById(id); if (el) el.value = d.gt[id]; });
+        Object.keys(d.chk || {}).forEach(id => { const el = document.getElementById(id); if (el) el.checked = !!d.chk[id]; });
+        if (f.sauKhoiPhuc) f.sauKhoiPhuc(d);
+        tb.remove();
+        toast('Đã khôi phục bản nháp - kiểm tra lại rồi bấm Lưu.', true);
+      });
+    }
+    Object.keys(NHAP_FORM).forEach(k => {
+      const neo = document.getElementById(NHAP_FORM[k].neo); const the = neo && neo.closest('.card');
+      if (!the) return;
+      ['input', 'change'].forEach(ev => the.addEventListener(ev, () => henLuuNhap(k)));
+      the.addEventListener('click', e => { if (k === 'baogia' && e.target.closest('button')) henLuuNhap(k); }); // thêm/xóa/tách nhóm giá
+    });
+    window.addEventListener('DOMContentLoaded', () => { moiKhoiPhucNhap('manual'); moiKhoiPhucNhap('donhang'); });
+
     function resetManualForm(){
       ['m_soPhieu','m_soXe','m_soXe2','m_khachHang','m_ngayCan1','m_gioCan1','m_ngayCan2','m_gioCan2','m_klCan1','m_klCan2','m_klHang','m_maKH','m_maNG']
         .forEach(id=> document.getElementById(id).value = '');
@@ -3476,6 +3571,7 @@
       try { await bgLoadQuoteList(); } catch(e) { console.error(e); }
 
       hideOverlay();
+      moiKhoiPhucNhap('baogia'); // danh mục mã đã tải xong mới khôi phục được nhóm giá
     }
 
     // Tải bảng "Danh sách báo giá đã lập" (kèm trạng thái có xóa được cả phiếu hay không)
@@ -3734,6 +3830,7 @@
         toast(res.message, res.status === 'success');
         if (res.status === 'success') setTimeout(()=> bgGoiYTinhLaiGia(res.phieuChoTinhLai), 300);
         if (res.status === 'success'){
+          xoaNhap('baogia');
           bgResetQuoteForm();
           const quotes = await runServer('BG_getQuoteList');
           if (quotes.status === 'success') { state.bgQuoteList = quotes.data; bgFillCopySelect(); }
@@ -3743,7 +3840,7 @@
       finally { hideOverlay(); }
     });
 
-    document.getElementById('bgBtnResetQuote').addEventListener('click', bgResetQuoteForm);
+    document.getElementById('bgBtnResetQuote').addEventListener('click', ()=>{ xoaNhap('baogia'); bgResetQuoteForm(); });
     function bgResetQuoteForm(){
       state.bgGroups = [];
       state.bgIdTam = '';
@@ -5239,7 +5336,7 @@
           ? await runServer('XH_updateDonHang', state.dhEditingRow, Object.assign({}, payload, { phienBan: state.dhEditingPB || '' }), state.dhEditingStt)
           : await runServer('XH_saveDonHang', payload);
         toast(res.message, res.status === 'success');
-        if (res.status === 'success'){ xhResetDonHangForm(); await xhLoadDonHangList(); }
+        if (res.status === 'success'){ if (!state.dhEditingRow) xoaNhap('donhang'); xhResetDonHangForm(); await xhLoadDonHangList(); }
       } catch(err){ toast('Lỗi lưu đơn hàng: ' + err, false); } finally { hideOverlay(); }
     });
 
@@ -5254,7 +5351,7 @@
     document.getElementById('dh_klMT').addEventListener('input', xhCapNhatKLBDMT);
     document.getElementById('dh_doKho').addEventListener('input', xhCapNhatKLBDMT);
 
-    document.getElementById('btnDhReset').addEventListener('click', xhResetDonHangForm);
+    document.getElementById('btnDhReset').addEventListener('click', ()=>{ xoaNhap('donhang'); xhResetDonHangForm(); });
     function xhResetDonHangForm(){
       ['dh_ngayDonHang','dh_soTKHQ','dh_tau','dh_khachHang','dh_diaChiKH','dh_tenHangHoa','dh_donGiaUSD',
        'dh_klMT','dh_doKho','dh_klBDMT','dh_tuNgay','dh_denNgay','dh_doKhoNhaMay'].forEach(id=>{

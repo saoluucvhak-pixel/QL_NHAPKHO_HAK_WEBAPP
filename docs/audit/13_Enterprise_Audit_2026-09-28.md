@@ -553,6 +553,17 @@ Quy tắc của chủ hệ thống:
 
 **Test:** `npm test` → 20/20 đạt (thêm: kiểm tra hợp lý, lịch sử sửa, L-10 so với hàm cũ).
 
+### Đợt sửa 4 (tiếp 3) — Tự lưu nháp, Giám sát, Kiểm tra sao lưu
+
+| Mục | Đã làm | Hàm / vị trí |
+|---|---|---|
+| Auto Save / Crash Recovery | Form **Nhập tay phiếu cân**, **Đơn hàng xuất bán** (khi tạo mới), **Lập báo giá** (gồm các nhóm giá) tự lưu nháp trên trình duyệt 0,5 giây sau khi gõ. Mở lại trang (tải lại, mất mạng, đóng trình duyệt) → thanh "📝 Có bản nháp chưa lưu lúc … [Khôi phục] [Bỏ bản nháp]". Lưu thành công hoặc "Làm mới form" → xóa nháp. Không lưu nháp khi đang Sửa. | `NHAP_FORM`, `luuNhap`, `moiKhoiPhucNhap`, `xoaNhap` |
+| Monitoring | Dashboard (chỉ Quản trị + Tổng hợp) có khung **🩺 Giám sát hệ thống**: số lỗi/từ chối/cảnh báo 24 giờ qua (nhóm theo hành động + 5 lỗi gần nhất), sao lưu gần nhất (thời gian, số file, lỗi), trigger sao lưu đêm / tính giá theo giờ có đang bật. | `HT_layGiamSat_` (route `HT_layGiamSat`, quyền HỆ THỐNG), `htLoadGiamSat` |
+| Kiểm tra bản sao lưu | Mỗi lần sao lưu: mở từng bản sao, đối chiếu số sheet với file gốc; lệch/không mở được → ghi lỗi (Nhật ký `SAO_LUU` = MOT_PHAN, hiện trên Giám sát). | `SL_thucHienSaoLuu_` |
+| CI | Đã xác nhận GitHub Actions chạy đạt 3/3 lần push, 20/20 bài (0 bỏ qua - gồm cả bài giao diện Chromium). Nâng `actions/checkout`, `actions/setup-node` lên v5 (Node 20 trên GitHub sắp ngừng). | `.github/workflows/test.yml` |
+
+**Test:** `npm test` → 22/22 đạt (thêm: tự lưu nháp + khôi phục trên Chromium, giám sát 24 giờ).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -562,3 +573,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4: ARCH-02, M-12, giao diện (zoom/di động/bàn phím/đọc màn hình), bộ kiểm thử + CI trong repo.
 - 28/09/2026 — Đợt sửa 4 (tiếp): chế độ tối (gom màu về biến CSS, nút chuyển giao diện).
 - 28/09/2026 — Đợt sửa 4 (tiếp 2): L-10, cảnh báo dữ liệu bất hợp lý, gợi ý tính lại giá sau khi lưu báo giá, lịch sử sửa trước/sau.
+- 28/09/2026 — Đợt sửa 4 (tiếp 3): tự lưu nháp/khôi phục form, giám sát lỗi 24h trên Dashboard, kiểm tra bản sao lưu, CI v5.

@@ -100,3 +100,33 @@ test('Chế độ tối: theo máy + nút chuyển Tự động/Tối/Sáng, ch�
   assert.strictEqual(r.sang[2], 'rgb(31, 41, 55)');
   assert.ok(r.lai.includes('Tự động'));
 });
+
+test('Tự lưu nháp: gõ dở form Nhập tay, tải lại trang -> khôi phục được; Bỏ nháp thì xóa', { skip: !chromium && 'chưa có Playwright' }, async () => {
+  const b = await chromium.launch(); const ctx = await b.newContext(); const pg = await ctx.newPage();
+  const url = taoTrang('VN');
+  await pg.goto(url);
+  await pg.evaluate(() => {
+    const g = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    const sp = document.getElementById('m_soPhieu'); sp.value = 'PX-123'; sp.dispatchEvent(new Event('input', { bubbles: true }));
+    const kl = document.getElementById('m_klHang'); kl.value = '17990'; kl.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await pg.waitForTimeout(700);
+  await pg.goto(url); // "tải lại trang"
+  const r = await pg.evaluate(() => {
+    const tb = document.getElementById('nhapTB_manual');
+    const o = { coThanh: !!tb, truoc: document.getElementById('m_soPhieu').value };
+    tb.querySelector('[data-khoi-phuc]').click();
+    o.soPhieu = document.getElementById('m_soPhieu').value;
+    o.klHienThi = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get.call(document.getElementById('m_klHang'));
+    o.conThanh = !!document.getElementById('nhapTB_manual');
+    xoaNhap('manual'); o.sauXoa = localStorage.getItem('hak_nhap_manual_v1');
+    return o;
+  });
+  await b.close();
+  assert.ok(r.coThanh, 'hiện thanh "Có bản nháp"');
+  assert.strictEqual(r.truoc, '');
+  assert.strictEqual(r.soPhieu, 'PX-123');
+  assert.strictEqual(r.klHienThi, '17.990');
+  assert.ok(!r.conThanh);
+  assert.strictEqual(r.sauXoa, null);
+});
