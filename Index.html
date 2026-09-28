@@ -225,6 +225,7 @@
     }
     .toast.ok{background:var(--brand);}
     .toast.err{background:var(--danger);}
+    .toast.warn{background:var(--accent);cursor:pointer;} /* thành công kèm cảnh báo (⚠️) - giữ lâu hơn, bấm để đóng */
     @keyframes toastin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 
     .spinner{
@@ -1896,10 +1897,13 @@
     function toast(msg, ok){
       const c = document.getElementById('toast-container');
       const el = document.createElement('div');
-      el.className = 'toast ' + (ok ? 'ok' : 'err');
+      // Thông báo thành công nhưng có cảnh báo (⚠️, VD chồng dải KL báo giá) giữ 20 giây, bấm để đóng.
+      const coCanhBao = ok && /⚠️/.test(String(msg));
+      el.className = 'toast ' + (coCanhBao ? 'warn' : (ok ? 'ok' : 'err'));
       el.textContent = msg;
+      if (coCanhBao) { el.title = 'Bấm để đóng'; el.addEventListener('click', ()=> el.remove()); }
       c.appendChild(el);
-      setTimeout(()=>{ el.remove(); }, 5200);
+      setTimeout(()=>{ el.remove(); }, coCanhBao ? 20000 : 5200);
     }
     // ---------------------------------------------------------------
     // PHIÊN ĐĂNG NHẬP (Cổng đăng nhập Gmail - xem Config.gs)
@@ -3148,7 +3152,8 @@
     document.getElementById('btnDownloadMisaGoc').addEventListener('click', async ()=>{
       showOverlay('Đang tạo file MISA gốc…');
       try {
-        const res = await runServer('downloadMisaExcel');
+        // H-06: gửi khoảng ngày đang chọn để máy chủ kiểm tra bản dữ liệu Misa có đúng kỳ không.
+        const res = await runServer('downloadMisaExcel', document.getElementById('ms_genFrom').value, document.getElementById('ms_genTo').value);
         if (res.status === 'success') moFileXuat(res); else toast(res.message, false);
       } catch(err){ toast('Lỗi xuất file MISA gốc: ' + err, false); } finally { hideOverlay(); }
     });

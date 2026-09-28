@@ -1098,17 +1098,37 @@ function chuyenLinkXuatThanhFile_(kq) {
     });
     if (res.getResponseCode() !== 200) throw new Error("HTTP " + res.getResponseCode());
     let tenFile = "tai-ve";
-    try { tenFile = DriveApp.getFileById(m[1]).getName(); } catch (e) { /* giữ tên mặc định */ }
+    let fileTam = null;
+    try { fileTam = DriveApp.getFileById(m[1]); tenFile = fileTam.getName(); } catch (e) { /* giữ tên mặc định */ }
     const out = {};
     for (const k in kq) out[k] = kq[k];
     out.fileBase64 = Utilities.base64Encode(res.getBlob().getBytes());
     out.fileName = tenFile + (laPdf ? ".pdf" : ".xlsx");
     out.mimeType = laPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    // FIX M-01: file Google Sheet TẠM (tạo trong thư mục Done chỉ để xuất) - đã tải về
+    // thành công thì chuyển vào Thùng rác (khôi phục được 30 ngày). File báo giá xuất
+    // vào thư mục lưu báo giá (BACKUP_FOLDER_ID) là bản lưu có chủ đích -> giữ nguyên.
+    // Tải lỗi -> không tới đây, file được giữ để giao diện mở link như cũ.
+    try { if (fileTam && laFileTamXuat_(fileTam)) fileTam.setTrashed(true); } catch (e) { /* không làm hỏng việc tải */ }
     return out;
   } catch (e) {
     logAudit_("XUAT_FILE", "ERROR", "Không tải được file xuất: " + e);
     return kq; // giao diện sẽ mở link như cũ (vẫn dùng được với tài khoản Admin)
   }
+}
+
+// File tạm của chức năng xuất: Google Sheet nằm trong thư mục Done, tên theo mẫu
+// các hàm xuất tạo ra (không đụng file Excel gốc đã import cũng nằm ở Done).
+const TIEN_TO_FILE_TAM_XUAT_ = ["BaoCao_", "PhieuNhapKho_", "Misa_Export_", "Mau_Import_", "NhatKy_HoatDong_"];
+function laTenFileTamXuat_(ten) {
+  ten = String(ten || "");
+  return TIEN_TO_FILE_TAM_XUAT_.some(function (p) { return ten.indexOf(p) === 0; });
+}
+function laFileTamXuat_(file) {
+  if (file.getMimeType() !== MimeType.GOOGLE_SHEETS || !laTenFileTamXuat_(file.getName())) return false;
+  const it = file.getParents();
+  while (it.hasNext()) { if (it.next().getId() === CONFIG.FOLDER_DONE) return true; }
+  return false;
 }
 
 /* ----- Luồng đăng nhập qua Cổng (không cần phiên) ----- */

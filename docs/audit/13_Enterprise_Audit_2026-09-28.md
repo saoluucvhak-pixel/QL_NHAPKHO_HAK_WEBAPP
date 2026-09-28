@@ -1,6 +1,6 @@
 # 13 — Báo cáo kiểm toán Enterprise (28/09/2026)
 
-> **Trạng thái: CHỈ BÁO CÁO — chưa sửa dòng code nào** (theo yêu cầu mục XI "Không sửa code ngay").
+> **Trạng thái:** báo cáo lập 28/09/2026; một phần đã sửa theo quyết định của chủ hệ thống — xem mục **"Đợt sửa 1"** cuối file.
 > Phạm vi: toàn bộ `Code.gs` (6.093 dòng, 199 hàm), `Config.gs` (1.296 dòng, 62 hàm), `Index.html` (5.604 dòng, ~160 hàm JS), `appsscript.json`, commit `099e3a8` trên nhánh `claude/vibrant-thompson-b9llb5`.
 > Phương pháp: đọc toàn bộ mã nguồn máy chủ + đọc có chọn lọc giao diện (luồng gọi máy chủ, render, phân quyền, chống bấm lặp, XSS), đối chiếu 12 báo cáo kiểm toán trước (`01`→`12`).
 > **Giới hạn trung thực:** không chạy được trên dự án Apps Script thật; bộ test mà các báo cáo trước nhắc tới (`test/`, `tools/`, "553 test") **không có trong repo** nên không chạy lại được. Mọi con số hiệu năng ở mục VI là **ước lượng theo số ô đọc/ghi và độ phức tạp**, không phải đo thực tế.
@@ -427,5 +427,31 @@ Không có môi trường Google thật trong phiên này và bộ test cũ khô
 
 ---
 
+## Đợt sửa 1 (28/09/2026) — theo quyết định của chủ hệ thống
+
+Quyết định: (1) chỉ sửa một số lỗi nhỏ; (2) "báo giá mới nhất thắng", lưu báo giá bị chồng dải vẫn cho lưu nhưng có cảnh báo; (3) xóa file tạm; (4) xử lý H-06; (5) Xuất hàng thống nhất đơn vị Kg.
+
+| ID | Đã sửa | Hàm |
+|---|---|---|
+| H-01 | Engine chọn dòng báo giá khớp có hiệu lực **muộn nhất** (hòa nhau giữ dòng đứng trước như cũ). Lưu/sửa báo giá hoặc thêm Mã KL chồng dải: **vẫn lưu**, thông báo kèm ⚠️ liệt kê cặp dải chồng (toast màu cam, giữ 20 giây, bấm để đóng). | `TG_tinhGiaDong_`, `BG_canhBaoChongDai_` (mới), `BG_lamMoiSaveSauGhi_(thongBao, idsMoi)`, `BG_createQuote_`, `BG_updateBaogiaRow_`, `BG_addMaKL_`, `toast()` |
+| H-02 | Import xong luôn cập nhật các phiếu ĐÃ CÓ trong Draft Chưa TT theo KL/ngày/giá mới (chỉ cập nhật, không thêm). | `step1_ConfirmImport_` → `TC_dongBoDraftChuaTT_` |
+| H-03 | Ngày chuyển kỳ vét bãi không còn bị khóa nhầm. | `kiemTraKhoaKyVetBaiPure_` |
+| H-04 | Xác nhận import tự tính lại Mã CT, bắt buộc ngày hợp lệ, KL là số ≥ 0; dòng sai đếm "Dữ liệu không hợp lệ (bỏ qua)". Mã CT ghi xuống cũng qua `sanitize_`. | `step1_ConfirmImport_` |
+| H-05 | Sửa/xóa phiếu Kho Dăm kiểm tra khóa kỳ theo cả ngày gốc. | `xuLySuaXoaGiaoDich_` |
+| H-06 | Misa loại dòng không có Ngày cân 1 hợp lệ; lưu thông tin bản (khoảng ngày, số dòng, người, lúc); tải file MISA kiểm tra khoảng ngày đang chọn khớp bản hiện có, tên file kèm khoảng ngày. | `copyDataWithFinalLookup_`, `runCreateMisaData_`, `downloadMisaExcel_(tuNgay, denNgay)`, `MISA_*` (mới), Index `btnDownloadMisaGoc` |
+| M-01 | File Google Sheet tạm của chức năng xuất (tên `BaoCao_`, `PhieuNhapKho_`, `Misa_Export_`, `Mau_Import_`, `NhatKy_HoatDong_` trong thư mục Done) vào Thùng rác ngay sau khi tải về thành công; file cũ > 1 ngày được dọn mỗi lượt sao lưu (tối đa 500/lượt). File báo giá xuất (`Bao_Gia_HAK_*`, thư mục lưu báo giá) và file Excel gốc import **không** bị đụng. | `chuyenLinkXuatThanhFile_`, `laFileTamXuat_`, `SL_donFileTamCu_` |
+| M-03 | Năm 2 chữ số hiểu là 20xx. | `toDateObj_` |
+| M-05 | Đơn hàng xuất bán: NL_Từ/Đến ngày qua `sanitize_`. | `XH_saveDonHang_`, `XH_updateDonHang_` |
+| M-06 | In phiếu nhập kho chặn công thức. | `exportPhieuCanPDF_` |
+| M-15 | Import Xuất hàng: KL Hàng, Cân lần 1/2 < 70 hiểu là Tấn → quy Kg; Cân lần 1/2 đọc theo Locale. | `XH_step1_PreviewDraft_` |
+| L-02 | Xóa độ khô không thấy dòng → báo lỗi rõ. | `xuLySuaXoaDoKho_` |
+
+**Lưu ý nghiệp vụ H-01:** phiếu **chưa OK** đang khớp 2 dải chồng nhau sẽ đổi sang giá của báo giá mới nhất ở lần tính giá kế tiếp (import, nhập tay, trigger, Tính lại giá). Phiếu OK không bị đụng.
+
+**Test case đã chạy (Node + stub Apps Script, múi giờ Asia/Ho_Chi_Minh):** ngày chuyển kỳ → mở; ngày trước đó → khóa; `"25/07/26"` → 2026; phiếu 40 tấn sau báo giá mới → giá mới, trước báo giá mới → giá cũ, 48 tấn → dải 45_999; cảnh báo chồng dải liệt kê đúng 2 cặp, không báo mã khác; nhận diện tên file tạm đúng/sai. Cú pháp 3 file hợp lệ. **Chưa chạy trên Google thật** — cần thử: import lại 1 phiếu đang có trong Draft Chưa TT, tạo báo giá chồng dải, xuất 1 báo cáo Excel (file tạm phải vào Thùng rác), trích xuất + tải Misa với 2 khoảng ngày khác nhau, import 1 file Xuất hàng có cột Tấn.
+
+**Rollback:** dán lại `Code.gs`, `Config.gs`, `Index.html` của commit `099e3a8` → Deploy › Manage deployments › Edit › New version. Không đổi cấu trúc sheet; chỉ thêm Script Property `MISA_BAN_HIEN_TAI_JSON` (vô hại khi quay lui). File tạm đã vào Thùng rác khôi phục được trong 30 ngày.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
+- 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
