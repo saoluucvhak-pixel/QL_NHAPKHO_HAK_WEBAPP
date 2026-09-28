@@ -542,6 +542,17 @@ Quy tắc của chủ hệ thống:
 - **Sửa khi kiểm tra ảnh chụp:** `--brand-dark` vừa là nền thanh menu vừa là màu chữ tiêu đề/số liệu → ở chế độ tối chữ gần như vô hình; tách thành `--sidebar-bg` (nền menu) và `--brand-dark` (chữ).
 - **Kiểm tra:** chụp màn hình Dashboard, Báo cáo tổng hợp cân, Quản lý độ khô ở cả 2 chế độ; bài test Chromium mới (theo máy, nút chuyển 3 trạng thái, màu nền/chữ tiêu đề). `npm test` → 17/17 đạt.
 
+### Đợt sửa 4 (tiếp 2) — thông minh hơn + lịch sử sửa
+
+| Mục | Đã làm | Hàm / vị trí |
+|---|---|---|
+| L-10 | "Hoàn thành đơn hàng xuất bán" (nút 1) đọc `DATA_GIAODICH` 1 lần thay vì 2 (kho nguồn trung chuyển tính cùng lượt, kết quả y hệt hàm cũ). | `tongHopSoLieuKhoXuatBan_`, `taoPhieuDieuChinhKho_` |
+| Kiểm tra hợp lý | Xem trước import Nhập kho + Xuất hàng: **cảnh báo** (không chặn, vẫn nhập được) khi Ngày giờ cân 2 trước cân 1, hoặc KL hàng lệch \|Cân 1 − Cân 2\| quá 1 kg; hiện nhãn ⚠️ trên dòng + số dòng cần xem trong thông báo + cột ghi chú sheet xem trước. **Nhập tay:** chặn Ngày giờ cân 2 trước cân 1; KL lệch thì lưu nhưng báo ⚠️. | `PC_canhBaoHopLy_`, `step1_PreviewDraft_`, `XH_step1_PreviewDraft_`, `addManualPhieuCan_`, `renderPreview`, `xhRenderPreview` |
+| Gợi ý tính lại giá | Lưu/sửa báo giá xong: máy chủ trả danh sách phiếu **chưa OK** dùng mã vừa lưu, ngày cân từ ngày hiệu lực (tối đa 5.000); giao diện hỏi "Tính lại giá N phiếu (M phiếu đang Lỗi ĐK/Báo giá)?" → tính ngay, không chờ lần import/trigger. | `BG_phieuChoTinhLai_`, `BG_createQuote_`, `BG_updateBaogiaRow_`, `bgGoiYTinhLaiGia` |
+| Lịch sử sửa | Nhật ký hoạt động ghi **giá trị cũ → mới** của các cột thay đổi (hành động `LICH_SU_SUA`) khi sửa phiếu Kho Dăm, độ khô, dòng báo giá, đơn hàng xuất bán; khi xóa ghi ảnh chụp cả dòng; lập báo giá ghi đủ nhóm giá (`BAOGIA_TAO`). Xem/lọc/xuất ở Hệ thống › Nhật ký hoạt động. (Sửa phiếu cân ở Tra cứu đã có từ trước.) | `LS_thayDoi_`, `LS_anhChup_` |
+
+**Test:** `npm test` → 20/20 đạt (thêm: kiểm tra hợp lý, lịch sử sửa, L-10 so với hàm cũ).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -550,3 +561,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — BUG-004: chặn người lưu sau (Kho Dăm, độ khô, đơn hàng xuất bán); đóng M-11, SEC-03 theo quyết định.
 - 28/09/2026 — Đợt sửa 4: ARCH-02, M-12, giao diện (zoom/di động/bàn phím/đọc màn hình), bộ kiểm thử + CI trong repo.
 - 28/09/2026 — Đợt sửa 4 (tiếp): chế độ tối (gom màu về biến CSS, nút chuyển giao diện).
+- 28/09/2026 — Đợt sửa 4 (tiếp 2): L-10, cảnh báo dữ liệu bất hợp lý, gợi ý tính lại giá sau khi lưu báo giá, lịch sử sửa trước/sau.

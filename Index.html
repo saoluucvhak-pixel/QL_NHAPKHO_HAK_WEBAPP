@@ -2713,7 +2713,8 @@
         state.previewData = result.data;
         renderPreview();
         pendingFiles = []; fileInput.value = ''; renderFileList();
-        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
+        const soCanhBao = result.data.filter(r => r.canhBao).length;
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (soCanhBao ? ' ⚠️ ' + soCanhBao + ' dòng cần kiểm tra lại (ngày cân / khối lượng) - vẫn nhập được.' : '') + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
@@ -2757,7 +2758,7 @@
           + '<td class="num">'+fmtNum(r.klCan1)+'</td>'
           + '<td class="num">'+fmtNum(r.klCan2)+'</td>'
           + '<td class="num">'+fmtNum(r.klHangGoc)+'</td>'
-          + '<td>'+ (r.isError ? escapeHtml(r.errorMsg) : escapeHtml(r.typeImport)) +'</td>'
+          + '<td>'+ (r.isError ? escapeHtml(r.errorMsg) : escapeHtml(r.typeImport) + (r.canhBao ? ' <span class="badge badge-warn" title="Chỉ cảnh báo - vẫn nhập được">⚠️ ' + escapeHtml(r.canhBao) + '</span>' : '')) +'</td>'
           + '</tr>';
       }, 13, 'Các dòng chưa hiển thị vẫn được nhập nếu đang chọn (Chọn / Bỏ chọn tất cả áp dụng cho mọi dòng)');
     }
@@ -3413,6 +3414,21 @@
     // =================================================================
     // QUẢN LÝ BÁO GIÁ
     // =================================================================
+    // Sau khi lưu/sửa báo giá: hỏi tính lại giá NGAY cho các phiếu chưa đóng thanh toán dùng
+    // mã vừa lưu (từ ngày hiệu lực) - không phải chờ lần import / trigger tính giá kế tiếp.
+    async function bgGoiYTinhLaiGia(p){
+      if (!p || !p.dsMaCT || !p.dsMaCT.length) return;
+      if (!coQuyen(state.currentUser, 'NGHIEP_VU')) return;
+      const moTa = fmtNum(p.dsMaCT.length) + ' phiếu cân chưa đóng thanh toán dùng mã vừa lưu (từ ngày hiệu lực)'
+        + (p.soLoiBaoGia ? ', trong đó ' + fmtNum(p.soLoiBaoGia) + ' phiếu đang "Lỗi ĐK/Báo giá"' : '');
+      if (!confirm('Có ' + moTa + '.\n\nTính lại giá các phiếu này ngay theo bảng giá mới? (Phiếu đã OK không bị động tới.)')) return;
+      showOverlay('Đang tính lại giá ' + fmtNum(p.dsMaCT.length) + ' phiếu…');
+      try {
+        const res = await runServer('TC_tinhLaiGiaCacPhieu', p.dsMaCT);
+        toast(res.message, res.status === 'success');
+      } catch(err){ toast('Lỗi tính lại giá: ' + err, false); } finally { hideOverlay(); }
+    }
+
     async function bgInitView(){
       showOverlay('Đang tải dữ liệu báo giá…');
       // FIX QUAN TRỌNG: trước đây dùng Promise.all() — nếu 1 trong 3 lệnh gọi bị lỗi
@@ -3677,6 +3693,7 @@
         try {
           const res = await runServer('BG_updateBaogiaRow', payload);
           toast(res.message, res.status === 'success');
+          if (res.status === 'success') setTimeout(()=> bgGoiYTinhLaiGia(res.phieuChoTinhLai), 300);
           if (res.status === 'success') {
             bgCancelEdit();
             const hl = await runServer(state.bgViewType === 'SAVE' ? 'BG_showAllData' : 'BG_updateHieuLuc');
@@ -3715,6 +3732,7 @@
       try {
         const res = await runServer('BG_createQuote', payload);
         toast(res.message, res.status === 'success');
+        if (res.status === 'success') setTimeout(()=> bgGoiYTinhLaiGia(res.phieuChoTinhLai), 300);
         if (res.status === 'success'){
           bgResetQuoteForm();
           const quotes = await runServer('BG_getQuoteList');
@@ -5066,7 +5084,8 @@
         state.xhPreviewData = result.data;
         xhRenderPreview();
         xhPendingFiles = []; xhFileInput.value = ''; xhRenderFileList();
-        toast('Đã xem trước ' + result.data.length + ' dòng.' + (result.canhBao ? ' ' + result.canhBao : ''), true);
+        const soCanhBao = result.data.filter(r => r.canhBao).length;
+        toast('Đã xem trước ' + result.data.length + ' dòng.' + (soCanhBao ? ' ⚠️ ' + soCanhBao + ' dòng cần kiểm tra lại (ngày cân / khối lượng) - vẫn nhập được.' : '') + (result.canhBao ? ' ' + result.canhBao : ''), true);
       } catch(err){
         toast('Lỗi xem trước: ' + err, false);
       } finally { hideOverlay(); }
@@ -5102,7 +5121,8 @@
       state.xhBoChon = new Set(); // M-13: như bảng xem trước phiếu cân nhập
       document.getElementById('xhCheckHeader').checked = true;
       veBangTheoLo(body, rows.map((r,i)=>({r:r, i:i})), ({r, i})=>{
-        const badge = r.isError ? '<span class="badge badge-warn">❌ Lỗi</span>' : '<span class="badge badge-ok">✔️ '+escapeHtml(r.typeImport)+'</span>';
+        const badge = r.isError ? '<span class="badge badge-warn">❌ Lỗi</span>' : '<span class="badge badge-ok">✔️ '+escapeHtml(r.typeImport)+'</span>'
+          + (r.canhBao ? ' <span class="badge badge-warn" title="Chỉ cảnh báo - vẫn nhập được">⚠️ ' + escapeHtml(r.canhBao) + '</span>' : '');
         const checkboxCell = r.isError
           ? '<input type="checkbox" disabled title="Dòng lỗi, không thể chọn">'
           : '<input type="checkbox" class="xh-row-check" data-idx="'+i+'"'+(state.xhBoChon.has(i) ? '' : ' checked')+'>';

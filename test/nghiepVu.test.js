@@ -127,3 +127,32 @@ test('Cú pháp: mã nguồn giao diện (Index.html) hợp lệ', () => {
   const js = h.match(/<script>([\s\S]*)<\/script>/)[1].replace(/<\?!=[^?]*\?>/g, 'null');
   assert.doesNotThrow(() => new Function(js));
 });
+
+test('Kiểm tra hợp lý phiếu cân: ngày cân 2 trước cân 1, KL hàng lệch |Cân 1 - Cân 2|', () => {
+  const { chay } = taoMoiTruong();
+  assert.strictEqual(chay('PC_canhBaoHopLy_(new Date(2026,6,25,8), new Date(2026,6,25,9), 27020, 9030, 17990)'), '');
+  assert.ok(chay('PC_canhBaoHopLy_(new Date(2026,6,25,9), new Date(2026,6,25,8), 27020, 9030, 17990)').includes('trước cân 1'));
+  assert.ok(chay('PC_canhBaoHopLy_(null, null, 27020, 9030, 17000)').includes('17990'));
+  assert.strictEqual(chay('PC_canhBaoHopLy_(null, null, 0, 0, 17000)'), '', 'thiếu số cân -> không cảnh báo');
+});
+
+test('Lịch sử sửa: chỉ liệt kê cột thay đổi; xóa thì chụp cả dòng', () => {
+  const { chay } = taoMoiTruong();
+  const d = chay('LS_thayDoi_(["MT","Kho","Ngày"], [10,"A",new Date(2026,8,20,7)], [12,"A",new Date(2026,8,20,7)])');
+  assert.strictEqual(d, 'MT: 10 → 12');
+  assert.strictEqual(chay('LS_thayDoi_(["MT"], [10], [10])'), 'Không có thay đổi');
+  assert.ok(chay('LS_anhChup_(["MT","Kho"], [10,"A"])').includes('Kho=A'));
+});
+
+test('L-10: kho nguồn trung chuyển tính cùng lượt đọc, giống hàm cũ', () => {
+  const { chay, ctx } = taoMoiTruong({ SpreadsheetApp: { openById: () => ({ getSheetByName: () => ctx.gdSheet }) } });
+  const { taoSheet } = require('./gasEnv');
+  ctx.gdSheet = taoSheet([['h']]);
+  chay(`gdSheet.rows.push(["1",new Date(2026,8,1),"XUẤT","TC","","KhoA","KhoXB",10,0.4,0,4,"Hợp lệ"]);
+        gdSheet.rows.push(["2",new Date(2026,8,2),"XUẤT","TC","","KhoB","KhoXB",20,0.4,0,8,"Hợp lệ"]);
+        gdSheet.rows.push(["3",new Date(2026,8,3),"XUẤT","TC","","KhoA","KhoXB",5,0.4,0,2,"Đã hủy"]);`);
+  const tu = 'new Date(2026,8,1).getTime()', den = 'new Date(2026,8,30).getTime()';
+  assert.strictEqual(chay(`tongHopSoLieuKhoXuatBan_("KhoXB",${tu},${den}).khoNguonTC`), 'KhoB');
+  assert.strictEqual(chay(`timKhoNguonTCLonNhat_("KhoXB",${tu},${den})`), 'KhoB');
+  assert.strictEqual(chay(`tongHopSoLieuKhoXuatBan_("KhoXB",${tu},${den}).nhapTC_BDMT`), 12);
+});
