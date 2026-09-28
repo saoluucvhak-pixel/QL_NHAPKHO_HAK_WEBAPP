@@ -951,9 +951,11 @@ function taoApiRoutes_() {
 
     // --- Báo cáo nhập kho + Misa (xem, xuất file) ---
     getFilterOptions: r(getFilterOptions_, X),
-    getBaoCaoTongHop: r(getBaoCaoTongHop_, X),
-    getBaoCaoMisa: r(getBaoCaoMisa_, X),
-    getBaoCaoDonGia: r(getBaoCaoDonGia_, X),
+    // ARCH-02: bản cho giao diện - tổng cộng đủ, chỉ gửi tối đa BC_TOI_DA_DONG_WEB_ dòng
+    // mới nhất (Xuất Excel/PDF và Dashboard vẫn dùng bản đầy đủ).
+    getBaoCaoTongHop: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoTongHop_(f), "ngayCan1"); }, X),
+    getBaoCaoMisa: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoMisa_(f), "ngay"); }, X),
+    getBaoCaoDonGia: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoDonGia_(f), "ngayCan1"); }, X),
     exportBaoCaoTongHopExcel: r(exportBaoCaoTongHopExcel_, X),
     exportBaoCaoTongHopPDF: r(exportBaoCaoTongHopPDF_, X),
     exportBaoCaoMisaExcel: r(exportBaoCaoMisaExcel_, X),

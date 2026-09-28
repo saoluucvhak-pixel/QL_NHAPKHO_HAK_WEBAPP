@@ -1,0 +1,11 @@
+{
+  "name": "ql-nhapkho-hak-webapp",
+  "private": true,
+  "description": "Kiểm thử tự động cho webapp Apps Script (không triển khai lên Apps Script).",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

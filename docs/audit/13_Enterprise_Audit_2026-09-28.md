@@ -522,9 +522,23 @@ Quy tắc của chủ hệ thống:
 
 **Còn mở:** ARCH-01/02 (quy mô > 300.000 phiếu: tách file phiếu đã khóa sổ theo năm + phân trang báo cáo) – cần làm cùng ĐNTT; M-12 (sheet xem trước dùng chung – chỉ ảnh hưởng hiển thị); L-05 (chấp nhận).
 
+## Đợt sửa 4 (28/09/2026)
+
+| ID | Đã làm | Hàm / vị trí |
+|---|---|---|
+| ARCH-02 | Báo cáo tổng hợp cân / theo báo giá / Misa gửi về trình duyệt tối đa **10.000 dòng có ngày mới nhất** (giữ thứ tự); **TỔNG CỘNG vẫn tính đủ mọi dòng**; giao diện báo rõ số dòng thật và gợi ý thu hẹp ngày / Xuất Excel. Xuất Excel/PDF và Dashboard dùng bản đầy đủ. Giảm phản hồi từ ~34 MB xuống ~3 MB ở 100.000 phiếu. | `BC_gioiHanDongWeb_`, route `getBaoCaoTongHop/DonGia/Misa`, `baoCatDongBaoCao` |
+| M-12 | Sheet xem trước (`PhieuCan_DN_Draft`, `NL_PC_XH_Draft`): khóa ngắn khi ghi (2 người xem trước cùng lúc không lẫn dòng), ghi chú ô A1 "Xem trước bởi … lúc …". Bận quá 10 giây thì bỏ qua ghi sheet (bảng xem trước trên web + Xác nhận không phụ thuộc sheet này). | `step1_PreviewDraft_`, `XH_step1_PreviewDraft_` |
+| Giao diện | Menu bên cuộn được khi zoom 150–200%; màn hình ≤ 480px: ô lọc 1 cột, nút rộng; nhãn tự gắn với ô nhập (bấm nhãn vào ô, đọc màn hình đọc đúng); menu dùng được bằng Tab + Enter/Space; viền nổi khi chọn bằng bàn phím; vùng thông báo `aria-live`. | `Index.html` (CSS, `ganNhanChoO`) |
+| Kiểm thử trong repo | `npm test` (Node ≥ 18, không cài thêm): 11 bài nghiệp vụ + 5 bài giao diện Chromium (tự bỏ qua nếu không có Playwright). GitHub Actions chạy mỗi lần push. `.claspignore` để không đẩy test/tài liệu lên Apps Script. | `test/`, `package.json`, `.github/workflows/test.yml`, `README.md` |
+
+**Kết quả:** `npm test` → 16/16 đạt. Chromium: 101/101 nhãn gắn ô nhập, Enter mở menu, 375px không tràn ngang, sidebar cuộn được khi zoom 200%.
+
+**Chưa làm – ngoài repo này:** ARCH-01 (phiếu đã khóa sổ ra file riêng mỗi năm) cần sửa đồng thời hệ thống ĐNTT (repo khác). **Chế độ tối (dark mode):** chưa làm – giao diện còn ~250 màu viết thẳng trong thuộc tính `style`, bật dark mode lúc này sẽ lẫn màu sáng/tối; cần gom màu về biến CSS trước.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
 - 28/09/2026 — Đợt sửa 2: định dạng số/ngày/canh lề theo Locale hệ thống (webapp + Google Sheet) và Locale Misa (PDF/Excel/MISA).
 - 28/09/2026 — Đợt sửa 3: M-02, M-04, M-07, M-08, M-09, M-10, M-13, M-14, M-16, L-03, L-04, L-06, L-07, L-08, L-09, L-11.
 - 28/09/2026 — BUG-004: chặn người lưu sau (Kho Dăm, độ khô, đơn hàng xuất bán); đóng M-11, SEC-03 theo quyết định.
+- 28/09/2026 — Đợt sửa 4: ARCH-02, M-12, giao diện (zoom/di động/bàn phím/đọc màn hình), bộ kiểm thử + CI trong repo.

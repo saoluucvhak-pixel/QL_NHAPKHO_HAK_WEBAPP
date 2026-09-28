@@ -1,0 +1,6 @@
+# Chỉ đẩy mã Apps Script lên dự án (nếu dùng clasp); bộ test/tài liệu ở lại repo.
+test/**
+docs/**
+.github/**
+package.json
+README.md

@@ -302,7 +302,13 @@ function step1_PreviewDraft_(fileDataList) {
     // của TOÀN BỘ các file trong lượt này (previewRows đã gộp sẵn ở trên),
     // KHÔNG tạo file mới, KHÔNG di chuyển file - chỉ còn 3-4 lệnh setValues/
     // setNumberFormat, nhanh hơn nhiều so với bản cũ.
-    if (previewRows.length > 0) {
+    // M-12: sheet xem trước dùng chung - khóa ngắn khi ghi để 2 người xem trước cùng lúc
+    // không lẫn dòng của nhau (người sau thay toàn bộ); ghi chú ô A1 ai xem trước, lúc nào.
+    // Không lấy được khóa trong 10 giây -> bỏ qua ghi sheet (bảng xem trước trên web và
+    // bước Xác nhận KHÔNG phụ thuộc sheet này).
+    const _khoaDraft = previewRows.length > 0 ? LockService.getScriptLock() : null;
+    const _coKhoaDraft = _khoaDraft ? _khoaDraft.tryLock(10000) : false;
+    if (previewRows.length > 0 && _coKhoaDraft) { try {
       let draftSheet = ss.getSheetByName(CONFIG.PREVIEW_DRAFT_SHEET);
       if (!draftSheet) draftSheet = ss.insertSheet(CONFIG.PREVIEW_DRAFT_SHEET);
       const draftHeaders = ["Trạng Thái", "Số Chứng Từ", "Số Phiếu", "Số Xe", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "KL Cân 1", "KL Cân 2", "KL Hàng (Kg)", "Ghi Chú Lỗi"];
@@ -319,7 +325,8 @@ function step1_PreviewDraft_(fileDataList) {
       draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
       draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
       draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center"); // Ngày/Giờ cân canh giữa
-    }
+      draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss") + " (" + previewRows.length + " dòng)");
+    } finally { _khoaDraft.releaseLock(); } }
 
     if (previewRows.length === 0 && fileLoi.length > 0) {
       return { status: "error", message: "Không đọc được dữ liệu từ file nào: " + fileLoi.map(f => f.name + " (" + f.reason + ")").join("; ") };
@@ -329,6 +336,7 @@ function step1_PreviewDraft_(fileDataList) {
     if (fileLoi.length > 0) {
       canhBao = "⚠️ " + fileLoi.length + " file bị bỏ qua: " + fileLoi.map(f => f.name + " - " + f.reason).join("; ");
     }
+    if (previewRows.length > 0 && !_coKhoaDraft) canhBao += (canhBao ? " " : "") + "(Sheet xem trước trên Google Sheet chưa cập nhật do hệ thống đang bận - không ảnh hưởng việc nhập.)";
     return { status: "success", data: previewRows, canhBao: canhBao };
   } catch (e) {
     return { status: "error", message: e.toString() };
@@ -1551,6 +1559,25 @@ function getBaoCaoTongHop_(filters) {
     result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongKL: tongKL, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+// ARCH-02: báo cáo không lọc ngày trước đây gửi TOÀN BỘ lịch sử về trình duyệt (~34 MB
+// JSON với 100.000 phiếu - chậm, có thể vượt giới hạn phản hồi). Nay: tổng cộng
+// (summary) vẫn tính trên MỌI dòng khớp; danh sách chỉ gửi tối đa 10.000 dòng có ngày
+// MỚI NHẤT (giữ nguyên thứ tự hiển thị), kèm tongSoDong + biCat để giao diện báo rõ.
+// Xem đầy đủ: Xuất Excel/PDF (không giới hạn).
+const BC_TOI_DA_DONG_WEB_ = 10000;
+function BC_gioiHanDongWeb_(res, truongNgay) {
+  if (!res || res.status !== "success" || !Array.isArray(res.data) || res.data.length <= BC_TOI_DA_DONG_WEB_) return res;
+  const khoaNgay = function (s) { const m = String(s || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? +(m[3] + m[2] + m[1]) : 0; };
+  const chiSo = res.data.map(function (r, i) { return i; });
+  chiSo.sort(function (a, b) { return (khoaNgay(res.data[b][truongNgay]) - khoaNgay(res.data[a][truongNgay])) || (a - b); });
+  const giu = chiSo.slice(0, BC_TOI_DA_DONG_WEB_).sort(function (a, b) { return a - b; });
+  res.tongSoDong = res.data.length;
+  res.data = giu.map(function (i) { return res.data[i]; });
+  res.biCat = true;
+  res.gioiHan = BC_TOI_DA_DONG_WEB_;
+  return res;
 }
 
 /* ---------- DASHBOARD: Tổng quan Phiếu cân nhập + Báo giá/Doanh số mua ---------- */
@@ -5086,7 +5113,13 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
     });
 
     // Sheet Draft để đối soát (ghi cùng lúc, tách biệt hoàn toàn với PhieuCan_DN) - xóa cũ ghi mới, không tạo file
-    if (previewRows.length > 0) {
+    // M-12: sheet xem trước dùng chung - khóa ngắn khi ghi để 2 người xem trước cùng lúc
+    // không lẫn dòng của nhau (người sau thay toàn bộ); ghi chú ô A1 ai xem trước, lúc nào.
+    // Không lấy được khóa trong 10 giây -> bỏ qua ghi sheet (bảng xem trước trên web và
+    // bước Xác nhận KHÔNG phụ thuộc sheet này).
+    const _khoaDraft = previewRows.length > 0 ? LockService.getScriptLock() : null;
+    const _coKhoaDraft = _khoaDraft ? _khoaDraft.tryLock(10000) : false;
+    if (previewRows.length > 0 && _coKhoaDraft) { try {
       const draftSheet = ss.getSheetByName(XUATHANG_CONFIG.SHEET_NLPCXH_DRAFT);
       if (draftSheet) {
         if (draftSheet.getLastRow() > 1) draftSheet.getRange(2, 1, draftSheet.getLastRow() - 1, 16).clearContent();
@@ -5102,8 +5135,9 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
         draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
         draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
         draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center");
+        draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss") + " (" + previewRows.length + " dòng)");
       }
-    }
+    } finally { _khoaDraft.releaseLock(); } }
 
     if (previewRows.length === 0 && fileLoi.length > 0) {
       return { status: "error", message: "Không đọc được dữ liệu từ file nào: " + fileLoi.map(f => f.name + " (" + f.reason + ")").join("; ") };
@@ -5113,6 +5147,7 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
     if (fileLoi.length > 0) {
       canhBao = "⚠️ " + fileLoi.length + " file bị bỏ qua: " + fileLoi.map(f => f.name + " - " + f.reason).join("; ");
     }
+    if (previewRows.length > 0 && !_coKhoaDraft) canhBao += (canhBao ? " " : "") + "(Sheet xem trước trên Google Sheet chưa cập nhật do hệ thống đang bận - không ảnh hưởng việc nhập.)";
     return { status: "success", data: previewRows, canhBao: canhBao };
   } catch (e) {
     return { status: "error", message: e.toString() };

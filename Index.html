@@ -73,6 +73,7 @@
       display:flex;flex-direction:column;
       padding:22px 16px;
       position:sticky;top:0;height:100vh;
+      overflow-y:auto; /* zoom 150-200%: menu dài không bị cắt, cuộn được */
     }
     .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;padding:0 6px;}
     .seal{
@@ -195,6 +196,15 @@
     tbody tr:hover{background:#f3f4f6;}
     .table-wrap{overflow:auto;max-height:52vh;border:1px solid var(--border);border-radius:8px;}
     .num{text-align:right;font-family:'JetBrains Mono',monospace;}
+    /* Bàn phím: thấy rõ phần tử đang được chọn (Tab) */
+    button:focus-visible, a:focus-visible, .menu-item:focus-visible, .sub-item:focus-visible, .tabbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+    /* Điện thoại (<= 480px): ô lọc 1 cột, nút giãn đủ rộng để bấm */
+    @media (max-width:480px){
+      .content{padding:12px;}
+      .field-grid{grid-template-columns:1fr !important;}
+      .btnrow .btn{flex:1 1 100%;}
+      .tc-modal-box{max-height:100vh;border-radius:0;}
+    }
     /* Quy tắc canh lề: số PHẢI (.num), chữ TRÁI (mặc định), ngày/giờ GIỮA (.ngay) */
     th, td{text-align:left;}
     th.num, td.num{text-align:right;}
@@ -1893,7 +1903,7 @@
     </div>
   </div>
   <div class="overlay-loading" id="overlay"><div class="overlay-box"><span class="spinner"></span><span id="overlayText">Đang xử lý…</span></div></div>
-  <div id="toast-container"></div>
+  <div id="toast-container" role="status" aria-live="polite"></div>
 
   <script>
     // ---------------------------------------------------------------
@@ -2026,6 +2036,31 @@
     new MutationObserver(ds => ds.forEach(d => d.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.matches && n.matches('input[type="number"], input[data-so]')) nangCapOSo(n); else nangCapCacOSo(n); } })))
       .observe(document.documentElement, { childList: true, subtree: true });
     nangCapCacOSo(document);
+
+    // Hỗ trợ đọc màn hình/bàn phím: gắn <label> với ô nhập ngay sau nó (bấm vào nhãn
+    // là vào ô), menu điều hướng bấm được bằng Tab + Enter/Space. Áp dụng cả phần vẽ sau.
+    let _soNhanTuDong = 0;
+    function ganNhanChoO(goc){
+      (goc || document).querySelectorAll('label').forEach(l=>{
+        if (l.htmlFor || l.querySelector('input,select,textarea')) return;
+        let o = l.nextElementSibling;
+        if (!o || !/^(INPUT|SELECT|TEXTAREA)$/.test(o.tagName)) { const cha = l.parentElement; o = cha && cha.classList.contains('field') ? cha.querySelector('input,select,textarea') : null; }
+        if (!o) return;
+        if (!o.id) o.id = 'o_tu_dong_' + (++_soNhanTuDong);
+        l.htmlFor = o.id;
+      });
+      (goc || document).querySelectorAll('.menu-item, .sub-item').forEach(m=>{
+        if (m.hasAttribute('tabindex')) return;
+        m.setAttribute('tabindex', '0'); m.setAttribute('role', 'button');
+      });
+    }
+    document.addEventListener('keydown', e=>{
+      const m = e.target;
+      if ((e.key === 'Enter' || e.key === ' ') && m && m.classList && (m.classList.contains('menu-item') || m.classList.contains('sub-item'))) { e.preventDefault(); m.click(); }
+    });
+    ganNhanChoO(document);
+    new MutationObserver(ds => ds.forEach(d => d.addedNodes.forEach(n => { if (n.nodeType === 1 && n.querySelectorAll) ganNhanChoO(n); })))
+      .observe(document.documentElement, { childList: true, subtree: true });
     function showOverlay(text){ document.getElementById('overlayText').textContent = text || 'Đang xử lý…'; document.getElementById('overlay').classList.add('show'); }
     function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
     function toast(msg, ok){
@@ -2788,7 +2823,12 @@
         renderTongHop(res);
       } catch(err){ toast('Lỗi tải báo cáo: ' + err, false); } finally { hideOverlay(); }
     }
+    // ARCH-02: máy chủ chỉ gửi tối đa 10.000 dòng mới nhất; tổng cộng vẫn tính đủ.
+    function baoCatDongBaoCao(res){
+      if (res && res.biCat) toast('⚠️ Có ' + fmtNum(res.tongSoDong) + ' dòng khớp bộ lọc - bảng hiển thị ' + fmtNum(res.data.length) + ' dòng có ngày mới nhất; số TỔNG CỘNG tính đủ ' + fmtNum(res.tongSoDong) + ' dòng. Thu hẹp khoảng ngày hoặc dùng Xuất Excel để xem đầy đủ.', true);
+    }
     function renderTongHop(res){
+      baoCatDongBaoCao(res);
       document.getElementById('th_sumSoLuong').textContent = res.summary.soLuong;
       document.getElementById('th_sumKL').textContent = fmtNum(res.summary.tongKL);
       document.getElementById('th_sumTien').textContent = fmtNum(res.summary.tongTien);
@@ -2868,6 +2908,7 @@
       } catch(err){ toast('Lỗi tải báo cáo: ' + err, false); } finally { hideOverlay(); }
     }
     function renderDonGia(res){
+      baoCatDongBaoCao(res);
       document.getElementById('dg_sumSoLuong').textContent = res.summary.soLuong;
       document.getElementById('dg_sumTien').textContent = fmtNum(res.summary.tongTien);
       const body = document.getElementById('dg_tableBody');
@@ -3272,6 +3313,7 @@
       } catch(err){ toast('Lỗi tải báo cáo: ' + err, false); } finally { hideOverlay(); }
     }
     function renderMisa(res){
+      baoCatDongBaoCao(res);
       document.getElementById('ms_sumSoLuong').textContent = res.summary.soLuong;
       document.getElementById('ms_sumKL').textContent = fmtSoLe(res.summary.tongKL, 2);
       document.getElementById('ms_sumTien').textContent = fmtNum(res.summary.tongTien);
