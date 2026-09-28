@@ -479,7 +479,33 @@ Quy tắc của chủ hệ thống:
 
 **Rollback:** dán lại 3 file của commit trước đợt này (`git log` – commit "Đợt sửa 1") → New version. Không đổi cấu trúc cột; NL_PC_XH/NL_DH_XB các dòng mới đã ghi dạng ngày thật vẫn được bản cũ đọc đúng (bản cũ cũng đọc qua `toDateObj_`).
 
+## Đợt sửa 3 (28/09/2026) — các lỗi còn lại không cần quyết định nghiệp vụ
+
+| ID | Đã sửa | Hàm / vị trí |
+|---|---|---|
+| M-08 | **Chống tạo trùng** khi bấm 2 lần / nhấn Enter khi đang gửi / mất mạng rồi bấm lại: trình duyệt gửi kèm mã yêu cầu cho thao tác tạo mới (Xác nhận import NK/XK, Nhập tay, Thêm mã báo giá, Thêm mã KL, Lưu báo giá, Lưu đơn hàng xuất bán, mọi thao tác Kho Dăm); bấm lại CÙNG dữ liệu dùng lại mã cũ. Máy chủ: đang chạy → báo "đang được xử lý"; đã xong → trả lại kết quả cũ kèm "(đã được lưu trước đó - không lưu lần 2)"; chạy lỗi → cho chạy lại. Dữ liệu khác = yêu cầu mới, không bị chặn. | `API(maPhien, tenHam, thamSo, maYeuCau)` (tham số thứ 4 tùy chọn – tương thích), `chayChongTrung_`, `taoApiRoutes_` (`rTao`), `runServer` |
+| M-09 | Báo cáo Kỳ vét bãi gọi thẳng (chỉ đọc), không còn giữ khóa toàn hệ thống. | route `layBaoCaoTheoKyVetBai` |
+| M-10 | "Nhập TP dăm" đọc 9 cột B..J thay vì toàn sheet, so ngày bằng số học (không gọi `formatDate` mỗi dòng) – kết quả giống hệt. | `xuLyNhapSanPhamSanXuat_` |
+| M-13 | Bảng xem trước import (Nhập kho + Xuất hàng) vẽ theo lô 500 dòng; trạng thái chọn lưu riêng nên dòng chưa vẽ vẫn được nhập; "Chọn / Bỏ chọn tất cả" áp dụng cho mọi dòng. | `renderPreview`, `xhRenderPreview`, `datChonTatCa`, `veBangTheoLo(…, ghiChuVuot)` |
+| M-14 | Chia sẻ Drive: lấy tài nguyên 1 lần / tài nguyên. | `HT_chiaSeTaiNguyenChoDanhSachQuyen_` |
+| M-02 | File gốc tải lên: cùng tên + cùng nội dung (MD5 lưu ở mô tả file) thì không lưu thêm bản. | `luuFileGocKhongTrung_` |
+| M-04 | File convert tạm đặt múi giờ = múi giờ script trước khi đọc (ô ngày giờ Excel không lệch). | `docFileConvertTam_` |
+| M-07 | Không xóa được Mã báo giá đang dùng trong báo giá đã lập hoặc phiếu cân; không xóa được Mã KL đang dùng trong báo giá. | `BG_maBaoGiaDangDung_`, `BG_deleteMaBaoGia_`, `BG_deleteMaKL_` |
+| M-16 | Nhập tay: ô tùy chọn "Đồng thời lưu vào Draft Chưa Thanh Toán" (kèm giá); luôn cập nhật các phiếu đã có trong Draft theo giá vừa tính (như Import). | `addManualPhieuCan_`, form Nhập tay |
+| L-03 | Thêm kho: chặn trùng tên kho đang hoạt động. | `xuLyDanhMucKho_` |
+| L-04 | Lưu danh sách người dùng có khóa. | `HT_luuDanhSachQuyen_` |
+| L-06 | `moveTo` thay `addFile/removeFile` (đã ngừng hỗ trợ). | 5 hàm xuất file |
+| L-07 | Sắp xếp Mã chứng từ theo số ("9/…" trước "10/…"). | 3 báo cáo |
+| L-08 | 1 phiếu báo giá không được có 2 nhóm cùng Mã + cùng Mã KL. | `BG_createQuote_` |
+| L-09 | Kho Dăm: thông báo dạng toast (47 chỗ `alert`); toast nhiều dòng, dài thì hiện lâu hơn, bấm để đóng. | `thongBaoKD`, `toast` |
+| L-11 | `xoaCacDong_` dùng `Set`. | `xoaCacDong_` |
+
+**Test:** Node + stub: chống trùng (lần 2 không chạy, đang chạy thì báo chờ, lỗi thì chạy lại được, Kho Dăm trả chuỗi ❌). Chromium: xem trước 1.200 dòng vẽ 501 hàng, bỏ chọn 1 dòng → 1.198, chọn tất cả → 1.199 (trừ dòng lỗi), bỏ tất cả → 0; 2 lần gọi `BG_createQuote` cùng dữ liệu → cùng mã yêu cầu, báo cáo không gửi mã. Các bộ test đợt 1–2 chạy lại đạt. **Chưa chạy trên Google thật.**
+
+**Còn mở – cần quyết định của chủ hệ thống:** M-11 (tách sheet Nhật ký sang file riêng), M-12 (sheet xem trước dùng chung), BUG-004 (2 người sửa cùng phiếu Kho Dăm), SEC-03 (vai trò Chỉ xem gọi hàm dựng lại sheet báo giá), ARCH-01/02 (giới hạn 10 triệu ô, phân trang báo cáo), L-05 (nonce vé đăng nhập – rủi ro rất thấp, chấp nhận).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
 - 28/09/2026 — Đợt sửa 2: định dạng số/ngày/canh lề theo Locale hệ thống (webapp + Google Sheet) và Locale Misa (PDF/Excel/MISA).
+- 28/09/2026 — Đợt sửa 3: M-02, M-04, M-07, M-08, M-09, M-10, M-13, M-14, M-16, L-03, L-04, L-06, L-07, L-08, L-09, L-11.

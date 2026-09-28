@@ -175,13 +175,13 @@ function step1_PreviewDraft_(fileDataList) {
         // File gốc được lưu trữ làm bằng chứng NGAY LẬP TỨC, không phụ thuộc việc
         // sau đó người dùng có bấm Xác nhận hay không - đơn giản và an toàn hơn.
         const blob = Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name);
-        DriveApp.getFolderById(CONFIG.FOLDER_DONE).createFile(blob);
+        luuFileGocKhongTrung_(blob); // M-02: cùng nội dung + cùng tên -> không lưu thêm bản
 
         // Convert TẠM đúng file vừa tải lên để đọc dữ liệu - đọc xong xóa NGAY bản
         // convert tạm (không đụng gì đến file gốc đã lưu trong Done ở trên).
         const tempFile = convertXlsxToTempSheet_(blob, "TMP_" + fileData.name);
         try {
-          const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
+          const values = docFileConvertTam_(tempFile.id);
 
           let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
           if (hIdx === -1) { fileLoi.push({ name: fileData.name, reason: "Không tìm thấy dòng tiêu đề (cột 'Số phiếu')" }); return; }
@@ -861,8 +861,20 @@ function addManualPhieuCan_(fields) {
     PC_dinhDangCacKhoi_(dataSheet, [[startRow, startRow]], _rf2, false); // Ngày/Giờ + KL theo Locale hệ thống
 
     // Gọi bản _core (không khóa) vì đang giữ khóa của addManualPhieuCan rồi
-    const priceResult = runCalculatePrice_core_();
-    const finalMsg = "Đã thêm phiếu cân " + uniqueKeyMaCT + " | " + priceResult.message;
+    const priceResult = runCalculatePrice_core_(undefined, true);
+    // M-16 (đồng bộ ĐNTT, giống Import - H-02/DRAFT-01): cập nhật phiếu đã có trong Draft
+    // Chưa TT theo giá vừa tính; tùy chọn ghi luôn phiếu vừa nhập vào Draft (kèm giá).
+    if (priceResult && priceResult.ketQua && priceResult.ketQua.length) TC_dongBoDraftChuaTT_(dataSheet, priceResult.ketQua);
+    let draftMsg = "";
+    if (fields.luuDraftChuaTT === true) {
+      const dongMoi = dataSheet.getRange(startRow, 1, 1, 26).getValues();
+      if (String(dongMoi[0][21] || "").trim() === uniqueKeyMaCT) {
+        ghepKetQuaGia_(dongMoi, startRow, priceResult && priceResult.ketQua);
+        ghiVaoDraftChuaTT_(dongMoi);
+        draftMsg = " | Đã lưu vào Draft Chưa Thanh Toán";
+      }
+    }
+    const finalMsg = "Đã thêm phiếu cân " + uniqueKeyMaCT + " | " + priceResult.message + draftMsg;
     logAudit_('MANUAL_ENTRY', 'OK', finalMsg);
     return { status: "success", message: finalMsg };
   } catch (e) {
@@ -897,7 +909,7 @@ const LT_SO_COT_DAY_DU = 27;
 // các dòng liền nhau thành 1 lệnh deleteRows() (mỗi lệnh là 1 lượt gọi Sheets
 // API chậm - xóa 200 dòng liền nhau: 1 lượt thay vì 200). Trả về số dòng đã xóa.
 function xoaCacDong_(sheet, dsDong) {
-  const giam = dsDong.filter(function (r, i, a) { return r >= 2 && a.indexOf(r) === i; })
+  const giam = Array.from(new Set(dsDong)).filter(function (r) { return r >= 2; }) // L-11: Set thay indexOf (O(n))
     .sort(function (a, b) { return b - a; });
   let i = 0;
   while (i < giam.length) {
@@ -1058,9 +1070,7 @@ function downloadMisaExcel_(tuNgay, denNgay) {
     // Ngày là giá trị ngày thật định dạng theo Locale Misa (canh giữa), số có phân cách (canh phải), chữ canh trái.
     XK_ghiBang_(tempSheet, 1, data[0], data.slice(1));
 
-    const tempFile = DriveApp.getFileById(tempSS.getId());
-    DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(tempFile);
-    DriveApp.getRootFolder().removeFile(tempFile);
+    DriveApp.getFileById(tempSS.getId()).moveTo(DriveApp.getFolderById(CONFIG.FOLDER_DONE)); // L-06: moveTo thay addFile/removeFile (đã ngừng hỗ trợ)
 
     return { status: "success", url: "https://docs.google.com/spreadsheets/d/" + tempSS.getId() + "/export?format=xlsx" };
   } catch (e) { return { status: "error", message: "Lỗi tạo file tải: " + e.toString() }; }
@@ -1538,7 +1548,7 @@ function getBaoCaoTongHop_(filters) {
       });
     });
 
-    result.sort((a, b) => (a.maChungTu > b.maChungTu ? 1 : -1));
+    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongKL: tongKL, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -1764,7 +1774,7 @@ function getBaoCaoDonGia_(filters) {
       });
     });
 
-    result.sort((a, b) => (a.maChungTu > b.maChungTu ? 1 : -1));
+    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -1851,7 +1861,7 @@ function getBaoCaoMisa_(filters) {
       });
     });
 
-    result.sort((a, b) => (a.maChungTu > b.maChungTu ? 1 : -1));
+    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongKL: tongKL, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -1957,9 +1967,7 @@ function createTempSheetForExport_(title, headers, rows, numberFormatCols) {
   XK_ghiBang_(tempSheet, 1, headers, rows);
   tempSheet.autoResizeColumns(1, headers.length);
   tempSheet.setFrozenRows(1);
-  const tempFile = DriveApp.getFileById(tempSS.getId());
-  DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(tempFile);
-  DriveApp.getRootFolder().removeFile(tempFile);
+  DriveApp.getFileById(tempSS.getId()).moveTo(DriveApp.getFolderById(CONFIG.FOLDER_DONE)); // L-06: moveTo thay addFile/removeFile (đã ngừng hỗ trợ)
   return tempSS;
 }
 
@@ -2175,9 +2183,7 @@ function exportPhieuCanPDF_(maChungTu) {
     sh.getRange(r, 5, 1, 2).merge().setValue("(Ký, họ tên)").setFontStyle("italic").setFontSize(9).setHorizontalAlignment("center");
     r += 5; // chừa khoảng trống để ký tay
 
-    const tempFile = DriveApp.getFileById(tempSS.getId());
-    DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(tempFile);
-    DriveApp.getRootFolder().removeFile(tempFile);
+    DriveApp.getFileById(tempSS.getId()).moveTo(DriveApp.getFolderById(CONFIG.FOLDER_DONE)); // L-06: moveTo thay addFile/removeFile (đã ngừng hỗ trợ)
 
     const gid = sh.getSheetId();
     const url = "https://docs.google.com/spreadsheets/d/" + tempSS.getId() + "/export?format=pdf&gid=" + gid +
@@ -2207,6 +2213,33 @@ function parseDate_(v) {
     }
   }
   return null;
+}
+
+// M-02: lưu file gốc đã tải lên vào thư mục Done - nếu đã có file CÙNG TÊN và CÙNG nội
+// dung (MD5 ghi ở phần mô tả file) thì dùng lại, không tạo thêm bản (trước đây mỗi lần
+// bấm "Xem trước" lại lưu 1 bản giống hệt). File lưu trước bản vá chưa có MD5 nên lần
+// đầu sau khi cập nhật vẫn lưu 1 bản mới.
+function luuFileGocKhongTrung_(blob) {
+  const folder = DriveApp.getFolderById(CONFIG.FOLDER_DONE);
+  const md5 = "md5:" + Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, blob.getBytes())
+    .map(function (b) { return ((b + 256) % 256).toString(16).padStart(2, "0"); }).join("");
+  try {
+    const ten = String(blob.getName() || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const it = folder.searchFiles("title = '" + ten + "' and trashed = false");
+    while (it.hasNext()) { const f = it.next(); if (f.getDescription() === md5) return f; }
+  } catch (e) { /* tìm lỗi -> vẫn lưu bản mới như cũ */ }
+  const moi = folder.createFile(blob);
+  try { moi.setDescription(md5); } catch (e) { /* bỏ qua */ }
+  return moi;
+}
+
+// M-04: đọc sheet đầu của file convert tạm SAU KHI đặt múi giờ file = múi giờ script -
+// ô ngày giờ thật trong Excel được đọc đúng giờ như hiển thị (file convert mặc định lấy
+// múi giờ tài khoản Drive, có thể khác Asia/Ho_Chi_Minh -> lệch giờ, lệch ngày/năm).
+function docFileConvertTam_(id) {
+  const ssTam = SpreadsheetApp.openById(id);
+  try { if (ssTam.getSpreadsheetTimeZone() !== Session.getScriptTimeZone()) ssTam.setSpreadsheetTimeZone(Session.getScriptTimeZone()); } catch (e) { /* giữ nguyên */ }
+  return ssTam.getSheets()[0].getDataRange().getValues();
 }
 
 // FIX #24: Chuyển đổi 1 Blob .xlsx sang Google Sheet TẠM để đọc dữ liệu - có
@@ -2430,9 +2463,7 @@ function taoFileMau_(tenFile, headers, dongViDu, ghiChu) {
   sh.autoResizeColumns(1, headers.length);
   sh.setRowHeight(1, 50);
 
-  const tempFile = DriveApp.getFileById(tempSS.getId());
-  DriveApp.getFolderById(CONFIG.FOLDER_DONE).addFile(tempFile);
-  DriveApp.getRootFolder().removeFile(tempFile);
+  DriveApp.getFileById(tempSS.getId()).moveTo(DriveApp.getFolderById(CONFIG.FOLDER_DONE)); // L-06: moveTo thay addFile/removeFile (đã ngừng hỗ trợ)
 
   return { status: "success", url: "https://docs.google.com/spreadsheets/d/" + tempSS.getId() + "/export?format=xlsx" };
 }
@@ -2517,6 +2548,24 @@ function BG_addMaBaoGia_(fields) {
   finally { lock.releaseLock(); }
 }
 
+// M-07: mô tả nơi mã báo giá đang được dùng ("" = chưa dùng ở đâu).
+function BG_maBaoGiaDangDung_(ma) {
+  if (!ma) return "";
+  const src = BG_ss_().getSheetByName(BAOGIA_CONFIG.SRC_SHEET);
+  if (src && src.getLastRow() > 1) {
+    const soNhom = src.getRange(2, 3, src.getLastRow() - 1, 1).getValues().filter(function (r) {
+      return String(r[0] || "").split(",").some(function (x) { return x.trim() === ma; });
+    }).length;
+    if (soNhom) return "đang dùng trong " + soNhom + " nhóm giá đã lập.";
+  }
+  const pc = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.DATA_SHEET);
+  if (pc && pc.getLastRow() > 1) {
+    const soPhieu = pc.getRange(2, 17, pc.getLastRow() - 1, 1).getValues().filter(function (r) { return String(r[0] || "").trim() === ma; }).length;
+    if (soPhieu) return "đang có " + soPhieu + " phiếu cân dùng mã này.";
+  }
+  return "";
+}
+
 function BG_nextMaBaoGiaCode_(sheet, lastRow) {
   const yy = String(new Date().getFullYear()).slice(-2);
   const prefix = "BG" + yy + "-";
@@ -2543,6 +2592,10 @@ function BG_deleteMaBaoGia_(maBaoGia) {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.MA_SHEET);
     const lastRow = sheet.getLastRow();
     if (lastRow <= 1) return { status: "error", message: "Danh mục trống." };
+    // M-07: không xóa mã đang được dùng (báo giá đã lập hoặc phiếu cân) - xóa sẽ làm báo
+    // cáo mất diễn giải "Không tìm thấy trong danh mục".
+    const dangDung = BG_maBaoGiaDangDung_(String(maBaoGia || "").trim());
+    if (dangDung) return { status: "error", message: "Không thể xóa mã báo giá " + maBaoGia + ": " + dangDung };
     const data = sheet.getRange(2, 2, lastRow - 1, 1).getValues(); // Cột B
     for (let i = 0; i < data.length; i++) {
       if (String(data[i][0] || "").trim() === String(maBaoGia || "").trim()) {
@@ -2628,6 +2681,13 @@ function BG_deleteMaKL_(maKL) {
     const sheet = BG_ss_().getSheetByName(BAOGIA_CONFIG.MAKL_SHEET);
     const lastRow = sheet.getLastRow();
     if (lastRow <= 1) return { status: "error", message: "Danh mục trống." };
+    // M-07: không xóa mã KL đang được dùng trong báo giá đã lập (cột D Baogia_DN).
+    const srcKL = BG_ss_().getSheetByName(BAOGIA_CONFIG.SRC_SHEET);
+    if (srcKL && srcKL.getLastRow() > 1) {
+      const soLan = srcKL.getRange(2, 4, srcKL.getLastRow() - 1, 1).getValues()
+        .filter(function (r) { return String(r[0] || "").trim() === String(maKL || "").trim(); }).length;
+      if (soLan) return { status: "error", message: "Không thể xóa mã khối lượng " + maKL + ": đang dùng trong " + soLan + " nhóm giá đã lập." };
+    }
     const data = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
     for (let i = 0; i < data.length; i++) {
       if (String(data[i][0] || "").trim() === String(maKL || "").trim()) {
@@ -3099,6 +3159,15 @@ function BG_createQuote_(payload) {
     if (!payload.hieuLuc) return { status: "error", message: "Vui lòng chọn thời điểm hiệu lực." };
     const groups = (payload.groups || []).filter(g => g.maList && g.maList.length > 0 && g.klCode && parseFloat(g.gia) > 0);
     if (groups.length === 0) return { status: "error", message: "Vui lòng thêm ít nhất 1 nhóm giá hợp lệ (có mã báo giá, mã khối lượng và đơn giá > 0)." };
+    // L-08: 1 mã báo giá + 1 mã KL chỉ được có 1 giá trong cùng phiếu báo giá.
+    const daCoMaKL = {};
+    for (const g of groups) {
+      for (const ma of g.maList) {
+        const k = String(ma).trim() + "|" + String(g.klCode).trim();
+        if (daCoMaKL[k]) return { status: "error", message: "Mã " + String(ma).trim() + " với mã KL " + g.klCode + " xuất hiện ở 2 nhóm giá trong cùng báo giá - vui lòng giữ 1 nhóm." };
+        daCoMaKL[k] = true;
+      }
+    }
 
     const ngayBaoGiaDate = new Date(payload.ngayBaoGia + "T00:00:00+07:00");
     const hieuLucDate = new Date(payload.hieuLuc + ":00+07:00");
@@ -3386,9 +3455,7 @@ function BG_exportFileSmart_(dateStr, currentView, filteredIds) {
     sheet.setColumnWidth(2, 100); sheet.setColumnWidth(3, 300); sheet.setColumnWidth(4, 110);
 
     SpreadsheetApp.flush();
-    const folder = DriveApp.getFolderById(BAOGIA_CONFIG.BACKUP_FOLDER_ID);
-    folder.addFile(DriveApp.getFileById(newSS.getId()));
-    DriveApp.getRootFolder().removeFile(DriveApp.getFileById(newSS.getId()));
+    DriveApp.getFileById(newSS.getId()).moveTo(DriveApp.getFolderById(BAOGIA_CONFIG.BACKUP_FOLDER_ID)); // L-06
 
     return { status: "success", url: "https://docs.google.com/spreadsheets/d/" + newSS.getId() + "/export?format=xlsx" };
   } catch (e) { return { status: "error", message: e.toString() }; }
@@ -3687,22 +3754,27 @@ function xuLyNhapSanPhamSanXuat_(ngayNhap, optionChon) {
 
     if (!sheetCan) return { status: "error", message: "Không tìm thấy sheet PhieuCan_DN trong file trạm cân!" };
 
-    var dataCan = sheetCan.getDataRange().getValues();
-    if (dataCan.length <= 1) return { status: "success", tongKhoiLuongUot: 0, doKho: 0.45, dotVetBai: "Mặc định", tongGoKeo: 0, dienGiaiDoKho: "Mặc định 45%" };
+    // M-10: chỉ đọc 2 cột cần dùng (B Ngày cân 1 .. J KL hàng -> đọc B..J = 9 cột thay vì
+    // toàn bộ 27 cột) và so ngày bằng số học (không gọi Utilities.formatDate cho MỖI dòng -
+    // hàm này chạy trong khóa hệ thống). Ô Date so theo ngày/tháng/năm múi giờ script -
+    // giống hệt chuanHoaNgay_; ô dạng chữ/số (dữ liệu cũ) vẫn qua chuanHoaNgay_ như trước.
+    var lastRowCan = sheetCan.getLastRow();
+    if (lastRowCan <= 1) return { status: "success", tongKhoiLuongUot: 0, doKho: 0.45, dotVetBai: "Mặc định", tongGoKeo: 0, dienGiaiDoKho: "Mặc định 45%" };
+    var dataCan = sheetCan.getRange(2, 2, lastRowCan - 1, 9).getValues(); // B..J: [0]=Ngày cân 1, [8]=KL hàng
 
     var targetDateStr = chuanHoaNgay_(ngayNhap);
     var arrKyCache = taiDanhSachKyVetBaiCache_();
     var thongSo = layThongSoVaTieuHaoCache_(ngayNhap, arrKyCache);
 
-    var tongKhoiLuongGoKeo = 0, colDateIdx = 1, colWeightIdx = 9;
-
-    for (var i = 1; i < dataCan.length; i++) {
-      var row = dataCan[i];
-      if (row[colDateIdx] !== undefined && row[colDateIdx] !== "") {
-        if (chuanHoaNgay_(row[colDateIdx]) === targetDateStr) {
-          tongKhoiLuongGoKeo += parseFloat(row[colWeightIdx]) || 0;
-        }
-      }
+    var tongKhoiLuongGoKeo = 0;
+    var hai = function (v) { return v < 10 ? "0" + v : String(v); };
+    for (var i = 0; i < dataCan.length; i++) {
+      var ngayO = dataCan[i][0];
+      if (ngayO === undefined || ngayO === "") continue;
+      var ngayStr = (ngayO instanceof Date)
+        ? (isNaN(ngayO.getTime()) ? "" : ngayO.getFullYear() + "-" + hai(ngayO.getMonth() + 1) + "-" + hai(ngayO.getDate()))
+        : chuanHoaNgay_(ngayO);
+      if (ngayStr === targetDateStr) tongKhoiLuongGoKeo += parseFloat(dataCan[i][8]) || 0;
     }
 
     var khoiLuongDamTuoi = (tongKhoiLuongGoKeo - (tongKhoiLuongGoKeo * thongSo.tieuHao)) / 1000;
@@ -4243,6 +4315,13 @@ function xuLyDanhMucKho_(dataDM) {
       }
     }
   } else if (dataDM.hanhDong === "THEM") {
+    // L-03: không cho thêm trùng tên kho đang hoạt động (so không phân biệt hoa/thường, khoảng trắng).
+    var tenMoi = String(dataDM.tenKho || "").trim().toLowerCase();
+    if (!tenMoi) return "❌ Vui lòng nhập Tên kho.";
+    var dsKho = sheetDM.getLastRow() > 1 ? sheetDM.getDataRange().getValues() : [];
+    for (var k = 1; k < dsKho.length; k++) {
+      if (String(dsKho[k][4]).trim() !== "Đã hủy" && String(dsKho[k][2] || "").trim().toLowerCase() === tenMoi) return "❌ Kho \"" + dsKho[k][2] + "\" đã có trong danh mục.";
+    }
     sheetDM.appendRow(["KHO_" + new Date().getTime(), sanitize_(dataDM.tenNhaMay), sanitize_(dataDM.tenKho), new Date(dataDM.ngayKhoiTao), "Hoạt động"]);
     sheetDM.getRange(sheetDM.getLastRow(), 4).setNumberFormat(REGION_FORMAT_().DATE_FMT).setHorizontalAlignment("center");
     xoaCacheKho_();
@@ -4870,13 +4949,13 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
         // File gốc được lưu trữ làm bằng chứng NGAY LẬP TỨC, không phụ thuộc việc
         // sau đó người dùng có bấm Xác nhận hay không - đơn giản và an toàn hơn.
         const blob = Utilities.newBlob(Utilities.base64Decode(fileData.base64), fileData.mimeType, fileData.name);
-        DriveApp.getFolderById(CONFIG.FOLDER_DONE).createFile(blob);
+        luuFileGocKhongTrung_(blob); // M-02: cùng nội dung + cùng tên -> không lưu thêm bản
 
         // Convert TẠM đúng file vừa tải lên để đọc dữ liệu - đọc xong xóa NGAY bản
         // convert tạm (không đụng gì đến file gốc đã lưu trong Done ở trên).
         const tempFile = convertXlsxToTempSheet_(blob, "TMP_XH_" + fileData.name);
         try {
-          const values = SpreadsheetApp.openById(tempFile.id).getSheets()[0].getDataRange().getValues();
+          const values = docFileConvertTam_(tempFile.id);
           let hIdx = values.findIndex(r => r.some(c => String(c).toLowerCase().includes("số phiếu")));
           if (hIdx === -1) { fileLoi.push({ name: fileData.name, reason: "Không tìm thấy dòng tiêu đề (cột 'Số phiếu')" }); return; }
 

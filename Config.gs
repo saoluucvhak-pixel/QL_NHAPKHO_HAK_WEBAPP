@@ -459,9 +459,12 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen_() {
 
     const ketQua = [];
     taiNguyen.forEach(function (tn) {
+      // M-14: lấy tài nguyên 1 lần / tài nguyên (trước đây 1 lần / tài nguyên × người dùng).
+      let resource = null, loiLay = "";
+      try { resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id); } catch (e) { loiLay = e.toString(); }
       nguoiDung.forEach(function (nd) {
         try {
-          const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+          if (!resource) throw new Error(loiLay);
           if (nd.quyenDrive === "VIEWER") resource.addViewer(nd.email);
           else if (nd.quyenDrive === "COMMENTER") resource.addCommenter(nd.email);
           else resource.addEditor(nd.email);
@@ -937,8 +940,10 @@ function API_ROUTES_() {
 function taoApiRoutes_() {
   const X = QUYEN.XEM, N = QUYEN.NGHIEP_VU, H = QUYEN.HE_THONG, Q = QUYEN.QUAN_TRI;
   const r = function (fn, quyen) { return { fn: fn, quyen: quyen }; };
+  // M-08: thao tác TẠO MỚI - chống tạo trùng khi bấm lại / mất mạng (xem API()).
+  const rTao = function (fn, quyen) { return { fn: fn, quyen: quyen, chongTrung: true }; };
   // Mỗi thao tác của processFormData (Kho Dăm) 1 mức quyền riêng.
-  const rTheoThaoTac = function (fn, quyenTheoThaoTac) { return { fn: fn, quyenTheoThaoTac: quyenTheoThaoTac }; };
+  const rTheoThaoTac = function (fn, quyenTheoThaoTac) { return { fn: fn, quyenTheoThaoTac: quyenTheoThaoTac, chongTrung: true }; };
   return {
     // --- Chung: người dùng, Dashboard ---
     HT_layThongTinNguoiDungHienTai: r(HT_layThongTinNguoiDungHienTai_, X),
@@ -997,30 +1002,32 @@ function taoApiRoutes_() {
     layDanhSachDanhMucKho: r(layDanhSachDanhMucKho_, X),
     layDanhSachDoKhoTheoBoLoc: r(layDanhSachDoKhoTheoBoLoc_, X),
     layDanhSachKyVetBai: r(layDanhSachKyVetBai_, X),
+    // M-09: báo cáo chỉ đọc - gọi thẳng, KHÔNG qua processFormData (vốn giữ khóa toàn hệ thống).
+    layBaoCaoTheoKyVetBai: r(layBaoCaoTheoKyVetBai_, X),
 
     // --- Nhập liệu phiếu cân (nghiệp vụ) ---
     step1_PreviewDraft: r(step1_PreviewDraft_, N),
-    step1_ConfirmImport: r(step1_ConfirmImport_, N),
-    addManualPhieuCan: r(addManualPhieuCan_, N),
+    step1_ConfirmImport: rTao(step1_ConfirmImport_, N),
+    addManualPhieuCan: rTao(addManualPhieuCan_, N),
     taoFileMauPhieuCan: r(taoFileMauPhieuCan_, N),
     taoFileMauXuatHang: r(taoFileMauXuatHang_, N),
     runCreateMisaData: r(runCreateMisaData_, N),
     downloadMisaExcel: r(downloadMisaExcel_, N),
 
     // --- Báo giá: nhập/sửa/xóa (nghiệp vụ) ---
-    BG_addMaBaoGia: r(BG_addMaBaoGia_, N),
+    BG_addMaBaoGia: rTao(BG_addMaBaoGia_, N),
     BG_deleteMaBaoGia: r(BG_deleteMaBaoGia_, N),
-    BG_addMaKL: r(BG_addMaKL_, N),
+    BG_addMaKL: rTao(BG_addMaKL_, N),
     BG_deleteMaKL: r(BG_deleteMaKL_, N),
-    BG_createQuote: r(BG_createQuote_, N),
+    BG_createQuote: rTao(BG_createQuote_, N),
     BG_deleteQuote: r(BG_deleteQuote_, N),
     BG_updateBaogiaRow: r(BG_updateBaogiaRow_, N),
     BG_deleteBaogiaRow: r(BG_deleteBaogiaRow_, N),
 
     // --- Xuất hàng: nhập/sửa/xóa (nghiệp vụ) ---
     XH_step1_PreviewDraft: r(XH_step1_PreviewDraft_, N),
-    XH_step1_ConfirmImport: r(XH_step1_ConfirmImport_, N),
-    XH_saveDonHang: r(XH_saveDonHang_, N),
+    XH_step1_ConfirmImport: rTao(XH_step1_ConfirmImport_, N),
+    XH_saveDonHang: rTao(XH_saveDonHang_, N),
     XH_updateDonHang: r(XH_updateDonHang_, N),
     XH_deleteDonHang: r(XH_deleteDonHang_, N),
 
@@ -1064,8 +1071,10 @@ function taoApiRoutes_() {
 }
 
 /** CỬA VÀO DUY NHẤT cho giao diện: kiểm tra phiên + quyền theo API_ROUTES rồi
- * gọi đúng hàm nội bộ đã đăng ký. */
-function API(maPhien, tenHam, thamSo) {
+ * gọi đúng hàm nội bộ đã đăng ký.
+ * maYeuCau (tùy chọn, M-08): mã do trình duyệt sinh cho 1 lần bấm; gửi lại CÙNG mã
+ * khi bấm lại cùng dữ liệu (sau mất mạng / bấm 2 lần) -> không chạy lần 2. */
+function API(maPhien, tenHam, thamSo, maYeuCau) {
   const ten = String(tenHam || "");
   const routes = API_ROUTES_();
   const route = Object.prototype.hasOwnProperty.call(routes, ten) ? routes[ten] : null;
@@ -1077,7 +1086,45 @@ function API(maPhien, tenHam, thamSo) {
     : route.quyen;
   if (!quyen) throw new Error("Thao tác không tồn tại: " + ten + " / " + String(args[0]));
   yeuCauQuyen_(quyen);
+  if (route.chongTrung && /^[A-Za-z0-9-]{16,64}$/.test(String(maYeuCau || ""))) {
+    return chayChongTrung_(PHIEN_HIEN_TAI_.email, ten, String(maYeuCau), function () { return route.fn.apply(null, args); });
+  }
   return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
+}
+
+// M-08 - CHỐNG TẠO TRÙNG: đánh dấu "đang xử lý" theo (người dùng + mã yêu cầu) trước
+// khi chạy; chạy THÀNH CÔNG thì lưu kết quả 10 phút. Cùng mã gửi lại: đang chạy -> báo
+// chờ; đã xong -> trả lại kết quả cũ (không ghi thêm). Chạy lỗi -> xóa dấu để thử lại được.
+const YC_DANG_XU_LY_ = "__DANG_XU_LY__";
+function laKetQuaThanhCong_(kq) {
+  if (typeof kq === "string") return kq.indexOf("❌") !== 0 && kq.indexOf("⚠️TRUNG_LAP_TP::") !== 0;
+  return !!kq && kq.status === "success";
+}
+function chayChongTrung_(email, tenHam, maYeuCau, viec) {
+  const cache = CacheService.getScriptCache();
+  const khoa = "yc_" + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, email + "|" + tenHam + "|" + maYeuCau));
+  const daCo = cache.get(khoa);
+  if (daCo === YC_DANG_XU_LY_) {
+    const tb = "Yêu cầu này đang được xử lý (có thể vừa bấm 2 lần) - vui lòng chờ kết quả, không cần bấm lại.";
+    return tenHam === "processFormData" ? "❌ " + tb : { status: "error", message: tb };
+  }
+  if (daCo) {
+    try {
+      const cu = JSON.parse(daCo);
+      const note = " (Yêu cầu này đã được lưu trước đó - không lưu lần 2.)";
+      if (typeof cu === "string") return cu + note;
+      if (cu && typeof cu.message === "string") cu.message += note;
+      return cu;
+    } catch (e) { /* hỏng -> chạy lại bình thường */ }
+  }
+  cache.put(khoa, YC_DANG_XU_LY_, 600);
+  let kq;
+  try { kq = viec(); }
+  catch (e) { cache.remove(khoa); throw e; }
+  if (laKetQuaThanhCong_(kq)) {
+    try { const json = JSON.stringify(kq); if (json.length < 90000) cache.put(khoa, json, 600); else cache.remove(khoa); } catch (e) { cache.remove(khoa); }
+  } else cache.remove(khoa);
+  return chuyenLinkXuatThanhFile_(kq);
 }
 
 // Các chức năng Xuất Excel/PDF trả về link docs.google.com/.../export của file
@@ -1265,6 +1312,12 @@ const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
 // danhSach = [{email, hoTen, vaiTro, trangThai, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ
 // sheet SYS_NguoiDung. Dòng không đổi giữ nguyên "Cập nhật lúc/bởi" cũ.
 function HT_luuDanhSachQuyen_(danhSach) {
+  // L-04: 2 Quản trị lưu cùng lúc -> người lưu sau không ghi đè lẫn lộn bảng người dùng.
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) { return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại sau ít giây." }; }
+  try { return HT_luuDanhSachQuyenTrongKhoa_(danhSach); } finally { lock.releaseLock(); }
+}
+function HT_luuDanhSachQuyenTrongKhoa_(danhSach) {
   try {
     if (!Array.isArray(danhSach) || danhSach.length === 0) {
       throw new Error("Danh sách người dùng không được để trống.");
