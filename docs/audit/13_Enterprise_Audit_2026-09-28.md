@@ -533,7 +533,14 @@ Quy tắc của chủ hệ thống:
 
 **Kết quả:** `npm test` → 16/16 đạt. Chromium: 101/101 nhãn gắn ô nhập, Enter mở menu, 375px không tràn ngang, sidebar cuộn được khi zoom 200%.
 
-**Chưa làm – ngoài repo này:** ARCH-01 (phiếu đã khóa sổ ra file riêng mỗi năm) cần sửa đồng thời hệ thống ĐNTT (repo khác). **Chế độ tối (dark mode):** chưa làm – giao diện còn ~250 màu viết thẳng trong thuộc tính `style`, bật dark mode lúc này sẽ lẫn màu sáng/tối; cần gom màu về biến CSS trước.
+**Chưa làm – ngoài repo này:** ARCH-01 (phiếu đã khóa sổ ra file riêng mỗi năm) cần sửa đồng thời hệ thống ĐNTT (repo khác).
+
+### Đợt sửa 4 (tiếp) — Chế độ tối (chủ hệ thống đồng ý)
+- **Gom màu:** ~140 chỗ màu viết cố định (CSS + thuộc tính `style` trong HTML/JS) đổi thành biến CSS (`--surface`, `--bg-soft`, `--bg-hover`, `--info-soft`, `--on-brand`, `--neutral-btn`, `--disabled`, `--accent-border`, `--accent-dark`, `--sidebar-bg`…). Chế độ sáng giữ đúng màu cũ.
+- **Bộ màu tối:** áp dụng khi máy đặt giao diện tối (Tự động) hoặc chọn tay. `color-scheme` đổi theo để ô chọn ngày, thanh cuộn, ô nhập cũng tối.
+- **Nút "🌓 Giao diện: Tự động / Tối / Sáng"** trên menu bên; lựa chọn lưu trên trình duyệt đó (không ảnh hưởng người khác).
+- **Sửa khi kiểm tra ảnh chụp:** `--brand-dark` vừa là nền thanh menu vừa là màu chữ tiêu đề/số liệu → ở chế độ tối chữ gần như vô hình; tách thành `--sidebar-bg` (nền menu) và `--brand-dark` (chữ).
+- **Kiểm tra:** chụp màn hình Dashboard, Báo cáo tổng hợp cân, Quản lý độ khô ở cả 2 chế độ; bài test Chromium mới (theo máy, nút chuyển 3 trạng thái, màu nền/chữ tiêu đề). `npm test` → 17/17 đạt.
 
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
@@ -542,3 +549,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 3: M-02, M-04, M-07, M-08, M-09, M-10, M-13, M-14, M-16, L-03, L-04, L-06, L-07, L-08, L-09, L-11.
 - 28/09/2026 — BUG-004: chặn người lưu sau (Kho Dăm, độ khô, đơn hàng xuất bán); đóng M-11, SEC-03 theo quyết định.
 - 28/09/2026 — Đợt sửa 4: ARCH-02, M-12, giao diện (zoom/di động/bàn phím/đọc màn hình), bộ kiểm thử + CI trong repo.
+- 28/09/2026 — Đợt sửa 4 (tiếp): chế độ tối (gom màu về biến CSS, nút chuyển giao diện).

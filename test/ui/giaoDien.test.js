@@ -77,3 +77,26 @@ test('Điện thoại 375px + bàn phím + nhãn ô nhập', { skip: !chromium &
   assert.ok(r.enter);
   assert.ok(!r.tran, 'không tràn ngang ở 375px');
 });
+
+test('Chế độ tối: theo máy + nút chuyển Tự động/Tối/Sáng, chữ tiêu đề đọc được', { skip: !chromium && 'chưa có Playwright' }, async () => {
+  const b = await chromium.launch(); const pg = await b.newPage({ colorScheme: 'dark' });
+  await pg.goto(taoTrang('VN'));
+  const r = await pg.evaluate(() => {
+    const nen = () => getComputedStyle(document.body).backgroundColor;
+    const chuTieuDe = () => getComputedStyle(document.querySelector('.page-head h1')).color;
+    const o = { tuDong: nen(), chuTuDong: chuTieuDe() };
+    const nut = document.getElementById('btnGiaoDien');
+    nut.click(); o.toi = [nen(), nut.textContent];
+    nut.click(); o.sang = [nen(), nut.textContent, chuTieuDe()];
+    nut.click(); o.lai = nut.textContent;
+    return o;
+  });
+  await b.close();
+  assert.strictEqual(r.tuDong, 'rgb(15, 20, 27)', 'máy đang tối -> Tự động là tối');
+  assert.strictEqual(r.chuTuDong, 'rgb(243, 244, 246)', 'tiêu đề chữ sáng trên nền tối');
+  assert.strictEqual(r.toi[0], 'rgb(15, 20, 27)');
+  assert.ok(r.toi[1].includes('Tối'));
+  assert.strictEqual(r.sang[0], 'rgb(243, 244, 246)');
+  assert.strictEqual(r.sang[2], 'rgb(31, 41, 55)');
+  assert.ok(r.lai.includes('Tự động'));
+});
