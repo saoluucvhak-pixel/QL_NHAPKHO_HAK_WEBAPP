@@ -589,7 +589,11 @@ Quy tắc của chủ hệ thống:
 
 **Test:** `npm test` → 28/28 đạt.
 
-**Chưa làm, cần bạn cung cấp:** *Import Wizard* (ánh xạ cột phiếu cân theo TÊN cột thay vì vị trí cố định) — cần 1–2 file Excel mẫu thật từ phần mềm cân để biết đúng tên tiêu đề từng cột; làm khi chưa có mẫu dễ từ chối nhầm file đang nhập tốt.
+**Đóng theo quyết định chủ hệ thống (28/09/2026) — KHÔNG làm:**
+- *Import Wizard* (ánh xạ cột phiếu cân theo tên cột): giữ đọc theo vị trí cột cố định như hiện tại.
+- *ARCH-01* (tách phiếu đã chốt sổ ra file riêng mỗi năm): giữ nguyên cơ chế lưu trữ theo năm hiện có (sheet lưu trữ trong cùng file). Khi dữ liệu lớn, theo dõi qua khung Giám sát (`API_CHAM`) để xem xét lại.
+
+**Kết thúc Đợt sửa 4** — mọi mục kiểm toán trong repo đã xử lý hoặc đóng theo quyết định (M-11, SEC-03, L-05, ARCH-01, Import Wizard).
 
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
@@ -603,3 +607,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp 3): tự lưu nháp/khôi phục form, giám sát lỗi 24h trên Dashboard, kiểm tra bản sao lưu, CI v5.
 - 28/09/2026 — Đợt sửa 4 (tiếp 4): email báo lỗi cho Quản trị khi sao lưu đêm / tính giá theo giờ lỗi (mặc định tắt), thêm scope script.send_mail.
 - 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
+- 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
