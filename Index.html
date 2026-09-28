@@ -1820,10 +1820,12 @@
             <div class="field-grid">
               <div class="field" style="justify-content:flex-end;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:38px;"><input type="checkbox" id="sl_batTuDong" style="width:18px;height:18px;margin:0;flex:none;"> Tự động sao lưu hằng đêm (1–2 giờ sáng)</label></div>
               <div class="field"><label>Giữ lại số bản gần nhất</label><input type="number" id="sl_giuLai" min="1" max="365" value="30"></div>
+              <div class="field" style="justify-content:flex-end;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:38px;"><input type="checkbox" id="sl_emailLoi" style="width:18px;height:18px;margin:0;flex:none;"> Gửi email cho Quản trị khi tác vụ tự động lỗi (sao lưu đêm, tính giá theo giờ)</label></div>
             </div>
             <div class="btnrow">
               <button class="btn btn-primary" id="btnLuuCauHinhSaoLuu">💾 Lưu cài đặt</button>
               <button class="btn btn-accent" id="btnSaoLuuNgay">▶️ Sao lưu ngay</button>
+              <button class="btn btn-ghost" id="btnGuiEmailThu">✉️ Gửi email thử</button>
               <button class="btn btn-ghost" id="btnTaiLaiSaoLuu">🔄 Tải lại</button>
             </div>
             <div id="sl_trangThai" style="font-size:12.5px;margin-top:8px;"></div>
@@ -5882,12 +5884,14 @@
         const d = res.data;
         document.getElementById('sl_batTuDong').checked = !!d.batTuDong;
         document.getElementById('sl_giuLai').value = d.giuLai;
+        document.getElementById('sl_emailLoi').checked = !!d.emailLoi;
         const kq = d.ketQuaCuoi;
         document.getElementById('sl_trangThai').innerHTML =
           (d.batTuDong ? '<span class="badge badge-ok">ĐANG BẬT</span> tự động hằng đêm ' + d.gioChay + '–' + (d.gioChay + 1) + ' giờ sáng'
                        : '<span class="badge badge-warn">ĐANG TẮT</span> sao lưu tự động')
           + ' · ' + d.soSpreadsheet + ' Google Sheet sẽ được sao lưu'
           + (d.thuMucUrl ? ' · <a href="' + escapeHtml(d.thuMucUrl) + '" target="_blank" rel="noopener">Mở thư mục sao lưu</a>' : '')
+          + '<br>Email báo lỗi: ' + (d.emailLoi ? '<b>BẬT</b> → ' + escapeHtml((d.dsNhanEmail || []).join(', ')) : 'tắt')
           + '<br>Lần gần nhất: ' + (kq ? escapeHtml(ngayHT(kq.thoiGian)) + ' (' + escapeHtml(kq.nguon) + ') — ' + kq.soFile + ' file, ' + kq.giay + ' giây'
               + (kq.loi && kq.loi.length ? ' — <b style="color:var(--danger);">lỗi: ' + escapeHtml(kq.loi.join('; ')) + '</b>' : '') : 'chưa có');
         const body = document.getElementById('sl_dsBan');
@@ -5902,11 +5906,19 @@
       try {
         const res = await runServer('HT_luuCauHinhSaoLuu', {
           batTuDong: document.getElementById('sl_batTuDong').checked,
-          giuLai: document.getElementById('sl_giuLai').value
+          giuLai: document.getElementById('sl_giuLai').value,
+          emailLoi: document.getElementById('sl_emailLoi').checked
         });
         toast(res.message, res.status === 'success');
         if (res.status === 'success') await htLoadSaoLuu();
       } catch(err){ toast('Lỗi lưu cài đặt sao lưu: ' + err, false); } finally { hideOverlay(); }
+    });
+    document.getElementById('btnGuiEmailThu').addEventListener('click', async ()=>{
+      showOverlay('Đang gửi email thử…');
+      try {
+        const res = await runServer('HT_guiEmailThu');
+        toast(res.message, res.status === 'success');
+      } catch(err){ toast('Lỗi gửi email thử: ' + err, false); } finally { hideOverlay(); }
     });
     document.getElementById('btnSaoLuuNgay').addEventListener('click', async ()=>{
       if (!confirm('Sao lưu ngay toàn bộ Google Sheet của hệ thống? (có thể mất 1–3 phút)')) return;

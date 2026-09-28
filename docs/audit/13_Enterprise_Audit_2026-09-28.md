@@ -564,6 +564,20 @@ Quy tắc của chủ hệ thống:
 
 **Test:** `npm test` → 22/22 đạt (thêm: tự lưu nháp + khôi phục trên Chromium, giám sát 24 giờ).
 
+### Đợt sửa 4 (tiếp 4) — Email báo lỗi tác vụ tự động
+
+| Mục | Đã làm | Hàm / vị trí |
+|---|---|---|
+| Cảnh báo qua email | Khi **sao lưu đêm** lỗi (ném lỗi, có file lỗi, hoặc 0 file) hoặc **tính giá theo giờ** (trigger thật) trả lỗi → gửi email cho Quản trị cố định + mọi tài khoản vai trò Quản trị đang Hoạt động (không trùng, gộp biến thể Gmail có "." / "+"). **Mặc định TẮT**, bật tại Hệ thống › Sao lưu. Bỏ qua các trường hợp tạm thời: "Đang có 1 lượt sao lưu chạy", "hệ thống đang bận", ĐNTT đang khóa sổ. Chống spam: mỗi loại tối đa 1 email/giờ. Gửi thất bại chỉ ghi Nhật ký `TB_EMAIL` = ERROR, không làm hỏng tác vụ. Trigger sao lưu vẫn ném lại lỗi như cũ. | `TB_guiEmailLoi_`, `TB_dsNhanEmail_`, `TB_emailLoiDangBat_` (Script Property `TB_EMAIL_LOI_BAT`), `TRIGGER_saoLuuHangDem`, `runCalculatePrice` |
+| Cài đặt | Ô "Gửi email cho Quản trị khi tác vụ tự động lỗi" + nút **✉️ Gửi email thử**; khung trạng thái hiện danh sách người nhận. `HT_luuCauHinhSaoLuu_` chỉ đổi cờ email khi client gửi kèm `emailLoi` (client cũ → giữ nguyên). | `HT_guiEmailThu_` (route `HT_guiEmailThu`, quyền HỆ THỐNG), `htLoadSaoLuu` |
+| Quyền | Thêm scope `https://www.googleapis.com/auth/script.send_mail` vào `appsscript.json`. | `CAP_QUYEN_EMAIL()` |
+
+**⚠️ Việc cần làm khi triển khai:** sau khi đẩy mã, **chủ script mở trình soạn thảo Apps Script, chọn hàm `CAP_QUYEN_EMAIL` → Chạy → Cho phép** (1 lần). Nếu bỏ qua, webapp và trigger có thể báo lỗi thiếu quyền cho tới khi được cấp.
+
+**Rollback:** tắt ô email trong Hệ thống › Sao lưu (hiệu lực ngay), hoặc revert commit (xóa scope `script.send_mail`; Script Property `TB_EMAIL_LOI_BAT` còn lại không ảnh hưởng).
+
+**Test:** `npm test` → 24/24 đạt (thêm: mặc định tắt, bật thì gửi, chống spam theo loại, danh sách nhận không trùng/bỏ tài khoản Khóa, gửi lỗi không ném ra ngoài + gợi ý `CAP_QUYEN_EMAIL`).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -574,3 +588,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp): chế độ tối (gom màu về biến CSS, nút chuyển giao diện).
 - 28/09/2026 — Đợt sửa 4 (tiếp 2): L-10, cảnh báo dữ liệu bất hợp lý, gợi ý tính lại giá sau khi lưu báo giá, lịch sử sửa trước/sau.
 - 28/09/2026 — Đợt sửa 4 (tiếp 3): tự lưu nháp/khôi phục form, giám sát lỗi 24h trên Dashboard, kiểm tra bản sao lưu, CI v5.
+- 28/09/2026 — Đợt sửa 4 (tiếp 4): email báo lỗi cho Quản trị khi sao lưu đêm / tính giá theo giờ lỗi (mặc định tắt), thêm scope script.send_mail.

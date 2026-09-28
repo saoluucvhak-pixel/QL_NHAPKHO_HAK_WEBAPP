@@ -178,3 +178,44 @@ test('Giám sát: đếm lỗi 24 giờ qua, bỏ dòng cũ hơn 24 giờ và d�
   assert.strictEqual(d.batSaoLuuTuDong, true);
   assert.strictEqual(d.coTriggerTinhGia, false);
 });
+
+test('Email báo lỗi tác vụ tự động: mặc định TẮT, bật thì gửi 1 lần/giờ, danh sách nhận không trùng', () => {
+  const daGui = [];
+  const dsQuyen = JSON.stringify([
+    { email: 'admin.moi@gmail.com', vaiTro: 'ADMIN', trangThai: 'Hoạt động' },
+    { email: 'adminmoi+hak@gmail.com', vaiTro: 'ADMIN', trangThai: 'Hoạt động' },   // trùng tài khoản Gmail ở trên
+    { email: 'bi.khoa@gmail.com', vaiTro: 'ADMIN', trangThai: 'Khóa' },
+    { email: 'nhanvien@gmail.com', vaiTro: 'NHANVIEN', trangThai: 'Hoạt động' }
+  ]);
+  const { chay, props } = taoMoiTruong({
+    cache: { sys_nguoi_dung_v1: dsQuyen },
+    MailApp: { sendEmail: o => { daGui.push(o); } },
+    SpreadsheetApp: { openById: () => { throw new Error('không cần'); } }
+  });
+  // Mặc định tắt -> không gửi
+  assert.strictEqual(chay('TB_guiEmailLoi_("SAO_LUU", "t", "n")'), false);
+  assert.strictEqual(daGui.length, 0);
+  props.TB_EMAIL_LOI_BAT = '1';
+  const ds = JSON.parse(chay('JSON.stringify(TB_dsNhanEmail_())'));
+  assert.deepStrictEqual(ds, ['saoluucvhak@gmail.com', 'phuthuy.apple@gmail.com', 'admin.moi@gmail.com']);
+  assert.strictEqual(chay('TB_guiEmailLoi_("SAO_LUU", "Sao lưu lỗi", "chi tiết")'), true);
+  assert.strictEqual(daGui.length, 1);
+  assert.ok(daGui[0].subject.includes('Sao lưu lỗi') && daGui[0].body.includes('chi tiết'));
+  // Cùng loại trong 1 giờ -> không gửi lại; loại khác vẫn gửi
+  assert.strictEqual(chay('TB_guiEmailLoi_("SAO_LUU", "x", "y")'), false);
+  assert.strictEqual(chay('TB_guiEmailLoi_("TINH_GIA", "x", "y")'), true);
+  assert.strictEqual(daGui.length, 2);
+});
+
+test('Email báo lỗi: gửi thất bại không ném lỗi ra tác vụ chính', () => {
+  const { chay } = taoMoiTruong({
+    props: { TB_EMAIL_LOI_BAT: '1' },
+    cache: { sys_nguoi_dung_v1: '[]' },
+    MailApp: { sendEmail: () => { throw new Error('Exception: You do not have permission to call MailApp.sendEmail'); } },
+    SpreadsheetApp: { openById: () => { throw new Error('không cần'); } }
+  });
+  assert.strictEqual(chay('TB_guiEmailLoi_("SAO_LUU", "t", "n")'), false);
+  const kq = JSON.parse(chay('JSON.stringify(HT_guiEmailThu_())'));
+  assert.strictEqual(kq.status, 'error');
+  assert.ok(kq.message.includes('CAP_QUYEN_EMAIL'));
+});

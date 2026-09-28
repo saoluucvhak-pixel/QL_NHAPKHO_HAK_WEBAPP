@@ -1205,7 +1205,8 @@ function copyDataWithFinalLookup_(fromDate, toDate) {
 // của trigger THẬT của dự án (triggerUid khớp ScriptApp.getProjectTriggers(),
 // giống TRIGGER_saoLuuHangDem) - gọi từ trình duyệt vẫn bắt buộc đăng nhập.
 function runCalculatePrice(e) {
-  if (laLuotChayTriggerThat_(e)) PHIEN_HIEN_TAI_ = PHIEN_HE_THONG_TRIGGER_();
+  const laTrigger = laLuotChayTriggerThat_(e);
+  if (laTrigger) PHIEN_HIEN_TAI_ = PHIEN_HE_THONG_TRIGGER_();
   yeuCauPhien_();
   const lock = LockService.getScriptLock();
   try {
@@ -1216,7 +1217,15 @@ function runCalculatePrice(e) {
   try {
     const _dnttKhoaSo = KS_thongBaoDNTTDangKhoaSo_();
     if (_dnttKhoaSo) return { status: "error", message: _dnttKhoaSo };
-    return runCalculatePrice_core_();
+    const kq = runCalculatePrice_core_();
+    // Đợt sửa 4 (tiếp 4): trigger theo giờ tính giá LỖI THẬT (không tính các
+    // trường hợp tạm thời "đang bận"/ĐNTT đang khóa sổ ở trên) -> email Quản trị
+    // (nếu đã bật; tối đa 1 email/giờ). Gọi từ trình duyệt thì người dùng đã
+    // thấy lỗi trên màn hình nên không gửi.
+    if (laTrigger && kq && kq.status === "error") {
+      TB_guiEmailLoi_("TINH_GIA", "Tính giá tự động theo giờ bị LỖI", "Lỗi: " + (kq.message || ""));
+    }
+    return kq;
   } finally {
     lock.releaseLock();
   }
@@ -5903,7 +5912,22 @@ function PHIEN_HE_THONG_TRIGGER_() {
 function TRIGGER_saoLuuHangDem(e) {
   const uid = (e && e.triggerUid) ? String(e.triggerUid) : "";
   if (!uid || !SL_timTrigger_().some(function (t) { return t.getUniqueId() === uid; })) return;
-  SL_thucHienSaoLuu_("Tự động");
+  // Đợt sửa 4 (tiếp 4): sao lưu đêm lỗi -> email Quản trị (nếu đã bật). Vẫn ném
+  // lại lỗi như cũ để Google ghi nhận lượt chạy thất bại (hành vi không đổi).
+  let kq;
+  try {
+    kq = SL_thucHienSaoLuu_("Tự động");
+  } catch (err) {
+    if (String(err).indexOf("Đang có 1 lượt sao lưu chạy") < 0) {
+      TB_guiEmailLoi_("SAO_LUU", "Sao lưu tự động hằng đêm bị LỖI", "Lỗi: " + err);
+    }
+    throw err;
+  }
+  if (kq && ((kq.loi && kq.loi.length) || !(kq.soFile > 0))) {
+    TB_guiEmailLoi_("SAO_LUU", "Sao lưu tự động hằng đêm có LỖI",
+      "Đã sao lưu " + (kq.soFile || 0) + " file" + (kq.thuMuc ? " vào " + kq.thuMuc : "") + ".\n"
+      + (kq.loi && kq.loi.length ? "Lỗi:\n- " + kq.loi.join("\n- ") : "Không sao lưu được file nào."));
+  }
 }
 
 function HT_layTinhTrangSaoLuu_() {
@@ -5920,6 +5944,8 @@ function HT_layTinhTrangSaoLuu_() {
         giuLai: SL_soBanGiuLai_(),
         thuMucUrl: goc ? goc.getUrl() : "",
         ketQuaCuoi: ketQuaCuoi,
+        emailLoi: TB_emailLoiDangBat_(),
+        dsNhanEmail: TB_dsNhanEmail_(),
         dsBan: goc ? SL_dsBanSaoLuu_(goc).slice(0, 10).map(function (f) { return { ten: f.getName(), url: f.getUrl() }; }) : [],
         soSpreadsheet: _layDanhSachTaiNguyenDaGopId_().filter(function (tn) { return tn.loai === "sheet"; }).length
       }
@@ -5933,12 +5959,18 @@ function HT_luuCauHinhSaoLuu_(cauHinh) {
     const giuLai = parseInt(cauHinh.giuLai, 10);
     if (!(giuLai >= 1 && giuLai <= 365)) throw new Error("Số bản giữ lại phải từ 1 đến 365.");
     PropertiesService.getScriptProperties().setProperty(SL_PROP_GIU_LAI_, String(giuLai));
+    // Đợt sửa 4 (tiếp 4): chỉ đổi cờ email khi client gửi kèm (client cũ không
+    // gửi -> giữ nguyên, tương thích ngược).
+    if (typeof cauHinh.emailLoi === "boolean") {
+      PropertiesService.getScriptProperties().setProperty(TB_PROP_EMAIL_LOI_, cauHinh.emailLoi ? "1" : "0");
+    }
     // Luôn xóa hết trigger cũ rồi tạo lại (tránh trùng 2 trigger chạy 2 lần/đêm).
     SL_timTrigger_().forEach(function (t) { ScriptApp.deleteTrigger(t); });
     if (cauHinh.batTuDong === true) {
       ScriptApp.newTrigger(SL_HAM_TRIGGER_).timeBased().everyDays(1).atHour(SL_GIO_CHAY_).create();
     }
-    logAudit_("CAUHINH_SAO_LUU", "OK", (cauHinh.batTuDong === true ? "Bật" : "Tắt") + " sao lưu tự động, giữ " + giuLai + " bản");
+    logAudit_("CAUHINH_SAO_LUU", "OK", (cauHinh.batTuDong === true ? "Bật" : "Tắt") + " sao lưu tự động, giữ " + giuLai + " bản"
+      + (typeof cauHinh.emailLoi === "boolean" ? ", email báo lỗi: " + (cauHinh.emailLoi ? "BẬT" : "TẮT") : ""));
     return { status: "success", message: cauHinh.batTuDong === true
       ? "✅ Đã bật sao lưu tự động hằng đêm (" + SL_GIO_CHAY_ + "–" + (SL_GIO_CHAY_ + 1) + " giờ sáng), giữ " + giuLai + " bản gần nhất."
       : "✅ Đã tắt sao lưu tự động (vẫn giữ các bản đã có)." };
@@ -5955,6 +5987,84 @@ function HT_saoLuuNgay_() {
         + (kq.loi.length ? " — lỗi: " + kq.loi.join("; ") : "")
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
+}
+
+/* ---------- 9A-1b. EMAIL BÁO LỖI TÁC VỤ TỰ ĐỘNG (Đợt sửa 4 tiếp 4) ----------
+ * Sao lưu đêm / tính giá theo giờ chạy ngầm, lỗi thì không ai thấy cho tới khi
+ * mở Dashboard. Nay (nếu Quản trị BẬT trong Hệ thống › Sao lưu, mặc định TẮT)
+ * gửi email cho Quản trị cố định + mọi tài khoản vai trò Quản trị đang hoạt động.
+ * Chống spam: mỗi loại lỗi tối đa 1 email/giờ (CacheService). Gửi lỗi (hết hạn
+ * mức, chưa cấp quyền gửi mail...) chỉ ghi Nhật ký, KHÔNG làm hỏng tác vụ chính.
+ * Cần quyền script.send_mail: sau khi cập nhật, chủ script chạy CAP_QUYEN_EMAIL
+ * 1 lần trong trình soạn thảo Apps Script để cấp quyền. */
+const TB_PROP_EMAIL_LOI_ = "TB_EMAIL_LOI_BAT";
+const TB_GIAN_CACH_GIAY_ = 3600;
+
+function TB_emailLoiDangBat_() {
+  try { return PropertiesService.getScriptProperties().getProperty(TB_PROP_EMAIL_LOI_) === "1"; } catch (e) { return false; }
+}
+
+function TB_dsNhanEmail_() {
+  const ds = [], daCo = {};
+  function them(email) {
+    email = String(email || "").trim().toLowerCase();
+    if (email.indexOf("@") < 1) return;
+    const k = chuanHoaEmailSoSanh_(email);
+    if (daCo[k]) return;
+    daCo[k] = true; ds.push(email);
+  }
+  danhSachQuanTriCoDinh_().forEach(them);
+  try {
+    DS_QUYEN_().forEach(function (u) { if (u.vaiTro === VAI_TRO.ADMIN && u.trangThai === TRANG_THAI_ND.HOAT_DONG) them(u.email); });
+  } catch (e) { /* đọc danh sách quyền lỗi -> vẫn gửi cho Quản trị cố định */ }
+  return ds;
+}
+
+function TB_noiDungEmail_(noiDung) {
+  return String(noiDung || "") + "\n\nThời điểm: "
+    + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss")
+    + "\n\nEmail tự động từ Hệ thống quản lý nhập kho HAK. Tắt tại: Hệ thống › Sao lưu › \"Gửi email cho Quản trị khi tác vụ tự động lỗi\".";
+}
+
+/** Gửi email báo lỗi (trả true nếu đã gửi). Không bao giờ ném lỗi. */
+function TB_guiEmailLoi_(loai, tieuDe, noiDung) {
+  try {
+    if (!TB_emailLoiDangBat_()) return false;
+    const cache = CacheService.getScriptCache();
+    const khoa = "tb_email_loi_" + loai;
+    if (cache.get(khoa)) return false;
+    const ds = TB_dsNhanEmail_();
+    if (!ds.length) return false;
+    MailApp.sendEmail({ to: ds.join(","), subject: "[HAK Nhập kho] " + tieuDe, body: TB_noiDungEmail_(noiDung) });
+    cache.put(khoa, "1", TB_GIAN_CACH_GIAY_);
+    logAudit_("TB_EMAIL", "OK", loai + " -> " + ds.join(", "));
+    return true;
+  } catch (e) {
+    logAudit_("TB_EMAIL", "ERROR", loai + ": " + e);
+    return false;
+  }
+}
+
+/** Nút "Gửi email thử" (Quản trị) - gửi ngay, báo lỗi rõ nếu chưa cấp quyền. */
+function HT_guiEmailThu_() {
+  try {
+    const ds = TB_dsNhanEmail_();
+    if (!ds.length) throw new Error("Không có email Quản trị nào để gửi.");
+    MailApp.sendEmail({ to: ds.join(","), subject: "[HAK Nhập kho] Email thử - báo lỗi tác vụ tự động",
+      body: TB_noiDungEmail_("Đây là email THỬ do " + (layThongTinNguoiDungHienTai_().email || "Quản trị") + " gửi. Nếu nhận được email này, hệ thống đã gửi được email báo lỗi.") });
+    logAudit_("TB_EMAIL", "OK", "Email thử -> " + ds.join(", "));
+    return { status: "success", message: "✅ Đã gửi email thử tới: " + ds.join(", ") };
+  } catch (e) {
+    const s = String(e);
+    return { status: "error", message: "❌ Không gửi được email: " + s
+      + (/permission|quyền|authoriz/i.test(s) ? " — Chủ script cần chạy hàm CAP_QUYEN_EMAIL 1 lần trong trình soạn thảo Apps Script để cấp quyền gửi mail." : "") };
+  }
+}
+
+/** Chủ script chạy 1 lần trong trình soạn thảo để Google hỏi & cấp quyền gửi
+ * mail (script.send_mail). Chỉ đọc hạn mức còn lại, không gửi gì, không đổi dữ liệu. */
+function CAP_QUYEN_EMAIL() {
+  return "Đã cấp quyền gửi mail. Hạn mức còn lại hôm nay: " + MailApp.getRemainingDailyQuota() + " email.";
 }
 
 /* ---------- 9A-2. GIÁM SÁT (Monitoring) cho Dashboard - Quản trị + Tổng hợp ----------
