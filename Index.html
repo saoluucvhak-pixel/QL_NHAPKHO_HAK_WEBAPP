@@ -195,6 +195,12 @@
     tbody tr:hover{background:#f3f4f6;}
     .table-wrap{overflow:auto;max-height:52vh;border:1px solid var(--border);border-radius:8px;}
     .num{text-align:right;font-family:'JetBrains Mono',monospace;}
+    /* Quy tắc canh lề: số PHẢI (.num), chữ TRÁI (mặc định), ngày/giờ GIỮA (.ngay) */
+    th, td{text-align:left;}
+    th.num, td.num{text-align:right;}
+    .ngay, th.ngay, td.ngay{text-align:center;white-space:nowrap;}
+    input.o-so{text-align:right;font-family:'JetBrains Mono',monospace;}
+    input[type="date"], input[type="datetime-local"], input[type="time"], input[type="month"]{text-align:center;}
     .badge{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;}
     .badge-ok{background:var(--success-soft);color:var(--success);}
     .badge-warn{background:var(--danger-soft);color:var(--danger);}
@@ -298,7 +304,9 @@
     #view-khodam .btn-scan{background:var(--accent);color:#ffffff;border:1px solid #92400e;padding:10px 15px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;width:100%;margin-top:10px;display:block;font-family:inherit;}
     #view-khodam .btn-scan:hover{filter:brightness(1.05);}
     #view-khodam .dokho-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
-    #view-khodam .dokho-table th, #view-khodam .dokho-table td{border:1px solid var(--border);padding:8px;text-align:center;}
+    #view-khodam .dokho-table th, #view-khodam .dokho-table td{border:1px solid var(--border);padding:8px;text-align:left;}
+    #view-khodam .dokho-table th.num, #view-khodam .dokho-table td.num{text-align:right;}
+    #view-khodam .dokho-table th.ngay, #view-khodam .dokho-table td.ngay{text-align:center;}
     #view-khodam .dokho-table th{background:var(--brand);color:#fff;font-weight:600;}
     #view-khodam .btn-action{padding:5px 10px;font-size:11.5px;border-radius:6px;cursor:pointer;border:none;font-weight:700;font-family:inherit;}
     #view-khodam .btn-sua{background:var(--accent-soft);color:#b45309;}
@@ -590,7 +598,7 @@
                   <tr>
                     <th><input type="checkbox" id="previewCheckHeader" checked></th>
                     <th>Trạng thái</th><th>Mã CT</th><th>Số phiếu</th><th>Số xe</th>
-                    <th>Ngày cân 1</th><th>Giờ cân 1</th><th>Ngày cân 2</th><th>Giờ cân 2</th>
+                    <th class="ngay">Ngày cân 1</th><th class="ngay">Giờ cân 1</th><th class="ngay">Ngày cân 2</th><th class="ngay">Giờ cân 2</th>
                     <th class="num">KL Cân1</th><th class="num">KL Cân2</th><th class="num">KL Hàng</th><th>Ghi chú</th>
                   </tr>
                 </thead>
@@ -670,7 +678,7 @@
                   <tr>
                     <th><input type="checkbox" id="xhCheckHeader" checked></th>
                     <th>Trạng thái</th><th>Mã CT</th><th>Số phiếu</th><th>Số xe</th>
-                    <th>Ngày cân 1</th><th>Giờ cân 1</th><th>Ngày cân 2</th><th>Giờ cân 2</th>
+                    <th class="ngay">Ngày cân 1</th><th class="ngay">Giờ cân 1</th><th class="ngay">Ngày cân 2</th><th class="ngay">Giờ cân 2</th>
                     <th class="num">Cân lần 1</th><th class="num">Cân lần 2</th><th class="num">KL Hàng</th>
                     <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Kho xuất</th><th>Kho nhập</th>
                   </tr>
@@ -699,7 +707,7 @@
               <div class="field"><label>Đơn giá (USD)</label><input type="number" id="dh_donGiaUSD" placeholder="0"></div>
               <div class="field"><label>KL_MT (Tấn tươi) *</label><input type="number" id="dh_klMT" placeholder="0"></div>
               <div class="field"><label>Độ khô (%) *</label><input type="number" id="dh_doKho" placeholder="VD: 39.45" step="0.01"></div>
-              <div class="field"><label>KL_BDMT (Tấn khô) - tự tính</label><input type="text" id="dh_klBDMT" readonly placeholder="= KL_MT × Độ khô"></div>
+              <div class="field"><label>KL_BDMT (Tấn khô) - tự tính</label><input type="text" id="dh_klBDMT" readonly data-so data-so-le="2" placeholder="= KL_MT × Độ khô"></div>
               <div class="field"><label>Kho xuất</label><select id="dh_khoXuat"><option value="">-- Chọn kho --</option></select></div>
               <div class="field"><label>Loại xe</label>
                 <select id="dh_loaiXe"><option value="Y">Y</option><option value="N">N</option></select>
@@ -732,9 +740,9 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Ngày</th><th>Số TKHQ</th><th>Tàu</th><th>Khách hàng</th><th>Kho xuất</th>
+                    <th class="ngay">Ngày</th><th>Số TKHQ</th><th>Tàu</th><th>Khách hàng</th><th>Kho xuất</th>
                     <th class="num">KL_MT</th><th class="num">KL_BDMT</th><th class="num">Độ khô</th>
-                    <th class="num">Độ khô NM</th><th>NL Từ ngày</th><th>NL Đến ngày</th><th>Loại xe</th><th>Hành động</th>
+                    <th class="num">Độ khô NM</th><th class="ngay">NL Từ ngày</th><th class="ngay">NL Đến ngày</th><th>Loại xe</th><th>Hành động</th>
                   </tr>
                 </thead>
                 <tbody id="dh_listBody"></tbody>
@@ -801,7 +809,7 @@
                 <table>
                   <thead>
                     <tr>
-                      <th>Mã CT</th><th>Số phiếu</th><th>Ngày cân 1</th><th>Số xe</th><th>Biển số 2</th><th>Khách hàng</th>
+                      <th>Mã CT</th><th>Số phiếu</th><th class="ngay">Ngày cân 1</th><th>Số xe</th><th>Biển số 2</th><th>Khách hàng</th>
                       <th class="num">KL Hàng (kg)</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th>
                       <th>Tình trạng thanh toán</th><th></th>
                     </tr>
@@ -851,7 +859,7 @@
                 <table>
                   <thead>
                     <tr>
-                      <th>Mã CT</th><th>Ngày cân</th><th>Mã đơn giá</th><th>Mã KL</th>
+                      <th>Mã CT</th><th class="ngay">Ngày cân</th><th>Mã đơn giá</th><th>Mã KL</th>
                       <th class="num">Giá gốc (ĐG_AD)</th><th class="num">Điều chỉnh</th><th class="num">Đơn giá áp dụng</th>
                       <th>Diễn giải đơn giá</th><th>Trạng thái giá</th><th class="num">Thành tiền</th>
                     </tr>
@@ -914,7 +922,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Mã CT</th><th>Ngày</th><th>Số xe</th><th class="num">KL (Tấn)</th>
+                    <th>Mã CT</th><th class="ngay">Ngày</th><th>Số xe</th><th class="num">KL (Tấn)</th>
                     <th class="num">Đơn giá</th><th class="num">Thành tiền</th><th>Tên NCC</th>
                     <th>Trạng thái ĐNTT</th><th></th>
                   </tr>
@@ -967,7 +975,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Số xe</th>
+                    <th>Số phiếu</th><th class="ngay">Ngày giờ cân 1</th><th>Số xe</th>
                     <th class="num">KL Hàng (Kg)</th><th class="num">KL (Tấn)</th>
                     <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Số TKHQ</th><th>Kho xuất</th><th>Kho nhập</th><th></th>
                   </tr>
@@ -1006,7 +1014,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Ngày đơn hàng</th><th>Số TKHQ</th><th>Tàu</th><th>Khách hàng</th><th>Tên hàng hóa</th>
+                    <th class="ngay">Ngày đơn hàng</th><th>Số TKHQ</th><th>Tàu</th><th>Khách hàng</th><th>Tên hàng hóa</th>
                     <th class="num">Đơn giá (USD)</th><th class="num">KL_MT</th><th class="num">KL_BDMT</th>
                     <th class="num">Thành tiền (USD)</th><th>Kho xuất</th>
                   </tr>
@@ -1072,7 +1080,7 @@
                 <thead>
                   <tr>
                     <th class="chi-ghi" style="width:34px;text-align:center;"><input type="checkbox" id="tcn_chonTatCa" title="Chọn tất cả phiếu chưa đóng thanh toán đang hiển thị"></th>
-                    <th>Mã chứng từ</th><th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Biển số</th><th>Khách hàng</th>
+                    <th>Mã chứng từ</th><th>Số phiếu</th><th class="ngay">Ngày giờ cân 1</th><th>Biển số</th><th>Khách hàng</th>
                     <th>Đại lý</th><th>Nguồn gốc</th><th>Hình ảnh</th><th class="num">KL Hàng (Kg)</th><th class="num">Thành tiền</th><th>Trạng thái giá</th><th>Thanh toán</th><th>Nơi lưu</th><th></th>
                   </tr>
                 </thead>
@@ -1113,7 +1121,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Số phiếu</th><th>Ngày giờ cân 1</th><th>Biển số</th><th class="num">KL Hàng (Kg)</th><th class="num">KL (Tấn)</th>
+                    <th>Số phiếu</th><th class="ngay">Ngày giờ cân 1</th><th>Biển số</th><th class="num">KL Hàng (Kg)</th><th class="num">KL (Tấn)</th>
                     <th>Đơn vị vận chuyển</th><th>Tên tài xế</th><th>Số TKHQ</th><th>Kho xuất</th><th>Kho nhập</th><th></th>
                   </tr>
                 </thead>
@@ -1222,7 +1230,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Số báo giá</th><th>Ngày báo giá</th><th>Hiệu lực</th><th>Sao chép từ</th>
+                    <th>Số báo giá</th><th class="ngay">Ngày báo giá</th><th class="ngay">Hiệu lực</th><th>Sao chép từ</th>
                     <th class="num">Số nhóm giá</th><th></th>
                   </tr>
                 </thead>
@@ -1258,7 +1266,7 @@
                   <tr>
                     <th><input type="checkbox" id="bg_checkHeader" checked></th>
                     <th>Mã</th><th>Diễn giải</th><th class="num">KL Min</th><th class="num">KL Max</th>
-                    <th class="num">Đơn giá</th><th>Từ ngày</th><th>Đến ngày</th><th>Trạng thái</th><th>Hành động</th>
+                    <th class="num">Đơn giá</th><th class="ngay">Từ ngày</th><th class="ngay">Đến ngày</th><th>Trạng thái</th><th>Hành động</th>
                   </tr>
                 </thead>
                 <tbody id="bg_hieuLucBody"></tbody>
@@ -1326,7 +1334,7 @@
             <h2>Danh mục hiện có <span class="tag" id="bg_maKLCount">0 mã</span></h2>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Mã khối lượng</th><th class="num">KL Min (Tấn)</th><th class="num">KL Max (Tấn)</th><th>Ngày tạo</th><th></th></tr></thead>
+                <thead><tr><th>Mã khối lượng</th><th class="num">KL Min (Tấn)</th><th class="num">KL Max (Tấn)</th><th class="ngay">Ngày tạo</th><th></th></tr></thead>
                 <tbody id="bg_maKLBody"></tbody>
               </table>
             </div>
@@ -1811,7 +1819,7 @@
             <div id="nk_tomTat" style="font-size:12.5px;color:var(--ink-soft);margin:6px 0;"></div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th style="white-space:nowrap;">Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Nội dung</th></tr></thead>
+                <thead><tr><th class="ngay">Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Nội dung</th></tr></thead>
                 <tbody id="nk_body"><tr><td colspan="5" class="empty-state">Bấm "Lọc" để xem nhật ký.</td></tr></tbody>
               </table>
             </div>
@@ -1891,7 +1899,128 @@
       const tz = new Date(d.getTime() - d.getTimezoneOffset()*60000);
       return tz.toISOString().slice(0,10);
     }
-    function fmtNum(n){ return Math.round(n||0).toLocaleString('vi-VN'); }
+    // ---------------------------------------------------------------
+    // ĐỊNH DẠNG THEO LOCALE HỆ THỐNG (Hệ thống › Cấu hình: VN = 1.234,5 · dd/MM/yyyy;
+    // US = 1,234.5 · MM/dd/yyyy). Quy tắc hiển thị: số có phân cách + canh PHẢI (.num),
+    // chữ canh TRÁI, ngày canh GIỮA (.ngay).
+    // ---------------------------------------------------------------
+    const MIEN_HT = (<?!= mienHeThongJson ?>) === 'US' ? 'US' : 'VN';
+    const LOCALE_HT = MIEN_HT === 'US' ? 'en-US' : 'vi-VN';
+    const SEP_TP = MIEN_HT === 'US' ? '.' : ',';   // dấu thập phân
+    const SEP_NGHIN = MIEN_HT === 'US' ? ',' : '.'; // dấu phân cách hàng nghìn
+    function fmtNum(n){ return Math.round(Number(n)||0).toLocaleString(LOCALE_HT); }
+    // Số có đúng soLe chữ số thập phân (VD khối lượng tấn, độ khô).
+    function fmtSoLe(n, soLe){ return (Number(n)||0).toLocaleString(LOCALE_HT, { minimumFractionDigits: soLe, maximumFractionDigits: soLe }); }
+    // Tỷ lệ 0..1 -> "39,45%" (VN) / "39.45%" (US).
+    function fmtPT(v, soLe){ return (v === null || v === undefined || v === '') ? '—' : fmtSoLe(Number(v) * 100, soLe == null ? 1 : soLe) + '%'; }
+    // Ngày/giờ máy chủ gửi dạng chuẩn nội bộ "dd/MM/yyyy[ HH:mm[:ss]]" hoặc "yyyy-MM-dd[ HH:mm]"
+    // -> hiển thị theo Locale hệ thống. Chuỗi khác giữ nguyên. Đổi được cả ngày nằm giữa câu
+    // (VD "Từ: 2026-01-01 00:00 - Đến: ...").
+    function ngayHT(s){
+      if (s === null || s === undefined) return '';
+      const us = MIEN_HT === 'US';
+      // 1 lượt thay duy nhất (tránh đổi 2 lần 1 ngày đã đổi ở kiểu US).
+      return String(s).replace(/\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\/(\d{2})\/(\d{4})\b/g, (m, y, mo, d, d2, mo2, y2) => {
+        if (y) return us ? mo + '/' + d + '/' + y : d + '/' + mo + '/' + y;
+        return us ? mo2 + '/' + d2 + '/' + y2 : m;
+      });
+    }
+    // Ô bảng ngày (canh giữa) / số (canh phải).
+    function tdNgay(s){ return '<td class="ngay">' + escapeHtml(ngayHT(s)) + '</td>'; }
+
+    // Ô NHẬP SỐ có phân cách hàng nghìn theo Locale: mọi <input type="number"> (kể cả vẽ
+    // sau bằng JS) được tự nâng cấp thành ô chữ canh phải, gõ tới đâu thêm phân cách tới
+    // đó. ".value" của ô VẪN đọc/ghi SỐ CHUẨN ("27020.5") nên toàn bộ code cũ (parseFloat,
+    // gửi máy chủ, gán lại khi sửa) giữ nguyên hành vi. Số chữ số lẻ tối đa lấy theo
+    // thuộc tính step (0.01 -> 2, 0.0001 -> 4), không có step -> tối đa 3.
+    const _GIA_TRI_GOC = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    function soChuanTuHienThi(t){
+      t = String(t || '').trim();
+      if (!t) return '';
+      const am = t.charAt(0) === '-';
+      t = t.split(SEP_NGHIN).join('').split(SEP_TP).join('.').replace(/[^0-9.]/g, '');
+      if (t === '' || t === '.') return '';
+      if (t.charAt(t.length - 1) === '.') t = t.slice(0, -1);
+      return (am ? '-' : '') + t;
+    }
+    function hienThiTuPhan(am, nguyen, coTP, le){
+      nguyen = nguyen.replace(/^0+(?=\d)/, '');
+      const nhom = nguyen.replace(/\B(?=(\d{3})+(?!\d))/g, SEP_NGHIN);
+      return (am ? '-' : '') + nhom + (coTP ? SEP_TP + le : '');
+    }
+    function hienThiTuSoChuan(v, soLeToiDa){
+      if (v === '' || v === null || v === undefined) return '';
+      const str = String(v).trim();
+      if (!/^-?\d*(\.\d*)?$/.test(str) || str === '' || str === '-') {
+        const n = Number(str); if (isNaN(n)) return str; return hienThiTuSoChuan(String(n), soLeToiDa);
+      }
+      const am = str.charAt(0) === '-';
+      const phan = str.replace('-', '').split('.');
+      const le = (phan[1] || '').slice(0, soLeToiDa);
+      return hienThiTuPhan(am, phan[0] || '0', le.length > 0, le);
+    }
+    function nangCapOSo(el){
+      if (el.__oSo) return;
+      el.__oSo = true;
+      const step = el.getAttribute('step');
+      el.__soLe = step && step.indexOf('.') !== -1 ? step.split('.')[1].length : (el.hasAttribute('data-so-le') ? parseInt(el.getAttribute('data-so-le'), 10) : 3);
+      const giaTriDau = _GIA_TRI_GOC.get.call(el);
+      if (el.type === 'number') el.type = 'text';
+      el.setAttribute('inputmode', el.__soLe > 0 ? 'decimal' : 'numeric');
+      el.setAttribute('autocomplete', 'off');
+      el.classList.add('o-so');
+      const ph = el.getAttribute('placeholder');
+      if (ph && MIEN_HT === 'VN') el.setAttribute('placeholder', ph.replace(/(\d)\.(\d)/g, '$1,$2'));
+      Object.defineProperty(el, 'value', {
+        configurable: true,
+        get(){ return soChuanTuHienThi(_GIA_TRI_GOC.get.call(this)); },
+        set(v){ _GIA_TRI_GOC.set.call(this, hienThiTuSoChuan(v, this.__soLe)); }
+      });
+      el.value = giaTriDau; // hiển thị lại giá trị có sẵn (value="3.15") theo Locale
+    }
+    function nangCapCacOSo(goc){
+      (goc || document).querySelectorAll('input[type="number"], input[data-so]').forEach(nangCapOSo);
+    }
+    // Gõ phím: VN gõ "." khi chưa có dấu thập phân -> hiểu là dấu thập phân ","; phím
+    // phân cách hàng nghìn tự gõ bị bỏ qua (hệ thống tự chèn).
+    document.addEventListener('keydown', e=>{
+      const el = e.target;
+      if (!el || !el.__oSo || el.readOnly || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === SEP_NGHIN || (e.key === '.' && MIEN_HT === 'VN')) {
+        const ht = _GIA_TRI_GOC.get.call(el);
+        e.preventDefault();
+        if (el.__soLe > 0 && ht.indexOf(SEP_TP) === -1) {
+          const a = el.selectionStart, b = el.selectionEnd;
+          _GIA_TRI_GOC.set.call(el, ht.slice(0, a) + SEP_TP + ht.slice(b));
+          el.setSelectionRange(a + 1, a + 1);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    }, true);
+    // Định dạng lại ngay khi gõ (chạy TRƯỚC các trình xử lý "input" riêng của từng ô).
+    document.addEventListener('input', e=>{
+      const el = e.target;
+      if (!el || !el.__oSo) return;
+      const ht = _GIA_TRI_GOC.get.call(el);
+      const viTri = el.selectionStart == null ? ht.length : el.selectionStart;
+      const dem = s2 => s2.replace(new RegExp('[^0-9' + (SEP_TP === '.' ? '\\.' : SEP_TP) + '-]', 'g'), '').length;
+      const truocCon = dem(ht.slice(0, viTri));
+      const am = ht.trim().charAt(0) === '-';
+      let sach = ht.replace(new RegExp('[^0-9' + (SEP_TP === '.' ? '\\.' : SEP_TP) + ']', 'g'), '');
+      const iTP = sach.indexOf(SEP_TP);
+      const coTP = el.__soLe > 0 && iTP !== -1;
+      const nguyen = (iTP === -1 ? sach : sach.slice(0, iTP)).split(SEP_TP).join('');
+      const le = coTP ? sach.slice(iTP + 1).split(SEP_TP).join('').slice(0, el.__soLe) : '';
+      const moi = (nguyen === '' && !coTP) ? (am ? '-' : '') : hienThiTuPhan(am, nguyen === '' ? '0' : nguyen, coTP, le);
+      if (moi === ht) return;
+      _GIA_TRI_GOC.set.call(el, moi);
+      let dat = 0, k = 0;
+      while (dat < moi.length && k < truocCon) { if (dem(moi.charAt(dat))) k++; dat++; }
+      try { el.setSelectionRange(dat, dat); } catch(err) {}
+    }, true);
+    new MutationObserver(ds => ds.forEach(d => d.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.matches && n.matches('input[type="number"], input[data-so]')) nangCapOSo(n); else nangCapCacOSo(n); } })))
+      .observe(document.documentElement, { childList: true, subtree: true });
+    nangCapCacOSo(document);
     function showOverlay(text){ document.getElementById('overlayText').textContent = text || 'Đang xử lý…'; document.getElementById('overlay').classList.add('show'); }
     function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
     function toast(msg, ok){
@@ -2293,7 +2422,7 @@
         if (res.status !== 'success') { toast(res.message, false); return; }
         const d = res.data;
 
-        document.getElementById('dash_capNhatLuc').textContent = '· Cập nhật lúc ' + d.capNhatLuc;
+        document.getElementById('dash_capNhatLuc').textContent = '· Cập nhật lúc ' + ngayHT(d.capNhatLuc);
         document.getElementById('dash_homNaySoLuong').textContent = fmtNum(d.homNay.soLuong);
         document.getElementById('dash_homNayKL').textContent = fmtNum(d.homNay.tongKL);
         document.getElementById('dash_homNayTien').textContent = fmtNum(d.homNay.tongTien);
@@ -2319,7 +2448,7 @@
           chartEl.innerHTML = d.bieuDoTheoNgay.map(x => {
             const ngayThang = x.ngay.split('/')[0]; // chỉ hiện số ngày (dd) cho gọn, đủ chỗ trong tháng
             const heightPct = Math.max(2, Math.round(x.tongTien / max * 100));
-            const tooltip = 'Ngày ' + x.ngay + ': ' + x.soPhieu + ' phiếu, ' + fmtNum(x.tongKL) + ' kg, ' + fmtNum(x.tongTien) + ' đ';
+            const tooltip = 'Ngày ' + ngayHT(x.ngay) + ': ' + x.soPhieu + ' phiếu, ' + fmtNum(x.tongKL) + ' kg, ' + fmtNum(x.tongTien) + ' đ';
             return '<div class="bar-col" title="' + escapeHtml(tooltip) + '">'
               + '<div class="bar" style="height:' + heightPct + '%;"></div>'
               + '<div class="bar-day">' + escapeHtml(ngayThang) + '</div>'
@@ -2516,10 +2645,10 @@
           + '<td class="mono">'+escapeHtml(r.uniqueKey)+'</td>'
           + '<td>'+escapeHtml(r.soPhieu)+'</td>'
           + '<td>'+escapeHtml(r.soXe)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan1)+'</td>'
-          + '<td>'+escapeHtml(r.gioCan1)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan2)+'</td>'
-          + '<td>'+escapeHtml(r.gioCan2)+'</td>'
+          + tdNgay(r.ngayCan1)
+          + tdNgay(r.gioCan1)
+          + tdNgay(r.ngayCan2)
+          + tdNgay(r.gioCan2)
           + '<td class="num">'+fmtNum(r.klCan1)+'</td>'
           + '<td class="num">'+fmtNum(r.klCan2)+'</td>'
           + '<td class="num">'+fmtNum(r.klHangGoc)+'</td>'
@@ -2636,7 +2765,7 @@
         return '<tr>'
           + '<td class="mono">'+escapeHtml(r.maChungTu)+'</td>'
           + '<td>'+escapeHtml(r.soPhieu)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan1)+'</td>'
+          + tdNgay(r.ngayCan1)
           + '<td>'+escapeHtml(r.soXe)+'</td>'
           + '<td>'+(r.soXe2 ? escapeHtml(r.soXe2) : '—')+'</td>'
           + '<td>'+escapeHtml(r.khachHang)+'</td>'
@@ -2713,7 +2842,7 @@
         else if (r.trangThaiGia) badgeClass = 'badge-warn';
         return '<tr>'
           + '<td class="mono">'+escapeHtml(r.maChungTu)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan1)+'</td>'
+          + tdNgay(r.ngayCan1)
           + '<td class="mono">'+escapeHtml(r.maDonGia)+'</td>'
           + '<td class="mono">'+(r.maKL ? escapeHtml(r.maKL) : '—')+'</td>'
           + '<td class="num">'+fmtNum(r.giaGoc)+'</td>'
@@ -2759,7 +2888,7 @@
     // Cửa sổ chi tiết dùng chung cho màn Tra cứu và nút "🔍 Chi tiết" trong các
     // báo cáo phiếu cân (nhập qua cân, nhập Misa, xuất qua cân).
     // ---------------------------------------------------------------
-    function fmtSo(n){ return Number(n||0).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
+    function fmtSo(n){ return Number(n||0).toLocaleString(LOCALE_HT, { maximumFractionDigits: 3 }); }
     function ngayTruocStr(soNgay){
       const d = new Date(Date.now() - soNgay*86400000);
       return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -2832,7 +2961,7 @@
             + '<td class="chi-ghi tc-o-chon" style="text-align:center;">' + (r.choSua ? '<input type="checkbox" class="tc-chon" value="' + escapeHtml(r.maChungTu) + '"' + (state.tcChon.has(r.maChungTu) ? ' checked' : '') + '>' : '') + '</td>'
             + '<td class="mono">' + escapeHtml(r.maChungTu) + '</td>'
             + '<td>' + escapeHtml(r.soPhieu) + '</td>'
-            + '<td>' + escapeHtml(r.ngayGioCan1) + '</td>'
+            + tdNgay(r.ngayGioCan1)
             + '<td>' + escapeHtml(r.soXe) + '</td>'
             + '<td>' + escapeHtml(r.khachHang) + '</td>'
             + '<td>' + escapeHtml(r.daiLy) + '</td>'
@@ -2903,7 +3032,7 @@
         if (!res.data.length) { body.innerHTML = '<tr><td colspan="11" class="empty-state">Không tìm thấy phiếu cân xuất nào.</td></tr>'; return; }
         veBangTheoLo(body, res.data, r=>(
           '<tr data-tc-mo data-tc-xuat-dong="' + escapeHtml(r.soPhieu) + '" data-tc-ts="' + (Number(r.ts)||0) + '">'
-          + '<td class="mono">' + escapeHtml(r.soPhieu) + '</td><td>' + escapeHtml(r.ngayGioCan1) + '</td><td>' + escapeHtml(r.bienSo) + '</td>'
+          + '<td class="mono">' + escapeHtml(r.soPhieu) + '</td>' + tdNgay(r.ngayGioCan1) + '<td>' + escapeHtml(r.bienSo) + '</td>'
           + '<td class="num">' + fmtNum(r.klHang) + '</td><td class="num">' + fmtSo(r.khoiLuongTan) + '</td>'
           + '<td>' + escapeHtml(r.donViVanChuyen) + '</td><td>' + escapeHtml(r.tenTaiXe) + '</td>'
           + '<td>' + (r.soTKHQ ? escapeHtml(r.soTKHQ) : '—') + '</td>'
@@ -2934,13 +3063,14 @@
       if (v === '' || v == null) return '<span style="color:var(--ink-soft);">—</span>';
       if (typeof v === 'number') return /cân lần|kl|khối lượng|giá|tiền|giảm/i.test(ten) ? fmtSo(v) : escapeHtml(String(v));
       const s = String(v);
+      if (/^\d{2}\/\d{2}\/\d{4}( \d{2}:\d{2}(:\d{2})?)?$/.test(s)) return escapeHtml(ngayHT(s)); // ngày theo Locale hệ thống
       if (/^https?:\/\/\S+$/i.test(s)) return '<a href="' + escapeHtml(s) + '" target="_blank" rel="noopener">Mở liên kết ↗</a>';
       return escapeHtml(s);
     }
     function tcBangTruongHtml(truong){
       return '<h3 style="font-size:14px;margin:4px 0 8px;">Toàn bộ thông tin trên sheet</h3>'
         + '<table class="tc-bang-truong"><tbody>'
-        + truong.map(t=>'<tr><th>' + escapeHtml(t[0]) + '</th><td>' + tcGiaTriTruong(t[0], t[1]) + '</td></tr>').join('')
+        + truong.map(t=>'<tr><th>' + escapeHtml(t[0]) + '</th><td' + (typeof t[1] === 'number' ? ' class="num"' : (/^\d{2}\/\d{2}\/\d{4}/.test(String(t[1])) || /^\d{2}:\d{2}:\d{2}$/.test(String(t[1])) ? ' class="ngay"' : '')) + '>' + tcGiaTriTruong(t[0], t[1]) + '</td></tr>').join('')
         + '</tbody></table>';
     }
     function tcMoModal(tieuDe, phu, html, maIn){
@@ -2966,7 +3096,7 @@
         const d = res.data, t = d.tomTat;
         const html = tcTheHtml([
           ['Số phiếu', t.soPhieu], ['Mã chứng từ', d.maChungTu], ['Biển số', t.soXe],
-          ['Ngày giờ cân 1', t.ngayGioCan1], ['Ngày giờ cân 2', t.ngayGioCan2], ['Khách hàng', t.khachHang],
+          ['Ngày giờ cân 1', ngayHT(t.ngayGioCan1)], ['Ngày giờ cân 2', ngayHT(t.ngayGioCan2)], ['Khách hàng', t.khachHang],
           ['Đại lý', t.daiLy], ['Nguồn gốc', t.nguonGoc], ['Hình ảnh', t.hinhAnh === 'N' ? 'Không hình ảnh (N)' : 'Có hình ảnh (Y)'], ['Mã đơn giá', t.maDonGia],
           ['Cân lần 1 (Kg)', fmtSo(t.klCan1)], ['Cân lần 2 (Kg)', fmtSo(t.klCan2)], ['KL hàng (Kg)', fmtSo(t.klHang), true],
           ['Đơn giá', fmtSo(t.donGia)], ['Thành tiền', fmtNum(t.thanhTien), true], ['Trạng thái giá', t.trangThaiGia],
@@ -2983,7 +3113,7 @@
         const d = res.data, t = d.tomTat;
         const html = tcTheHtml([
           ['Số phiếu', t.soPhieu], ['Biển số', t.bienSo], ['Đơn vị vận chuyển', t.donViVanChuyen],
-          ['Ngày giờ cân 1', t.ngayGioCan1], ['Ngày giờ cân 2', t.ngayGioCan2], ['Tên tài xế', t.tenTaiXe],
+          ['Ngày giờ cân 1', ngayHT(t.ngayGioCan1)], ['Ngày giờ cân 2', ngayHT(t.ngayGioCan2)], ['Tên tài xế', t.tenTaiXe],
           ['Cân lần 1 (Kg)', fmtSo(t.canLan1)], ['Cân lần 2 (Kg)', fmtSo(t.canLan2)], ['KL hàng (Kg)', fmtSo(t.klHang), true],
           ['Khối lượng (Tấn)', fmtSo(t.khoiLuongTan), true], ['Số TKHQ', t.soTKHQ], ['Kho xuất', t.khoXuat], ['Kho nhập', t.khoNhap]
         ]) + tcBangTruongHtml(d.truong);
@@ -3102,7 +3232,7 @@
     }
     function renderMisa(res){
       document.getElementById('ms_sumSoLuong').textContent = res.summary.soLuong;
-      document.getElementById('ms_sumKL').textContent = fmtNum(res.summary.tongKL);
+      document.getElementById('ms_sumKL').textContent = fmtSoLe(res.summary.tongKL, 2);
       document.getElementById('ms_sumTien').textContent = fmtNum(res.summary.tongTien);
       const body = document.getElementById('ms_tableBody');
       if (res.data.length === 0){
@@ -3113,9 +3243,9 @@
         const badgeClass = r.trangThaiThanhToan === 'Đã lập ĐNTT' ? 'badge-ok' : 'badge-warn';
         return '<tr>'
           + '<td class="mono">'+escapeHtml(r.maChungTu)+'</td>'
-          + '<td>'+escapeHtml(r.ngay)+'</td>'
+          + tdNgay(r.ngay)
           + '<td>'+escapeHtml(r.soXe)+'</td>'
-          + '<td class="num">'+fmtNum(r.khoiLuong)+'</td>'
+          + '<td class="num">'+fmtSo(r.khoiLuong)+'</td>'
           + '<td class="num">'+fmtNum(r.donGia)+'</td>'
           + '<td class="num">'+fmtNum(r.thanhTien)+'</td>'
           + '<td>'+escapeHtml(r.tenNCC)+'</td>'
@@ -3228,8 +3358,8 @@
           : '<span class="badge badge-neutral" title="'+escapeHtml(q.reason || 'Không thể xóa')+'" style="cursor:help;">🔒 Đã khóa</span>';
         return '<tr>'
           + '<td class="mono">'+escapeHtml(q.soBaoGia)+'</td>'
-          + '<td>'+escapeHtml(q.ngayBaoGia)+'</td>'
-          + '<td>'+escapeHtml(q.hieuLuc)+'</td>'
+          + tdNgay(q.ngayBaoGia)
+          + tdNgay(q.hieuLuc)
           + '<td>'+(q.idTam ? escapeHtml(q.idTam) : '—')+'</td>'
           + '<td class="num">'+q.soNhom+'</td>'
           + '<td>'+actionCell+'</td>'
@@ -3275,7 +3405,7 @@
       hint.style.display = isEmpty ? 'none' : 'block';
 
       sel.innerHTML = '<option value="">-- Không sao chép, nhập mới hoàn toàn --</option>' +
-        state.bgQuoteList.map(q => '<option value="'+escapeHtml(q.soBaoGia)+'">'+escapeHtml(q.soBaoGia)+' · hiệu lực '+escapeHtml(q.hieuLuc)+'</option>').join('');
+        state.bgQuoteList.map(q => '<option value="'+escapeHtml(q.soBaoGia)+'">'+escapeHtml(q.soBaoGia)+' · hiệu lực '+escapeHtml(ngayHT(q.hieuLuc))+'</option>').join('');
     }
 
     // ---------- Nhóm giá: thêm / xóa / tách / đồng bộ DOM <-> state ----------
@@ -3334,7 +3464,7 @@
     function bgKLOptionsHtml(selected){
       return '<option value="">-- Chọn --</option>' + state.bgMaKLList.map(k=>{
         const sel = k.maKL === selected ? ' selected' : '';
-        return '<option value="'+escapeHtml(k.maKL)+'"'+sel+'>'+escapeHtml(k.maKL)+' ('+(k.klMinKg/1000)+' - '+(k.klMaxKg/1000)+' Tấn)</option>';
+        return '<option value="'+escapeHtml(k.maKL)+'"'+sel+'>'+escapeHtml(k.maKL)+' ('+fmtSo(k.klMinKg/1000)+' - '+fmtSo(k.klMaxKg/1000)+' Tấn)</option>';
       }).join('');
     }
 
@@ -3619,8 +3749,8 @@
       const body = document.getElementById('bg_maKLBody');
       if (state.bgMaKLList.length === 0){ body.innerHTML = '<tr><td colspan="5" class="empty-state">Danh mục trống.</td></tr>'; return; }
       body.innerHTML = state.bgMaKLList.map(k=>(
-        '<tr><td class="mono">'+escapeHtml(k.maKL)+'</td><td class="num">'+fmtNum(k.klMinKg/1000)+'</td>'
-        + '<td class="num">'+fmtNum(k.klMaxKg/1000)+'</td><td>'+escapeHtml(k.timestamp)+'</td>'
+        '<tr><td class="mono">'+escapeHtml(k.maKL)+'</td><td class="num">'+fmtSo(k.klMinKg/1000)+'</td>'
+        + '<td class="num">'+fmtSo(k.klMaxKg/1000)+'</td>'+tdNgay(k.timestamp)
         + '<td><button class="btn btn-danger btn-sm" data-delkl="'+escapeHtml(k.maKL)+'">Xóa</button></td></tr>'
       )).join('');
       body.querySelectorAll('[data-delkl]').forEach(btn=>{
@@ -3711,8 +3841,8 @@
         return '<tr>'
           + '<td><input type="checkbox" class="bg-row-check" data-id="'+escapeHtml(r.id)+'"'+isChecked+'></td>'
           + '<td class="mono">'+escapeHtml(r.ma)+'</td><td>'+escapeHtml(r.dienGiai)+'</td>'
-          + '<td class="num">'+fmtNum(r.klMin)+'</td><td class="num">'+fmtNum(r.klMax)+'</td>'
-          + '<td class="num">'+fmtNum(r.gia)+'</td><td>'+escapeHtml(r.tuNgay)+'</td><td>'+escapeHtml(r.denNgay)+'</td>'
+          + '<td class="num">'+fmtSo(r.klMin)+'</td><td class="num">'+fmtSo(r.klMax)+'</td>'
+          + '<td class="num">'+fmtNum(r.gia)+'</td>'+tdNgay(r.tuNgay)+tdNgay(r.denNgay)
           + '<td><span class="badge '+badgeClass+'">'+escapeHtml(r.trangThai)+'</span>'+daApDungBadge+'</td>'
           + '<td>'+actionCell+'</td>'
           + '</tr>';
@@ -3891,8 +4021,8 @@
         return `<option value="${safeN}">${safeN}</option>`;
       }).join('');
 
-      let fmtSo = (n) => (n || 0).toLocaleString('vi-VN', {minimumFractionDigits:2, maximumFractionDigits:2});
-      let fmtDoKho = (v) => (v === null || v === undefined) ? '—' : (v * 100).toFixed(1) + '%';
+      let fmtSo = (n) => fmtSoLe(n, 2);
+      let fmtDoKho = (v) => fmtPT(v, 1);
 
       let rowsHTML = chiTiet.length === 0 ? '<tr><td colspan="9">Không có kho hoặc dữ liệu phù hợp bộ lọc.</td></tr>' : chiTiet.map(function(k, idx) {
         let mauTon = k.tonCuoiBDMT < 0 ? '#dc2626' : '#16a34a';
@@ -3919,11 +4049,11 @@
               <div class="grid-2">
                 <div>
                   <label style="font-weight:bold; color:#2563eb;">📥 Nhập trong kỳ theo hình thức</label>
-                  <table class="dokho-table"><tr><th>Hình thức</th><th>Tươi (MT)</th><th>Khô (BDMT)</th></tr>${nhapCT}</table>
+                  <table class="dokho-table"><tr><th>Hình thức</th><th class="num">Tươi (MT)</th><th class="num">Khô (BDMT)</th></tr>${nhapCT}</table>
                 </div>
                 <div>
                   <label style="font-weight:bold; color:#dc2626;">📤 Xuất trong kỳ theo hình thức</label>
-                  <table class="dokho-table"><tr><th>Hình thức</th><th>Tươi (MT)</th><th>Khô (BDMT)</th></tr>${xuatCT}</table>
+                  <table class="dokho-table"><tr><th>Hình thức</th><th class="num">Tươi (MT)</th><th class="num">Khô (BDMT)</th></tr>${xuatCT}</table>
                 </div>
               </div>
             </td>
@@ -3942,7 +4072,7 @@
             <select id="baocaoTenKho" style="width:180px;">${khoOptions}</select>
             <button class="nav-btn" style="background:#2563eb; color:#fff;" onclick="taiBaoCaoTonKho()">Lọc Dữ Liệu</button>
           </div>
-          <p style="font-size:12px; color:#6b7280; margin:0;">Kỳ báo cáo: <b>${tuNgay}</b> → <b>${denNgay}</b>. Bấm "🔍 Chi tiết" để xem nhập/xuất theo từng hình thức của mỗi kho.</p>
+          <p style="font-size:12px; color:#6b7280; margin:0;">Kỳ báo cáo: <b>${escapeHtml(ngayHT(tuNgay))}</b> → <b>${escapeHtml(ngayHT(denNgay))}</b>. Bấm "🔍 Chi tiết" để xem nhập/xuất theo từng hình thức của mỗi kho.</p>
           <div style="max-height: 550px; overflow-y: auto;">
             <table class="dokho-table">
               <tr><th>Nhà máy</th><th>Kho</th><th>Tồn đầu kỳ</th><th>Nhập trong kỳ</th><th>Xuất trong kỳ</th><th>Tồn cuối kỳ</th><th>Thao tác</th></tr>
@@ -3997,7 +4127,7 @@
         return `<option value="${safeK}">${safeK}</option>`;
       }).join('');
 
-      let fmtSo = (n) => (n || 0).toLocaleString('vi-VN', {minimumFractionDigits:2, maximumFractionDigits:2});
+      let fmtSo = (n) => fmtSoLe(n, 2);
 
       let rowsHTML = chiTiet.length === 0 ? '<tr><td colspan="7">Không có dữ liệu trong khoảng thời gian đã chọn.</td></tr>' : chiTiet.map(k => {
         let mauCL = k.chenhLechBDMT < 0 ? '#dc2626' : '#16a34a';
@@ -4022,7 +4152,7 @@
             <select id="bcKyTenKho" style="width:180px;">${khoOptions}</select>
             <button class="nav-btn" style="background:#2563eb; color:#fff;" onclick="taiBaoCaoTheoKyVetBai()">Lọc Dữ Liệu</button>
           </div>
-          <p style="font-size:12px; color:#6b7280; margin:0;">Kỳ báo cáo: <b>${tuNgay}</b> → <b>${denNgay}</b>. Gộp theo cột "Đợt vét bãi" của từng phiếu.</p>
+          <p style="font-size:12px; color:#6b7280; margin:0;">Kỳ báo cáo: <b>${escapeHtml(ngayHT(tuNgay))}</b> → <b>${escapeHtml(ngayHT(denNgay))}</b>. Gộp theo cột "Đợt vét bãi" của từng phiếu.</p>
           <div style="max-height: 550px; overflow-y: auto;">
             <table class="dokho-table">
               <tr><th>Kỳ Vét Bãi</th><th>Tổng Nhập</th><th>Số phiếu Nhập</th><th>Tổng Xuất</th><th>Số phiếu Xuất</th><th>Chênh lệch (Nhập - Xuất)</th></tr>
@@ -4056,7 +4186,7 @@
           danhSach = danhSach || [];
           let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có danh mục kho nào</td></tr>' : danhSach.map(item => {
             let safeMaKho = jsAttr(item.maKho);
-            return `<tr><td><b>${escapeHtml(item.tenNhaMay)}</b></td><td>${escapeHtml(item.tenKho)}</td><td>${escapeHtml(item.ngayKhoiTao)}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKho('${safeMaKho}')">Xóa</button></td></tr>`;
+            return `<tr><td><b>${escapeHtml(item.tenNhaMay)}</b></td><td>${escapeHtml(item.tenKho)}</td><td class="ngay">${escapeHtml(ngayHT(item.ngayKhoiTao))}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKho('${safeMaKho}')">Xóa</button></td></tr>`;
           }).join('');
           renderScreen(`
             <div class="form-container">
@@ -4071,7 +4201,7 @@
                 </div>
                 <div>
                   <label style="font-weight:bold;">DANH SÁCH KHO HIỆN TẠI</label>
-                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table"><tr><th>Nhà Máy</th><th>Tên Kho</th><th>Ngày</th><th>Xóa</th></tr>${rowsHTML}</table></div>
+                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table"><tr><th>Nhà Máy</th><th>Tên Kho</th><th class="ngay">Ngày</th><th>Xóa</th></tr>${rowsHTML}</table></div>
                 </div>
               </div>
             </div>
@@ -4098,7 +4228,7 @@
       apiRun()
         .withSuccessHandler(function(danhSach) {
           danhSach = danhSach || [];
-          let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có kỳ nào</td></tr>' : danhSach.map(item => item.isLocked ? `<tr class="locked-row"><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td>🔒 Khóa</td></tr>` : `<tr><td><b>${escapeHtml(item.kyVetBai)}</b></td><td>${escapeHtml(item.thoiGian)}</td><td>${escapeHtml(item.tieuHao)}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKy('${jsAttr(item.rowIndex)}')">Xóa</button></td></tr>`).join('');
+          let rowsHTML = danhSach.length === 0 ? '<tr><td colspan="4">Chưa có kỳ nào</td></tr>' : danhSach.map(item => item.isLocked ? `<tr class="locked-row"><td><b>${escapeHtml(item.kyVetBai)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.thoiGian))}</td><td class="num">${escapeHtml(String(item.tieuHao == null ? '' : item.tieuHao).replace(/(\d)\.(\d)/g, '$1' + SEP_TP + '$2'))}</td><td>🔒 Khóa</td></tr>` : `<tr><td><b>${escapeHtml(item.kyVetBai)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.thoiGian))}</td><td class="num">${escapeHtml(String(item.tieuHao == null ? '' : item.tieuHao).replace(/(\d)\.(\d)/g, '$1' + SEP_TP + '$2'))}</td><td><button class="btn-action btn-xoa" onclick="thucHienXoaKy('${jsAttr(item.rowIndex)}')">Xóa</button></td></tr>`).join('');
           renderScreen(`
             <div class="form-container">
               <b>⚙️ QUẢN LÝ KỲ VÉT BÃI</b>
@@ -4112,7 +4242,7 @@
                 </div>
                 <div>
                   <label style="font-weight:bold;">DANH SÁCH KỲ VÉT BÃI</label>
-                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table"><tr><th>Kỳ Bãi</th><th>Thời Gian</th><th>Tiêu Hao</th><th>Thao Tác</th></tr>${rowsHTML}</table></div>
+                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table"><tr><th>Kỳ Bãi</th><th class="ngay">Thời Gian</th><th class="num">Tiêu Hao</th><th>Thao Tác</th></tr>${rowsHTML}</table></div>
                 </div>
               </div>
             </div>
@@ -4158,8 +4288,8 @@
             let safeHinhThuc = jsAttr(item.hinhThuc);
             let safeDoKho = jsAttr(item.doKho);
             return item.isLocked ?
-              `<tr class="locked-row"><td><b>${escapeHtml(item.ngay)}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td>🔒 Khóa</td></tr>` :
-              `<tr><td><b>${escapeHtml(item.ngay)}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td>${(item.doKho * 100).toFixed(1)}%</td><td>${(item.doAm * 100).toFixed(1)}%</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}')">Xóa</button></td></tr>`;
+              `<tr class="locked-row"><td class="ngay"><b>${escapeHtml(ngayHT(item.ngay))}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td class="num">${fmtPT(item.doKho, 1)}</td><td class="num">${fmtPT(item.doAm, 1)}</td><td>🔒 Khóa</td></tr>` :
+              `<tr><td class="ngay"><b>${escapeHtml(ngayHT(item.ngay))}</b></td><td>${escapeHtml(item.hinhThuc)}</td><td class="num">${fmtPT(item.doKho, 1)}</td><td class="num">${fmtPT(item.doAm, 1)}</td><td><button class="btn-action btn-sua" onclick="chonSuaDoKho('${safeNgay}', '${safeHinhThuc}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaDoKho('${safeNgay}')">Xóa</button></td></tr>`;
           }).join('');
 
           let phanTrangHTML = renderPhanTrang(trangHienTai, tongSoTrang, tongSoPhieu,
@@ -4185,7 +4315,7 @@
                 </div>
                 <div>
                   <label style="font-weight:bold;">DANH SÁCH ĐỘ KHÔ</label>
-                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table" id="tableDoKho"><tr><th>Ngày</th><th>Hình thức</th><th>Độ khô</th><th>Độ ẩm</th><th>Thao tác</th></tr>${rowsHTML}</table></div>
+                  <div style="max-height: 250px; overflow-y: auto;"><table class="dokho-table" id="tableDoKho"><tr><th class="ngay">Ngày</th><th>Hình thức</th><th class="num">Độ khô</th><th class="num">Độ ẩm</th><th>Thao tác</th></tr>${rowsHTML}</table></div>
                   ${phanTrangHTML}
                 </div>
               </div>
@@ -4295,11 +4425,11 @@
         let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
         let safeMt = jsAttr(item.mt);
         let safeDoKho = jsAttr(item.doKho);
-        let dkStr = (item.doKho * 100).toFixed(1) + '%';
+        let dkStr = fmtPT(item.doKho, 1);
 
         return item.isLocked ?
-          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` :
-          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td>🔒 Khóa</td></tr>` :
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.hinhThuc)}</td><td>${escapeHtml(item.khoXuat)}->${escapeHtml(item.khoNhap)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('${loai}', '${tab}', '${safeMaPhieu}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -4369,7 +4499,7 @@
               <label style="font-weight:bold;">DANH SÁCH PHIẾU (${tab})</label>
               <div style="max-height: 500px; overflow-y: auto;">
                 <table class="dokho-table" id="tableGiaoDich">
-                  <tr><th>Mã</th><th>Thời gian</th><th>Kỳ bãi</th><th>Hình thức</th><th>Từ->Đến</th><th>Tươi (MT)</th><th>Độ khô</th><th>Nguồn tham chiếu</th><th>Khô (BDMT)</th><th>Thao tác</th></tr>
+                  <tr><th>Mã</th><th class="ngay">Thời gian</th><th>Kỳ bãi</th><th>Hình thức</th><th>Từ->Đến</th><th class="num">Tươi (MT)</th><th class="num">Độ khô</th><th>Nguồn tham chiếu</th><th class="num">Khô (BDMT)</th><th>Thao tác</th></tr>
                   ${rowsHTML}
                 </table>
               </div>
@@ -4391,11 +4521,11 @@
         let dotVetBaiDisplay = escapeHtml(item.dotVetBai || "Mặc định");
         let safeMt = jsAttr(item.mt);
         let safeDoKho = jsAttr(item.doKho);
-        let dkStr = (item.doKho * 100).toFixed(1) + '%';
+        let dkStr = fmtPT(item.doKho, 1);
 
         return item.isLocked ?
-          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td>🔒 Khóa</td></tr>` :
-          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td>${escapeHtml(item.ngay)}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td>${item.mt.toFixed(2)}</td><td>${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td>${item.bdmt.toFixed(2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}')">Xóa</button></td></tr>`;
+          `<tr class="locked-row"><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small>${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td>🔒 Khóa</td></tr>` :
+          `<tr><td><b>${escapeHtml(item.maPhieu)}</b></td><td class="ngay">${escapeHtml(ngayHT(item.ngay))}</td><td>${dotVetBaiDisplay}</td><td>${escapeHtml(item.khoXuat)}</td><td class="num">${fmtSoLe(item.mt, 2)}</td><td class="num">${dkStr}</td><td><small style="color:#2563eb; font-weight:bold;">${escapeHtml(item.nguonDK)}</small></td><td class="num">${fmtSoLe(item.bdmt, 2)}</td><td><button class="btn-action btn-sua" onclick="chonSuaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}', '${safeNgay}', '${safeHinhThuc}', '${safeKhoXuat}', '${safeKhoNhap}', '${safeMt}', '${safeDoKho}')">Sửa</button> <button class="btn-action btn-xoa" onclick="thucHienXoaGiaoDich('XUẤT', 'Xuất bán', '${safeMaPhieu}')">Xóa</button></td></tr>`;
       }).join('');
     }
 
@@ -4443,7 +4573,7 @@
             <label style="font-weight:bold;">DANH SÁCH PHIẾU (Xuất bán) — theo bộ lọc thời gian phía trên</label>
             <div style="max-height: 450px; overflow-y: auto;">
               <table class="dokho-table" id="tableGiaoDichXuatBan">
-                <tr><th>Mã</th><th>Thời gian</th><th>Kỳ bãi</th><th>Kho xuất</th><th>Tươi (MT)</th><th>Độ khô</th><th>Nguồn tham chiếu</th><th>Khô (BDMT)</th><th>Thao tác</th></tr>
+                <tr><th>Mã</th><th class="ngay">Thời gian</th><th>Kỳ bãi</th><th>Kho xuất</th><th class="num">Tươi (MT)</th><th class="num">Độ khô</th><th>Nguồn tham chiếu</th><th class="num">Khô (BDMT)</th><th>Thao tác</th></tr>
                 ${rowsHTML}
               </table>
             </div>
@@ -4488,19 +4618,19 @@
         window._scannedData = res;
 
         if (res.status === "need_dokho_choice") {
-          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Đã quét dữ liệu phiếu cân:<br>- Gỗ keo: <b>${res.tongGoKeo.toLocaleString()} kg</b><br>- Dăm tươi: <b>${res.tongKhoiLuongUot.toLocaleString()} MT</b><br><span style="color:#dc2626;">⚠️ Chưa có độ khô ngày này! Vui lòng chọn nguồn thay thế hoặc tự điền phía trên.</span>`;
+          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Đã quét dữ liệu phiếu cân:<br>- Gỗ keo: <b>${fmtNum(res.tongGoKeo)} kg</b><br>- Dăm tươi: <b>${fmtSoLe(res.tongKhoiLuongUot, 2)} MT</b><br><span style="color:#dc2626;">⚠️ Chưa có độ khô ngày này! Vui lòng chọn nguồn thay thế hoặc tự điền phía trên.</span>`;
           let luaChon = prompt("⚠️ " + res.message + "\n\nBạn muốn lấy độ khô nào thay thế?\n1. Ngày trước đó gần nhất\n2. Độ khô trung bình tháng\n3. Hủy để tự điền tay vào ô Độ Khô ngay dưới Ngày Nhập", "1");
           if (luaChon === "1" || luaChon === "2") {
             taiPhieuCanThucTe(loai, tab, luaChon, btn);
           } else {
-            alert("👉 Đã lưu sẵn số tấn tươi (" + res.tongKhoiLuongUot.toLocaleString() + " MT)!\n\nGiờ bạn chỉ cần gõ số Độ Khô vào ô 'Độ Khô' phía trên rồi bấm Lưu Phiếu là xong!");
+            alert("👉 Đã lưu sẵn số tấn tươi (" + fmtSoLe(res.tongKhoiLuongUot, 2) + " MT)!\n\nGiờ bạn chỉ cần gõ số Độ Khô vào ô 'Độ Khô' phía trên rồi bấm Lưu Phiếu là xong!");
             if (document.getElementById('doKho_' + loai)) document.getElementById('doKho_' + loai).focus();
           }
         } else if (res.status === "success") {
           // FIX (XSS/nhất quán): trước đây res.dienGiaiDoKho được chèn thẳng vào
           // innerHTML không qua escapeHtml(), khác với hầu hết nơi còn lại của
           // file luôn escape dữ liệu server/người dùng trước khi chèn HTML.
-          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Thành phẩm:<br>- Gỗ keo: <b>${res.tongGoKeo.toLocaleString()} kg</b><br>- Dăm tươi: <b>${res.tongKhoiLuongUot.toLocaleString()} MT</b><br>- Độ khô: <b>${(res.doKho*100).toFixed(1)}%</b><br>- Nguồn: <b style="color:#b45309;">${escapeHtml(res.dienGiaiDoKho)}</b>`;
+          document.getElementById('infoScanText_NHẬP').innerHTML = `✅ Thành phẩm:<br>- Gỗ keo: <b>${fmtNum(res.tongGoKeo)} kg</b><br>- Dăm tươi: <b>${fmtSoLe(res.tongKhoiLuongUot, 2)} MT</b><br>- Độ khô: <b>${fmtPT(res.doKho, 1)}</b><br>- Nguồn: <b style="color:#b45309;">${escapeHtml(res.dienGiaiDoKho)}</b>`;
           alert("✅ Tải phiếu cân thành công! Nhấn 'Hoàn Thành & Lưu Phiếu'.");
         } else {
           alert("⚠️ " + res.message);
@@ -4588,8 +4718,8 @@
         "📦 XÁC NHẬN TẠO PHIẾU ĐIỀU CHỈNH KHÔ (BDMT)\n\n" +
         "Kho Xuất: " + khoXuat + "\n" +
         "Kho Nhập: " + khoNhap + "\n" +
-        "Khối lượng: " + data.mt.toFixed(2) + " MT\n" +
-        "Độ khô: " + (data.doKho * 100).toFixed(2) + "%\n\n" +
+        "Khối lượng: " + fmtSoLe(data.mt, 2) + " MT\n" +
+        "Độ khô: " + fmtPT(data.doKho, 2) + "\n\n" +
         ghiChuKho +
         "\n\nBấm OK để tạo phiếu với thông tin trên.\nBấm Cancel nếu muốn tự chọn Kho Xuất/Kho Nhập khác."
       );
@@ -4626,7 +4756,7 @@
         "Loại phiếu: " + (laDuTuoi ? "XUẤT KHÁC (dư tươi)" : "NHẬP KHÁC (thiếu tươi)") + "\n" +
         "Kho: " + data.khoXuatBan + "\n" +
         (laDuTuoi ? "Kho Nhập: Không có\n" : "Kho Xuất: Không có\n") +
-        "Khối lượng chênh lệch: " + Math.abs(data.chenhLechMT).toFixed(2) + " MT\n" +
+        "Khối lượng chênh lệch: " + fmtSoLe(Math.abs(data.chenhLechMT), 2) + " MT\n" +
         "Độ khô: 0% (điều chỉnh Tươi thuần túy, không ảnh hưởng số Khô đã cân bằng)\n\n" +
         data.msg + "\n\nBấm OK để tạo phiếu."
       );
@@ -4707,7 +4837,7 @@
            let valDK = parseFloat(doKhoInputVal);
            if (valDK > 1) valDK = valDK / 100;
            doKhoInputVal = valDK;
-           dienGiaiVal = "Tự điền độ khô thủ công (" + (valDK * 100).toFixed(2) + "%)";
+           dienGiaiVal = "Tự điền độ khô thủ công (" + fmtPT(valDK, 2) + ")";
         } else if (window._scannedData.doKho) {
            doKhoInputVal = window._scannedData.doKho;
            dienGiaiVal = window._scannedData.dienGiaiDoKho;
@@ -4847,10 +4977,10 @@
           + '<td class="mono">'+escapeHtml(r.uniqueKey)+'</td>'
           + '<td>'+escapeHtml(r.soPhieu)+'</td>'
           + '<td>'+escapeHtml(r.bienSo)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan1)+'</td>'
-          + '<td>'+escapeHtml(r.gioCan1)+'</td>'
-          + '<td>'+escapeHtml(r.ngayCan2)+'</td>'
-          + '<td>'+escapeHtml(r.gioCan2)+'</td>'
+          + tdNgay(r.ngayCan1)
+          + tdNgay(r.gioCan1)
+          + tdNgay(r.ngayCan2)
+          + tdNgay(r.gioCan2)
           + '<td class="num">'+fmtNum(r.canLan1)+'</td>'
           + '<td class="num">'+fmtNum(r.canLan2)+'</td>'
           + '<td class="num">'+fmtNum(r.klHang)+'</td>'
@@ -4921,7 +5051,7 @@
           document.getElementById('dh_doKhoNhaMay').value = '';
           toast(res.message, false);
         } else {
-          document.getElementById('dh_doKhoNhaMay').value = (res.doKho * 100).toFixed(2) + '%  (' + res.doKho.toFixed(4) + ')';
+          document.getElementById('dh_doKhoNhaMay').value = fmtPT(res.doKho, 2) + '  (' + fmtSoLe(res.doKho, 4) + ')';
           document.getElementById('dh_doKhoNhaMay').dataset.raw = res.doKho;
           toast(res.message, true);
         }
@@ -5001,7 +5131,7 @@
         document.getElementById('dh_tuNgay').value = res.tuNgay;
         document.getElementById('dh_denNgay').value = res.denNgay;
         document.getElementById('dh_loaiXe').value = res.loaiXe;
-        document.getElementById('dh_doKhoNhaMay').value = res.doKhoNhaMay ? (res.doKhoNhaMay*100).toFixed(2) + '%  (' + res.doKhoNhaMay.toFixed(4) + ')' : '';
+        document.getElementById('dh_doKhoNhaMay').value = res.doKhoNhaMay ? fmtPT(res.doKhoNhaMay, 2) + '  (' + fmtSoLe(res.doKhoNhaMay, 4) + ')' : '';
         document.getElementById('dh_doKhoNhaMay').dataset.raw = res.doKhoNhaMay || 0;
         xhCapNhatKLBDMT();
         state.dhEditingRow = res.rowIndex;
@@ -5030,11 +5160,11 @@
         const body = document.getElementById('dh_listBody');
         if (res.data.length === 0){ body.innerHTML = '<tr><td colspan="13" class="empty-state">Chưa có đơn hàng nào.</td></tr>'; return; }
         body.innerHTML = res.data.map(d=>(
-          '<tr><td>'+escapeHtml(d.ngayDonHang)+'</td><td class="mono">'+escapeHtml(d.soTKHQ)+'</td><td>'+escapeHtml(d.tau)+'</td>'
+          '<tr>'+tdNgay(d.ngayDonHang)+'<td class="mono">'+escapeHtml(d.soTKHQ)+'</td><td>'+escapeHtml(d.tau)+'</td>'
           + '<td>'+escapeHtml(d.khachHang)+'</td><td>'+escapeHtml(d.khoXuat)+'</td>'
-          + '<td class="num">'+fmtNum(d.klMT)+'</td><td class="num">'+fmtNum(d.klBDMT)+'</td>'
-          + '<td class="num">'+(d.doKho*100).toFixed(2)+'%</td><td class="num">'+(d.doKhoNhaMay*100).toFixed(2)+'%</td>'
-          + '<td>'+(d.tuNgay ? escapeHtml(d.tuNgay) : '—')+'</td><td>'+(d.denNgay ? escapeHtml(d.denNgay) : '—')+'</td>'
+          + '<td class="num">'+fmtSoLe(d.klMT, 2)+'</td><td class="num">'+fmtSoLe(d.klBDMT, 2)+'</td>'
+          + '<td class="num">'+fmtPT(d.doKho, 2)+'</td><td class="num">'+fmtPT(d.doKhoNhaMay, 2)+'</td>'
+          + '<td class="ngay">'+(d.tuNgay ? escapeHtml(ngayHT(d.tuNgay)) : '—')+'</td><td class="ngay">'+(d.denNgay ? escapeHtml(ngayHT(d.denNgay)) : '—')+'</td>'
           + '<td>'+escapeHtml(d.loaiXe)+'</td>'
           + '<td><div class="btnrow" style="margin:0;gap:6px;">'
           + '<button class="btn btn-ghost btn-sm" data-editdh="'+d.rowIndex+'" data-stt="'+escapeHtml(d.stt)+'">✏️ Sửa</button>'
@@ -5084,7 +5214,7 @@
     function renderXuatQuaCan(res){
       document.getElementById('xk_sumSoLuong').textContent = res.summary.soLuong;
       document.getElementById('xk_sumKLHang').textContent = fmtNum(res.summary.tongKLHang);
-      document.getElementById('xk_sumTan').textContent = fmtNum(res.summary.tongTan);
+      document.getElementById('xk_sumTan').textContent = fmtSoLe(res.summary.tongTan, 2);
 
       // Đổ danh mục lọc (giữ nguyên lựa chọn hiện tại nếu có)
       fillSelect('xk_dvvc', res.dsDonViVanChuyen);
@@ -5095,8 +5225,8 @@
         body.innerHTML = '<tr><td colspan="11" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>';
       } else {
         veBangTheoLo(body, res.data, r=>(
-          '<tr><td class="mono">'+escapeHtml(r.soPhieu)+'</td><td>'+escapeHtml(r.ngayGioCan1)+'</td><td>'+escapeHtml(r.bienSo)+'</td>'
-          + '<td class="num">'+fmtNum(r.klHang)+'</td><td class="num">'+fmtNum(r.khoiLuongTan)+'</td>'
+          '<tr><td class="mono">'+escapeHtml(r.soPhieu)+'</td>'+tdNgay(r.ngayGioCan1)+'<td>'+escapeHtml(r.bienSo)+'</td>'
+          + '<td class="num">'+fmtNum(r.klHang)+'</td><td class="num">'+fmtSoLe(r.khoiLuongTan, 2)+'</td>'
           + '<td>'+escapeHtml(r.donViVanChuyen)+'</td><td>'+escapeHtml(r.tenTaiXe)+'</td>'
           + '<td>'+(r.soTKHQ ? escapeHtml(r.soTKHQ) : '—')+'</td>'
           + '<td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td><td>'+(r.khoNhap ? escapeHtml(r.khoNhap) : '—')+'</td>'
@@ -5146,16 +5276,16 @@
     }
     function renderXuatMisa(res){
       document.getElementById('xm_sumSoLuong').textContent = res.summary.soLuong;
-      document.getElementById('xm_sumKLMT').textContent = fmtNum(res.summary.tongKLMT);
-      document.getElementById('xm_sumKLBDMT').textContent = fmtNum(res.summary.tongKLBDMT);
-      document.getElementById('xm_sumTien').textContent = fmtNum(res.summary.tongThanhTienUSD);
+      document.getElementById('xm_sumKLMT').textContent = fmtSoLe(res.summary.tongKLMT, 2);
+      document.getElementById('xm_sumKLBDMT').textContent = fmtSoLe(res.summary.tongKLBDMT, 2);
+      document.getElementById('xm_sumTien').textContent = fmtSoLe(res.summary.tongThanhTienUSD, 2);
       const body = document.getElementById('xm_tableBody');
       if (res.data.length === 0){ body.innerHTML = '<tr><td colspan="10" class="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>'; return; }
       veBangTheoLo(body, res.data, r=>(
-        '<tr><td>'+escapeHtml(r.ngayDonHang)+'</td><td class="mono">'+escapeHtml(r.soTKHQ)+'</td><td>'+escapeHtml(r.tau)+'</td>'
+        '<tr>'+tdNgay(r.ngayDonHang)+'<td class="mono">'+escapeHtml(r.soTKHQ)+'</td><td>'+escapeHtml(r.tau)+'</td>'
         + '<td>'+escapeHtml(r.khachHang)+'</td><td>'+escapeHtml(r.tenHangHoa)+'</td>'
-        + '<td class="num">'+fmtNum(r.donGiaUSD)+'</td><td class="num">'+fmtNum(r.klMT)+'</td><td class="num">'+fmtNum(r.klBDMT)+'</td>'
-        + '<td class="num">'+fmtNum(r.thanhTienUSD)+'</td><td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td></tr>'
+        + '<td class="num">'+fmtSoLe(r.donGiaUSD, 2)+'</td><td class="num">'+fmtSoLe(r.klMT, 2)+'</td><td class="num">'+fmtSoLe(r.klBDMT, 2)+'</td>'
+        + '<td class="num">'+fmtSoLe(r.thanhTienUSD, 2)+'</td><td>'+(r.khoXuat ? escapeHtml(r.khoXuat) : '—')+'</td></tr>'
       ), 10);
     }
     document.getElementById('btnLocXuatMisa').addEventListener('click', locXuatMisa);
@@ -5501,7 +5631,7 @@
                        : '<span class="badge badge-warn">ĐANG TẮT</span> sao lưu tự động')
           + ' · ' + d.soSpreadsheet + ' Google Sheet sẽ được sao lưu'
           + (d.thuMucUrl ? ' · <a href="' + escapeHtml(d.thuMucUrl) + '" target="_blank" rel="noopener">Mở thư mục sao lưu</a>' : '')
-          + '<br>Lần gần nhất: ' + (kq ? escapeHtml(kq.thoiGian) + ' (' + escapeHtml(kq.nguon) + ') — ' + kq.soFile + ' file, ' + kq.giay + ' giây'
+          + '<br>Lần gần nhất: ' + (kq ? escapeHtml(ngayHT(kq.thoiGian)) + ' (' + escapeHtml(kq.nguon) + ') — ' + kq.soFile + ' file, ' + kq.giay + ' giây'
               + (kq.loi && kq.loi.length ? ' — <b style="color:var(--danger);">lỗi: ' + escapeHtml(kq.loi.join('; ')) + '</b>' : '') : 'chưa có');
         const body = document.getElementById('sl_dsBan');
         body.innerHTML = d.dsBan.length
@@ -5575,7 +5705,7 @@
         document.getElementById('btnNhatKySau').disabled = res.trang >= res.tongSoTrang;
         const body = document.getElementById('nk_body');
         body.innerHTML = res.data.length ? res.data.map(r => '<tr>'
-            + '<td class="mono" style="white-space:nowrap;">' + escapeHtml(r.thoiGian) + '</td>'
+            + '<td class="mono ngay">' + escapeHtml(ngayHT(r.thoiGian)) + '</td>'
             + '<td>' + escapeHtml(r.email || '—') + '</td>'
             + '<td>' + escapeHtml(r.hanhDong) + '</td>'
             + '<td><span class="badge ' + nkLopTrangThai(r.trangThai) + '">' + escapeHtml(r.trangThai) + '</span></td>'

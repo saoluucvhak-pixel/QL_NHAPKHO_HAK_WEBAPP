@@ -452,6 +452,34 @@ Quyết định: (1) chỉ sửa một số lỗi nhỏ; (2) "báo giá mới nh
 
 **Rollback:** dán lại `Code.gs`, `Config.gs`, `Index.html` của commit `099e3a8` → Deploy › Manage deployments › Edit › New version. Không đổi cấu trúc sheet; chỉ thêm Script Property `MISA_BAN_HIEN_TAI_JSON` (vô hại khi quay lui). File tạm đã vào Thùng rác khôi phục được trong 30 ngày.
 
+## Đợt sửa 2 (28/09/2026) — Quy tắc định dạng số / ngày / canh lề
+
+Quy tắc của chủ hệ thống:
+1. Chỗ điền số có phân cách hàng nghìn.
+2. Số canh phải, chuỗi canh trái, ngày canh giữa.
+3. Webapp hiển thị và ghi Google Sheet theo **Locale hệ thống** (Hệ thống › Cấu hình).
+4. PDF, kết xuất Excel, kết xuất MISA theo **Locale Misa** riêng.
+
+| Phạm vi | Đã làm | Hàm / vị trí |
+|---|---|---|
+| Ô nhập số (webapp) | Mọi `<input type="number">` (kể cả ô vẽ bằng JS ở Kho Dăm, Báo giá) tự thành ô chữ canh phải, gõ tới đâu thêm phân cách tới đó theo Locale hệ thống (VN `1.234,5` · US `1,234.5`). VN gõ phím `.` khi chưa có dấu thập phân = dấu `,`. **`.value` vẫn trả số chuẩn** (`"1234.5"`) nên mọi code cũ + máy chủ không đổi. Số lẻ tối đa theo `step` (0.01→2, 0.0001→4), không có `step`→3. | `Index.html`: `nangCapOSo`, `soChuanTuHienThi`, `hienThiTuSoChuan`, bộ lắng nghe `keydown`/`input`, `MutationObserver` |
+| Hiển thị số (webapp) | `fmtNum`, `fmtSo`, `fmtSoLe`, `fmtPT` theo Locale hệ thống; bỏ `toFixed`/`'vi-VN'` cố định. Số tấn, USD, độ khô trước đây bị làm tròn thành số nguyên ở vài bảng (Misa KL tấn, Xuất hàng tấn/USD, Mã KL) nay hiện đúng số lẻ. | `Index.html` |
+| Hiển thị ngày (webapp) | `ngayHT()` đổi ngày máy chủ gửi (`dd/MM/yyyy…`, `yyyy-MM-dd…`) theo Locale hệ thống; ô ngày dùng `tdNgay()`. | `Index.html` |
+| Canh lề (webapp) | CSS: `th,td` trái; `.num` phải; `.ngay` giữa; ô nhập số phải; ô chọn ngày giữa; bảng Kho Dăm trước đây canh giữa tất cả → nay theo quy tắc. Tiêu đề cột ngày/số gắn lớp tương ứng. | `Index.html` |
+| Locale hệ thống cho giao diện | `doGet` nhúng `REGION_FORMAT_().MIEN` vào trang. | `doGet` |
+| Ghi Google Sheet (Locale hệ thống) | PhieuCan_DN (import, cập nhật, nhập tay, tính giá T/X/Z, sửa ở Tra cứu), Draft Chưa TT, sheet xem trước (ngày dạng chữ theo Locale), NL_PC_XH (**Ngày giờ cân 1/2 nay là giá trị ngày thật** – trước là chữ `dd/MM/yyyy HH:mm:ss` cố định; mọi chỗ đọc đều qua `toDateObj_` nên dữ liệu cũ vẫn đọc đúng), NL_DH_XB (NL Từ/Đến ngày thành ngày thật), Baogia_DN, QL_BaoGia, FINAL/SAVE, Ma_KL, Update_MiSa_PC, Kho Dăm (giao dịch, độ khô, danh mục kho): ngày theo Locale + canh giữa, số có phân cách + canh phải. | `PC_dinhDangCacKhoi_`, `doiChuoiNgayTheoMien_`, `XH_dinhDangDongDonHang_`, `XH_ngayTuInput_`, `BG_dinhDangDongBaoGia_`, `BG_dinhDangBangHieuLuc_` |
+| Kết xuất (Locale Misa) | File tạm Excel/PDF/MISA/báo giá/phiếu nhập kho: đặt Locale file = Locale Misa (quyết định ký tự phân cách trong PDF) + múi giờ script; ngày/giờ ghi là **giá trị ngày thật** định dạng Locale Misa, canh giữa; số `#,##0` / `#,##0.00` (tự nhận có số lẻ – trước đây cột tấn bị ép `#,##0`), canh phải; chữ canh trái; cột mã (Số phiếu, Mã CT, Số xe, Số TKHQ…) giữ dạng chữ, không thêm phân cách. | `XK_datLocaleFileTam_`, `XK_chuanBiCot_`, `XK_apDinhDangCot_`, `XK_ghiBang_`, `createTempSheetForExport_`, `downloadMisaExcel_`, `BG_exportFileSmart_`, `exportPhieuCanPDF_` |
+
+**Giới hạn (không điều khiển được bằng code):**
+- Ô chọn ngày (`<input type="date">`) hiển thị theo ngôn ngữ **trình duyệt/máy** người dùng, không theo Locale hệ thống.
+- File `.xlsx` tải về mang mã định dạng; ký tự phân cách khi mở bằng Excel do cài đặt vùng của **máy mở file** quyết định. PDF thì đúng Locale Misa.
+- Dữ liệu cũ đã có trên sheet **không** được định dạng lại hàng loạt; chỉ dòng ghi mới/sửa từ nay.
+
+**Test đã chạy:** Chromium (Playwright) với Locale VN và US: gõ `17990` → `17.990` / `17,990`, `.value` = `17990`; gõ `1234,5` (VN) / `1234.5` (US); VN gõ `27.5` → `27,5`; gán `.value = "39.45"` → `39,45`; ô vẽ bằng JS tự nâng cấp; `ngayHT` 5 trường hợp (phát hiện và đã sửa lỗi đổi ngày 2 lần ở US); canh lề ô số/ngày/chữ và tiêu đề cột ngày. Máy chủ (Node + stub): nhận diện cột mã/số/ngày/giờ/chữ, định dạng `#,##0` vs `#,##0.00`, ngày/giờ đổi thành giá trị thật, `doiChuoiNgayTheoMien_`, `XH_ngayTuInput_` (chặn công thức). **Chưa chạy trên Google thật** – cần thử: xuất 1 báo cáo Excel + PDF với Locale Misa = US, import 1 file phiếu cân, 1 file xuất hàng, lưu 1 báo giá, rồi mở sheet xem định dạng/canh lề.
+
+**Rollback:** dán lại 3 file của commit trước đợt này (`git log` – commit "Đợt sửa 1") → New version. Không đổi cấu trúc cột; NL_PC_XH/NL_DH_XB các dòng mới đã ghi dạng ngày thật vẫn được bản cũ đọc đúng (bản cũ cũng đọc qua `toDateObj_`).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
+- 28/09/2026 — Đợt sửa 2: định dạng số/ngày/canh lề theo Locale hệ thống (webapp + Google Sheet) và Locale Misa (PDF/Excel/MISA).
