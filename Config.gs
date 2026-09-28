@@ -1090,10 +1090,28 @@ function API(maPhien, tenHam, thamSo, maYeuCau) {
     : route.quyen;
   if (!quyen) throw new Error("Thao tác không tồn tại: " + ten + " / " + String(args[0]));
   yeuCauQuyen_(quyen);
-  if (route.chongTrung && /^[A-Za-z0-9-]{16,64}$/.test(String(maYeuCau || ""))) {
-    return chayChongTrung_(PHIEN_HIEN_TAI_.email, ten, String(maYeuCau), function () { return route.fn.apply(null, args); });
+  // Đợt sửa 4 (tiếp 5) - GIÁM SÁT HIỆU NĂNG: đo thời gian từng lượt gọi; chậm quá
+  // API_CHAM_MS_ thì ghi Nhật ký "API_CHAM" = WARNING (tự hiện ở khung Giám sát
+  // 24 giờ trên Dashboard). Chỉ ghi khi chậm -> không thêm lượt ghi sheet cho
+  // lượt gọi bình thường. Không đổi kết quả / lỗi trả về.
+  const batDau = Date.now();
+  try {
+    if (route.chongTrung && /^[A-Za-z0-9-]{16,64}$/.test(String(maYeuCau || ""))) {
+      return chayChongTrung_(PHIEN_HIEN_TAI_.email, ten, String(maYeuCau), function () { return route.fn.apply(null, args); });
+    }
+    return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
+  } finally {
+    ghiNhanApiCham_(ten, Date.now() - batDau);
   }
-  return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
+}
+
+const API_CHAM_MS_ = 30000;
+// Chức năng vốn chạy lâu theo thiết kế (sao lưu toàn bộ 1–3 phút) - không tính là chậm.
+const API_CHAM_BO_QUA_ = { HT_saoLuuNgay: true };
+function ghiNhanApiCham_(tenHam, ms) {
+  if (!(ms >= API_CHAM_MS_) || API_CHAM_BO_QUA_[tenHam]) return false;
+  try { logAudit_("API_CHAM", "WARNING", tenHam + " chạy " + Math.round(ms / 100) / 10 + " giây (ngưỡng " + API_CHAM_MS_ / 1000 + " giây)"); } catch (e) { /* bỏ qua */ }
+  return true;
 }
 
 // M-08 - CHỐNG TẠO TRÙNG: đánh dấu "đang xử lý" theo (người dùng + mã yêu cầu) trước

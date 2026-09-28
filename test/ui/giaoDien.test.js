@@ -130,3 +130,20 @@ test('Tự lưu nháp: gõ dở form Nhập tay, tải lại trang -> khôi ph�
   assert.ok(!r.conThanh);
   assert.strictEqual(r.sauXoa, null);
 });
+
+test('Tải lớn giao diện: xem trước 50.000 dòng vẽ lô đầu < 2 giây, Chọn tất cả đủ 50.000', { skip: !chromium && 'chưa có Playwright' }, async () => {
+  const b = await chromium.launch(); const pg = await b.newPage();
+  await pg.goto(taoTrang('VN'));
+  const r = await pg.evaluate(() => {
+    state.previewData = Array.from({ length: 50000 }, (_, i) => ({ isError: false, typeImport: 'Mới', uniqueKey: i + '/2026/NK', soPhieu: String(i), soXe: 'X', ngayCan1: '25/07/2026', gioCan1: '08:00:00', ngayCan2: '25/07/2026', gioCan2: '09:00:00', klCan1: 1, klCan2: 2, klHangGoc: 3 }));
+    const t0 = performance.now();
+    renderPreview();
+    const ms = performance.now() - t0;
+    const chon = () => state.previewData.filter((x, i) => !x.isError && !state.previewBoChon.has(i)).length;
+    return { ms, hang: document.querySelectorAll('#previewBody tr').length, chon: chon() };
+  });
+  await b.close();
+  assert.ok(r.ms < 2000, 'vẽ ' + Math.round(r.ms) + ' ms');
+  assert.ok(r.hang <= 501, 'chỉ vẽ lô đầu, thấy ' + r.hang + ' dòng');
+  assert.strictEqual(r.chon, 50000);
+});

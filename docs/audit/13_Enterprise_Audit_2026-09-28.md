@@ -578,6 +578,19 @@ Quy tắc của chủ hệ thống:
 
 **Test:** `npm test` → 24/24 đạt (thêm: mặc định tắt, bật thì gửi, chống spam theo loại, danh sách nhận không trùng/bỏ tài khoản Khóa, gửi lỗi không ném ra ngoài + gợi ý `CAP_QUYEN_EMAIL`).
 
+### Đợt sửa 4 (tiếp 5) — Giám sát hiệu năng API + kiểm thử tải lớn
+
+| Mục | Đã làm | Hàm / vị trí |
+|---|---|---|
+| Monitoring – thời gian chạy API | Mọi lượt gọi qua `API()` được đo thời gian; lượt nào chạy **≥ 30 giây** thì ghi Nhật ký `API_CHAM` = WARNING (tên chức năng + số giây) → tự hiện trong khung **🩺 Giám sát** 24 giờ trên Dashboard. Lượt gọi bình thường không ghi gì thêm (không tốn lượt ghi sheet). Bỏ qua `HT_saoLuuNgay` (vốn chạy 1–3 phút). Không đổi kết quả / lỗi trả về. | `API`, `ghiNhanApiCham_`, `API_CHAM_MS_`, `API_CHAM_BO_QUA_` (Config.gs) |
+| Kiểm thử tải lớn (mục XIII.1–2) | Tính giá 50.000 phiếu × 3.000 dòng báo giá (có dải chồng → chọn báo giá mới nhất) < 5 giây; báo cáo 100.000 dòng cắt còn 10.000 dòng mới nhất, giữ thứ tự < 3 giây; Chromium: xem trước 50.000 dòng vẽ lô đầu < 2 giây, "Chọn tất cả" đủ 50.000. | `test/taiLon.test.js`, `test/ui/giaoDien.test.js` |
+
+**Rollback:** revert commit (chỉ thêm đo thời gian trong `API()` + bài test; không đổi dữ liệu, không đổi sheet).
+
+**Test:** `npm test` → 28/28 đạt.
+
+**Chưa làm, cần bạn cung cấp:** *Import Wizard* (ánh xạ cột phiếu cân theo TÊN cột thay vì vị trí cố định) — cần 1–2 file Excel mẫu thật từ phần mềm cân để biết đúng tên tiêu đề từng cột; làm khi chưa có mẫu dễ từ chối nhầm file đang nhập tốt.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -589,3 +602,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp 2): L-10, cảnh báo dữ liệu bất hợp lý, gợi ý tính lại giá sau khi lưu báo giá, lịch sử sửa trước/sau.
 - 28/09/2026 — Đợt sửa 4 (tiếp 3): tự lưu nháp/khôi phục form, giám sát lỗi 24h trên Dashboard, kiểm tra bản sao lưu, CI v5.
 - 28/09/2026 — Đợt sửa 4 (tiếp 4): email báo lỗi cho Quản trị khi sao lưu đêm / tính giá theo giờ lỗi (mặc định tắt), thêm scope script.send_mail.
+- 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
