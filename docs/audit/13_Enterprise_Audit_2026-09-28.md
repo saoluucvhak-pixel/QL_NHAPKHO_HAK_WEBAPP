@@ -595,6 +595,17 @@ Quy tắc của chủ hệ thống:
 
 **Kết thúc Đợt sửa 4** — mọi mục kiểm toán trong repo đã xử lý hoặc đóng theo quyết định (M-11, SEC-03, L-05, ARCH-01, Import Wizard).
 
+## Sửa lỗi sau Đợt 4 (29/09/2026) — File kết xuất MISA trống trơn
+
+| Mục | Nội dung |
+|---|---|
+| Lỗi | Tải file MISA gốc / Excel / PDF báo cáo Misa → file về máy **trống**. |
+| Nguyên nhân | Apps Script gom các lệnh ghi `SpreadsheetApp` và chưa ghi thật vào file tạm. Máy chủ tải file qua link export **ngay trong cùng lượt chạy** (`chuyenLinkXuatThanhFile_`) nên nhận bản chưa có dữ liệu; sau đó file tạm bị chuyển vào Thùng rác (M-01) nên cũng không mở lại được bản đúng. Đợt 2 thêm nhiều lệnh định dạng hơn (Locale Misa, canh lề) nên dễ xảy ra hơn, rõ nhất ở file MISA 31 cột. |
+| Sửa | `SpreadsheetApp.flush()` trước khi tải file xuất - áp dụng cho **mọi** chức năng xuất Excel/PDF (một chỗ dùng chung). |
+| Vị trí | `chuyenLinkXuatThanhFile_` (Config.gs) |
+| Test | Mô phỏng tải file MISA gốc: file tạm có đủ tiêu đề + dữ liệu (ngày là giá trị ngày thật, mã giữ dạng chữ), thứ tự ghi → flush → tải. Bỏ bản sửa thì test báo lỗi. `npm test` → 29/29 đạt. |
+| Rollback | Revert commit (chỉ thêm 1 lệnh flush). |
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -608,3 +619,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp 4): email báo lỗi cho Quản trị khi sao lưu đêm / tính giá theo giờ lỗi (mặc định tắt), thêm scope script.send_mail.
 - 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
 - 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
+- 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.

@@ -219,3 +219,52 @@ test('Email báo lỗi: gửi thất bại không ném lỗi ra tác vụ chính
   assert.strictEqual(kq.status, 'error');
   assert.ok(kq.message.includes('CAP_QUYEN_EMAIL'));
 });
+
+test('Kết xuất MISA: file tạm có đủ tiêu đề + dữ liệu; ép ghi (flush) TRƯỚC khi tải file về', () => {
+  const nhatKy = [];
+  const ghi = {};   // "hàng,cột" -> giá trị đã ghi vào file tạm
+  function taoSheetTam() {
+    const range = (r, c, nr, nc) => {
+      const g = {
+        setValues(vs) { nhatKy.push('ghi'); vs.forEach((row, i) => row.forEach((v, j) => { ghi[(r + i) + ',' + (c + j)] = v; })); return g; },
+        setNumberFormat() { return g; }, setBackground() { return g; }, setFontWeight() { return g; },
+        setHorizontalAlignment() { return g; }, setFontColor() { return g; }
+      };
+      return g;
+    };
+    return { getRange: range, getRangeList() { const g = { setNumberFormat() { return g; }, setHorizontalAlignment() { return g; } }; return g; }, getSheetId: () => 0 };
+  }
+  const tieuDe = Array.from({ length: 31 }, (_, i) => 'Cột ' + (i + 1));
+  tieuDe[0] = 'Ngày hạch toán'; tieuDe[2] = 'Số chứng từ'; tieuDe[4] = 'Số lượng'; tieuDe[9] = 'Số hợp đồng'; tieuDe[10] = 'Mã nhà cung cấp';
+  const { chay, ctx } = taoMoiTruong({
+    SpreadsheetApp: {
+      openById: () => ({ getSheetByName: () => ctx.nguonMisa }),
+      create: () => { const sh = taoSheetTam(); return { getId: () => 'TAM1', getSheets: () => [sh], setSpreadsheetLocale() {}, setSpreadsheetTimeZone() {} }; },
+      flush: () => { nhatKy.push('flush'); }
+    },
+    DriveApp: {
+      getFileById: () => ({ moveTo() {}, getName: () => 'Misa_Export_x', getMimeType: () => 'sheets', getParents: () => ({ hasNext: () => false }), setTrashed() {} }),
+      getFolderById: () => ({})
+    },
+    MimeType: { GOOGLE_SHEETS: 'sheets' },
+    ScriptApp: { getOAuthToken: () => 't' },
+    UrlFetchApp: { fetch: () => { nhatKy.push('tai'); return { getResponseCode: () => 200, getBlob: () => ({ getBytes: () => [1, 2] }) }; } }
+  });
+  ctx.tieuDe = tieuDe;
+  ctx.Utilities.base64Encode = () => 'AQI=';
+  chay(`var d1 = new Array(31).fill(""); d1[0] = new Date(2026,8,5); d1[1] = new Date(2026,8,5); d1[2] = "12/2026/NK"; d1[4] = 20.5; d1[5] = 1500000; d1[6] = 30750000; d1[9] = "0123"; d1[10] = "NCC01";
+        var sh = { rows: [tieuDe, d1], getLastRow: function () { return 2; },
+          getRange: function (r, c, nr, nc) { var self = this; return { getValues: function () { return self.rows.slice(r - 1, r - 1 + nr).map(function (x) { return x.slice(c - 1, c - 1 + nc); }); } }; } };
+        nguonMisa = sh;`);
+  const kq = chay('chuyenLinkXuatThanhFile_(downloadMisaExcel_())');
+  assert.strictEqual(kq.status, 'success', kq.message);
+  assert.ok(kq.fileBase64, 'phải tải được file về');
+  assert.strictEqual(ghi['1,1'], 'Ngày hạch toán');
+  assert.strictEqual(ghi['2,3'], '12/2026/NK');
+  assert.strictEqual(ghi['2,5'], 20.5);
+  assert.strictEqual(ghi['2,11'], 'NCC01');
+  assert.strictEqual(Object.prototype.toString.call(ghi['2,1']), '[object Date]'); // ngày thật, không phải chữ
+  // Thứ tự: mọi lệnh ghi -> flush -> tải
+  assert.deepStrictEqual(nhatKy.slice(-2), ['flush', 'tai']);
+  assert.ok(nhatKy.indexOf('ghi') < nhatKy.indexOf('flush'));
+});

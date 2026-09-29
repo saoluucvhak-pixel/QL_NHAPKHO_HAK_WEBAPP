@@ -1160,6 +1160,11 @@ function chuyenLinkXuatThanhFile_(kq) {
   const m = kq.url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)\/export\?(.*)$/);
   if (!m) return kq;
   try {
+    // FIX (file xuất TRỐNG): Apps Script gom các lệnh ghi SpreadsheetApp lại, chưa ghi
+    // thật vào file. Tải qua link export NGAY sau khi ghi có thể nhận bản CHƯA có dữ
+    // liệu (file Excel/PDF trống trơn, rõ nhất ở file MISA nhiều cột). Ép ghi xong
+    // mọi thay đổi đang chờ trước khi tải.
+    SpreadsheetApp.flush();
     const laPdf = /(^|&)format=pdf(&|$)/.test(m[2]);
     const res = UrlFetchApp.fetch(kq.url, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
