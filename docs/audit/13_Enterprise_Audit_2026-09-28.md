@@ -663,6 +663,19 @@ Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ 
 
 **Đã kiểm tra đủ 30 màn hình con của 7 menu** (ảnh chụp Chromium với dữ liệu giả lập). **Rollback:** xóa khối CSS "GIAO DIỆN CHUYÊN NGHIỆP" trong `Index.html`. **Test:** `npm test` → 46/46 đạt (gồm các bài giao diện Chromium: 375px, zoom, chế độ tối).
 
+## Rà soát nguyên tắc số & vùng (29/09/2026)
+
+Kiểm tra lại 4 nguyên tắc (Đợt 2) trên toàn bộ mã, kể cả phần thêm sau:
+
+| Nguyên tắc | Kết quả |
+|---|---|
+| 1. Ô nhập số có phân cách hàng nghìn | Đạt - mọi ô số (22 ô `type=number` + ô `data-so`, cả ô vẽ sau) tự nâng cấp; test Chromium VN/US |
+| 2. Số phải, chữ trái, ngày giữa | Đạt - bảng web (`.num`, `.ngay`), Google Sheet (setHorizontalAlignment), file xuất (`XK_apDinhDangCot_`) |
+| 3. Webapp + ghi Google Sheet theo Locale hệ thống | Đạt cho bảng/ô nhập/sheet. **Sửa thêm:** 4 thông báo máy chủ viết số cố định kiểu VN (`toLocaleString("vi-VN")`) và 6 chỗ ngày trong thông báo/ghi chú viết cứng `dd/MM/yyyy` → nay theo Locale hệ thống (`soHT_`, `ngayHT_`): cảnh báo chồng dải báo giá, kiểm tra sửa dòng báo giá, mô tả giá Tra cứu, lỗi "CHƯA LƯU" Tra cứu, thông tin bản Misa, ghi chú sheet xem trước |
+| 4. PDF / Excel / MISA theo Locale Misa | Đạt - `XK_datLocaleFileTam_` + `MISA_FORMAT_` cho mọi file xuất (test `ketXuat.test.js`) |
+
+Dữ liệu bảng gửi lên giao diện vẫn là chuẩn nội bộ `dd/MM/yyyy` và được giao diện đổi theo vùng khi hiển thị (`ngayHT`) - đúng thiết kế Đợt 2. Email báo lỗi giữ `dd/MM/yyyy` (thư gửi Quản trị, không phải màn hình). **Test:** thêm 1 bài VN/US cho thông báo máy chủ; `npm test` → 47/47.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -681,3 +694,4 @@ Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ 
 - 29/09/2026 — Rà soát lại toàn bộ thay đổi: tối ưu sắp xếp Mã CT (Intl.Collator), đọc 6 cột khi gợi ý tính lại giá, ghi đè Draft Chưa TT theo khối.
 - 29/09/2026 — Giao diện chuyên nghiệp (CSS, giữ nguyên bộ màu).
 - 29/09/2026 — Đồng bộ giao diện cho tất cả menu (nhóm Kho Dăm theo cùng kiểu).
+- 29/09/2026 — Thông báo máy chủ (số, ngày) theo Locale hệ thống (soHT_, ngayHT_).

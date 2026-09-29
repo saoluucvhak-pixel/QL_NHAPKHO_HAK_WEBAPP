@@ -139,6 +139,19 @@ function PC_canhBaoHopLy_(dateC, dateD, can1, can2, klHang) {
 
 // Chuỗi ngày chuẩn nội bộ "dd/MM/yyyy[...]" -> theo Locale (VN giữ nguyên, US đổi
 // thành "MM/dd/yyyy[...]"). Dùng khi GHI CHỮ ngày vào Google Sheet (sheet xem trước).
+// Nguyên tắc số & vùng cho CHỮ TRONG THÔNG BÁO gửi người dùng (toast, lỗi, ghi chú sheet):
+// theo Locale hệ thống (REGION_FORMAT_), không viết cứng kiểu VN. Dữ liệu bảng vẫn gửi
+// dạng chuẩn nội bộ dd/MM/yyyy - giao diện tự đổi theo vùng khi hiển thị (ngayHT).
+function soHT_(n, soLe) {
+  const x = Number(n);
+  if (!isFinite(x)) return String(n == null ? "" : n);
+  return x.toLocaleString(REGION_FORMAT_().MIEN === "US" ? "en-US" : "vi-VN", { maximumFractionDigits: soLe == null ? 3 : soLe });
+}
+function ngayHT_(d, coGio) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+  return dinhDangGMT7_(d, REGION_FORMAT_().DATE_FMT + (coGio ? " HH:mm:ss" : ""));
+}
+
 function doiChuoiNgayTheoMien_(s, mien) {
   const m = String(s == null ? "" : s).match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
   return (mien === "US" && m) ? m[2] + "/" + m[1] + "/" + m[3] + m[4] : s;
@@ -366,7 +379,7 @@ function step1_PreviewDraft_(fileDataList) {
       draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
       draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
       draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center"); // Ngày/Giờ cân canh giữa
-      draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss") + " (" + previewRows.length + " dòng)");
+      draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + ngayHT_(new Date(), true) + " (" + previewRows.length + " dòng)");
     } finally { _khoaDraft.releaseLock(); } }
 
     if (previewRows.length === 0 && fileLoi.length > 0) {
@@ -1083,7 +1096,7 @@ const MISA_BAN_PROP_ = "MISA_BAN_HIEN_TAI_JSON";
 function MISA_luuThongTinBan_(start, end, soDong) {
   const tt = {
     tuNgay: dinhDangGMT7_(start, "yyyy-MM-dd"), denNgay: dinhDangGMT7_(end, "yyyy-MM-dd"),
-    soDong: soDong, email: layThongTinNguoiDungHienTai_().email || "", luc: dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss")
+    soDong: soDong, email: layThongTinNguoiDungHienTai_().email || "", luc: ngayHT_(new Date(), true)
   };
   PropertiesService.getScriptProperties().setProperty(MISA_BAN_PROP_, JSON.stringify(tt));
   return tt;
@@ -1093,7 +1106,7 @@ function MISA_docThongTinBan_() {
 }
 function MISA_moTaBan_(tt) {
   if (!tt) return "";
-  const d = function (s) { const p = String(s).split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : s; };
+  const d = function (s) { const p = String(s).split("-"); return p.length === 3 ? ngayHT_(new Date(+p[0], +p[1] - 1, +p[2])) : s; };
   return "khoảng " + d(tt.tuNgay) + " – " + d(tt.denNgay) + ", " + tt.soDong + " dòng, tạo bởi " + (tt.email || "?") + " lúc " + tt.luc;
 }
 
@@ -3104,7 +3117,7 @@ function BG_kiemTraSauKhiSua_(sheet, rowIndex, idBgct, giaTriMoi) {
   cacDong.forEach(function (r) { tuSomNhat = Math.min(tuSomNhat, r[1].getTime()); });
   const byMa = BG_getPhieuCanByMaDG_(tuSomNhat);
   const canDuoi = function (ds, x) { let lo = 0, hi = ds.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ds[m] < x) lo = m + 1; else hi = m; } return lo; };
-  const ngay = function (ts) { return dinhDangGMT7_(new Date(ts), "dd/MM/yyyy"); };
+  const ngay = function (ts) { return ngayHT_(new Date(ts)); };
   for (const r of cacDong) {
     const ds = byMa[r[3]] || [];
     const tu = canDuoi(ds, r[1].getTime()), den = canDuoi(ds, r[2].getTime());
@@ -3417,7 +3430,7 @@ function BG_lamMoiSaveSauGhi_(thongBao, idsMoi) {
 function BG_canhBaoChongDai_(finalRows, idsMoi) {
   const moi = new Set(idsMoi.map(function (x) { return String(x || "").trim(); }));
   const hieuLuc = function (r) { return r[13] !== "Hết hiệu lực" && r[1] instanceof Date && r[2] instanceof Date; };
-  const ngay = function (d) { return dinhDangGMT7_(d, "dd/MM/yyyy"); };
+  const ngay = function (d) { return ngayHT_(d); };
   const dsMoi = finalRows.filter(function (r) { return moi.has(String(r[0] || "").trim()) && hieuLuc(r); });
   const cap = []; const daCo = {};
   dsMoi.forEach(function (r) {
@@ -3430,8 +3443,8 @@ function BG_canhBaoChongDai_(finalRows, idsMoi) {
       const kNguoc = [r[3], o[0], o[4], o[5], r[0], r[4], r[5]].join("|");
       if (daCo[k] || daCo[kNguoc]) return;
       daCo[k] = true;
-      cap.push("mã " + r[3] + ": dải " + r[4] + "_" + r[5] + " tấn (từ " + ngay(r[1]) + ", giá " + Number(r[6]).toLocaleString("vi-VN")
-        + ") chồng dải " + o[4] + "_" + o[5] + " tấn (từ " + ngay(o[1]) + ", giá " + Number(o[6]).toLocaleString("vi-VN") + ")");
+      cap.push("mã " + r[3] + ": dải " + r[4] + "_" + r[5] + " tấn (từ " + ngay(r[1]) + ", giá " + soHT_(r[6])
+        + ") chồng dải " + o[4] + "_" + o[5] + " tấn (từ " + ngay(o[1]) + ", giá " + soHT_(o[6]) + ")");
     });
   });
   if (!cap.length) return "";
@@ -5258,7 +5271,7 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
         draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
         draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
         draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center");
-        draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + dinhDangGMT7_(new Date(), "dd/MM/yyyy HH:mm:ss") + " (" + previewRows.length + " dòng)");
+        draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + ngayHT_(new Date(), true) + " (" + previewRows.length + " dòng)");
       }
     } finally { _khoaDraft.releaseLock(); } }
 
@@ -6599,7 +6612,7 @@ function TC_loiPhieuKhongSuaDuoc_(ss, maCT) {
 function TC_moTaGia_(kq) {
   if (!kq) return "";
   return kq.trangThai === "Test giá"
-    ? "Đơn giá " + Number(kq.hieuSo).toLocaleString("vi-VN") + " · Thành tiền " + Number(kq.thanhTien).toLocaleString("vi-VN")
+    ? "Đơn giá " + soHT_(kq.hieuSo) + " · Thành tiền " + soHT_(kq.thanhTien)
     : "⚠️ Lỗi ĐK/Báo giá: chưa có báo giá khớp Mã ĐG + khối lượng + ngày cân";
 }
 
@@ -6704,8 +6717,8 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
       kq = TG_tinhGiaDong_(moi, TG_docBaoGia_());
       if (kq.trangThai !== "Test giá") {
         const klTan = (parseFloat(cu[9]) || 0) / 1000;
-        const ngay = cu[1] instanceof Date ? dinhDangGMT7_(cu[1], "dd/MM/yyyy") : String(cu[1] || "");
-        throw new Error("CHƯA LƯU: không tính được giá cho Mã ĐG " + moi[16] + " (khối lượng " + klTan.toLocaleString("vi-VN")
+        const ngay = cu[1] instanceof Date ? ngayHT_(cu[1]) : String(cu[1] || "");
+        throw new Error("CHƯA LƯU: không tính được giá cho Mã ĐG " + moi[16] + " (khối lượng " + soHT_(klTan)
           + " tấn, ngày cân " + ngay + ") - chưa có báo giá hiệu lực khớp. Kiểm tra lại Đại lý / Nguồn gốc / Hình ảnh, hoặc nhập báo giá cho mã này trước.");
       }
       moi[19] = kq.gia; moi[23] = kq.hieuSo; moi[24] = kq.trangThai; moi[25] = kq.thanhTien;

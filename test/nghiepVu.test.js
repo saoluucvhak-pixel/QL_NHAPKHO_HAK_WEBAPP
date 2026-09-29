@@ -268,3 +268,17 @@ test('Kết xuất MISA: file tạm có đủ tiêu đề + dữ liệu; ép ghi
   assert.deepStrictEqual(nhatKy.slice(-2), ['flush', 'tai']);
   assert.ok(nhatKy.indexOf('ghi') < nhatKy.indexOf('flush'));
 });
+
+test('Nguyên tắc số & vùng trong thông báo máy chủ: theo Locale hệ thống (VN / US)', () => {
+  const vn = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'VN' } });
+  assert.strictEqual(vn.chay('soHT_(1500000)'), '1.500.000');
+  assert.strictEqual(vn.chay('soHT_(20.5)'), '20,5');
+  assert.strictEqual(vn.chay('ngayHT_(new Date(2026,8,5,8,30,0))'), '05/09/2026');
+  assert.strictEqual(vn.chay('ngayHT_(new Date(2026,8,5,8,30,0), true)'), '05/09/2026 08:30:00');
+  const us = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'US' } });
+  assert.strictEqual(us.chay('soHT_(1500000)'), '1,500,000');
+  assert.strictEqual(us.chay('soHT_(20.5)'), '20.5');
+  assert.strictEqual(us.chay('ngayHT_(new Date(2026,8,5))'), '09/05/2026');
+  assert.strictEqual(us.chay('MISA_moTaBan_({ tuNgay: "2026-09-01", denNgay: "2026-09-30", soDong: 5, email: "a@x", luc: "x" })').startsWith('khoảng 09/01/2026 – 09/30/2026'), true);
+  assert.strictEqual(us.chay('TC_moTaGia_({ trangThai: "Test giá", hieuSo: 1500000, thanhTien: 30000000 })'), 'Đơn giá 1,500,000 · Thành tiền 30,000,000');
+});
