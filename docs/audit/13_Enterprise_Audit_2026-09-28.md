@@ -644,6 +644,24 @@ Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu
 
 **Rollback:** revert commit (không đổi dữ liệu / cấu trúc sheet).
 
+## Giao diện chuyên nghiệp (29/09/2026) — giữ nguyên bộ màu
+
+Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ dùng các biến màu sẵn có** nên màu sáng/tối giữ nguyên; không đổi HTML, JavaScript hay máy chủ.
+
+| Phần | Thay đổi |
+|---|---|
+| Chữ số | Dùng cùng font chữ chính, chữ số đều cột (`tabular-nums`) thay font "máy đánh chữ" |
+| Thanh menu | Tách vùng logo, menu con có đường dẫn dọc, mục đang chọn có nền nhạt, chân menu tách dòng |
+| Tiêu đề trang, thẻ | Tiêu đề lớn hơn, bo góc 12px, bóng nhẹ hai lớp |
+| Ô số liệu (KPI) | Nhãn chữ nhỏ in hoa, số 24px, vạch màu bên trái (xanh; đỏ cho mục cần chú ý) |
+| Ô nhập, nút | Cao đều 40px, viền nổi khi chọn (vòng sáng xanh), nút phụ có viền |
+| Bảng | Tiêu đề in hoa nhỏ, dòng xen kẽ nhạt, rê chuột tô xanh nhạt |
+| Biểu đồ Dashboard | Cột giãn đều cả chiều ngang, bo góc |
+| Kéo thả file | Có biểu tượng tải lên |
+| Điện thoại | Thanh menu gọn, không chiếm hết màn hình đầu |
+
+**Rollback:** xóa khối CSS "GIAO DIỆN CHUYÊN NGHIỆP" trong `Index.html`. **Test:** `npm test` → 46/46 đạt (gồm các bài giao diện Chromium: 375px, zoom, chế độ tối).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -660,3 +678,4 @@ Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu
 - 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.
 - 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 15 nút kết xuất Excel/PDF (test/ketXuat.test.js).
 - 29/09/2026 — Rà soát lại toàn bộ thay đổi: tối ưu sắp xếp Mã CT (Intl.Collator), đọc 6 cột khi gợi ý tính lại giá, ghi đè Draft Chưa TT theo khối.
+- 29/09/2026 — Giao diện chuyên nghiệp (CSS, giữ nguyên bộ màu).
