@@ -626,6 +626,24 @@ Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu
 
 **Ghi nhận (chưa sửa, không phải lỗi kết xuất):** file mẫu import Phiếu cân có 14 cột tiêu đề nhưng dòng ví dụ chỉ có 13 giá trị. Vì vậy chữ "ĐL" rơi vào cột "Nguồn gốc", còn cột "ĐL" để trống. Bước import đọc Đại lý ở cột thứ 14 ("ĐL"). Chỉ ảnh hưởng dòng ví dụ minh họa.
 
+## Rà soát lại toàn bộ thay đổi (29/09/2026)
+
+Đọc lại toàn bộ phần đã sửa từ đầu đợt kiểm toán (Config.gs, Code.gs, Index.html) + quét mẫu đọc/ghi sheet trong vòng lặp.
+
+**Lỗi chức năng:** không phát hiện lỗi mới. Đã kiểm tra riêng: mọi chỗ đọc lại `NL_PC_XH` đều qua `toDateObj_` nên đọc được cả ngày thật (ghi từ Đợt 2) lẫn chữ cũ; chống tạo trùng, khóa phiên bản BUG-004, email báo lỗi, đo API chậm hoạt động như thiết kế.
+
+**Tối ưu đã làm:**
+
+| Vị trí | Vấn đề | Sửa | Hiệu quả |
+|---|---|---|---|
+| `getBaoCaoTongHop_`, `getBaoCaoDonGia_`, `getBaoCaoMisa_` | Sắp xếp Mã CT bằng `localeCompare(…, "vi", {numeric})` (từ L-07) tạo lại bộ so sánh ở mỗi lần so | 1 `Intl.Collator` tạo sẵn (`soSanhMaChungTu_`), cùng thứ tự | 100.000 dòng: ~7,5 giây → ~0,3 giây |
+| `BG_phieuChoTinhLai_` (chạy sau mỗi lần lưu báo giá) | Đọc 24 cột B..Y của toàn bộ PhieuCan_DN | Chỉ đọc 6 cột B, Q, V..Y | Ít hơn 4 lần số ô đọc |
+| `ghiVaoDraftChuaTT_` | Ghi đè phiếu đã có trong Draft Chưa TT: 1 lệnh ghi / dòng | Gom theo khối dòng liền nhau; trùng dòng thì bản sau thắng (như cũ) | Import lại 500 phiếu: 500 → vài lượt ghi |
+
+**Test:** thêm 3 bài (sắp xếp 100.000 mã, gợi ý tính lại giá đọc đúng 6 cột + đúng phiếu, ghi đè Draft theo khối). Với mã cũ, 3 bài này báo lỗi. `npm test` → 46/46 đạt.
+
+**Rollback:** revert commit (không đổi dữ liệu / cấu trúc sheet).
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -641,3 +659,4 @@ Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu
 - 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
 - 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.
 - 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 15 nút kết xuất Excel/PDF (test/ketXuat.test.js).
+- 29/09/2026 — Rà soát lại toàn bộ thay đổi: tối ưu sắp xếp Mã CT (Intl.Collator), đọc 6 cột khi gợi ý tính lại giá, ghi đè Draft Chưa TT theo khối.

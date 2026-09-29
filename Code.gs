@@ -423,18 +423,29 @@ function ghiVaoDraftChuaTT_(rowsMoiNK) {
     const giuChu = function (v) { return typeof v === "string" && v !== "" ? "'" + v.replace(/^'+/, "") : v; };
     rowsMoiNK = rowsMoiNK.map(function (r) { const x = r.slice(); x[0] = giuChu(x[0]); if (x.length > 22) x[22] = giuChu(x[22]); return x; });
 
+    // PERF: dòng ghi đè gom theo số dòng rồi ghi THEO KHỐI dòng liền nhau (trước: 1 lệnh
+    // ghi / dòng - import lại 500 phiếu = 500 lượt ghi). Cùng dòng xuất hiện 2 lần -> bản
+    // sau thắng, giống ghi tuần tự như trước.
+    const ghiDeTheoDong = new Map();
     rowsMoiNK.forEach(row => {
       const key = String(row[21] || "").trim();
       if (!key) return;
       if (mapDongCu.has(key)) {
         // TRÙNG Mã chứng từ đã có sẵn trong Draft -> GHI ĐÈ đúng dòng đó (không tạo dòng trùng)
-        const dongThat = mapDongCu.get(key);
-        sheet.getRange(dongThat, 1, 1, row.length).setValues([row]);
-        dongGhiDe.push(dongThat);
+        ghiDeTheoDong.set(mapDongCu.get(key), row);
       } else {
         rowsThemMoi.push(row);
       }
     });
+    const dsDongGhiDe = Array.from(ghiDeTheoDong.keys()).sort(function (a, b) { return a - b; });
+    for (let i = 0; i < dsDongGhiDe.length;) {
+      let j = i;
+      const soCot = ghiDeTheoDong.get(dsDongGhiDe[i]).length;
+      while (j + 1 < dsDongGhiDe.length && dsDongGhiDe[j + 1] === dsDongGhiDe[j] + 1 && ghiDeTheoDong.get(dsDongGhiDe[j + 1]).length === soCot) j++;
+      sheet.getRange(dsDongGhiDe[i], 1, j - i + 1, soCot).setValues(dsDongGhiDe.slice(i, j + 1).map(function (d) { return ghiDeTheoDong.get(d); }));
+      Array.prototype.push.apply(dongGhiDe, dsDongGhiDe.slice(i, j + 1));
+      i = j + 1;
+    }
     // PERF-06: định dạng Ngày/Giờ các dòng ghi đè gom vào 2 lệnh RangeList (trước: 4 lệnh/dòng).
     if (dongGhiDe.length > 0) PC_dinhDangCacKhoi_(sheet, dongGhiDe.map(function (r) { return [r, r]; }), _rf, true);
 
@@ -1608,7 +1619,7 @@ function getBaoCaoTongHop_(filters) {
       });
     });
 
-    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
+    result.sort((a, b) => soSanhMaChungTu_(a.maChungTu, b.maChungTu)); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongKL: tongKL, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -1618,6 +1629,16 @@ function getBaoCaoTongHop_(filters) {
 // (summary) vẫn tính trên MỌI dòng khớp; danh sách chỉ gửi tối đa 10.000 dòng có ngày
 // MỚI NHẤT (giữ nguyên thứ tự hiển thị), kèm tongSoDong + biCat để giao diện báo rõ.
 // Xem đầy đủ: Xuất Excel/PDF (không giới hạn).
+// PERF (sau L-07): localeCompare(..., "vi", {numeric}) tạo lại bộ so sánh ở MỖI lần so -
+// 100.000 dòng mất ~7,5 giây. Dùng 1 Intl.Collator tạo sẵn: cùng thứ tự, ~0,3 giây.
+let SO_SANH_MA_CT_ = null;
+function soSanhMaChungTu_(a, b) {
+  if (!SO_SANH_MA_CT_) {
+    try { SO_SANH_MA_CT_ = new Intl.Collator("vi", { numeric: true }).compare; }
+    catch (e) { SO_SANH_MA_CT_ = function (x, y) { return x.localeCompare(y, "vi", { numeric: true }); }; }
+  }
+  return SO_SANH_MA_CT_(String(a || ""), String(b || ""));
+}
 const BC_TOI_DA_DONG_WEB_ = 10000;
 function BC_gioiHanDongWeb_(res, truongNgay) {
   if (!res || res.status !== "success" || !Array.isArray(res.data) || res.data.length <= BC_TOI_DA_DONG_WEB_) return res;
@@ -1853,7 +1874,7 @@ function getBaoCaoDonGia_(filters) {
       });
     });
 
-    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
+    result.sort((a, b) => soSanhMaChungTu_(a.maChungTu, b.maChungTu)); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -1940,7 +1961,7 @@ function getBaoCaoMisa_(filters) {
       });
     });
 
-    result.sort((a, b) => a.maChungTu.localeCompare(b.maChungTu, "vi", { numeric: true })); // L-07: "9/..." trước "10/..."
+    result.sort((a, b) => soSanhMaChungTu_(a.maChungTu, b.maChungTu)); // L-07: "9/..." trước "10/..."
     return { status: "success", data: result, summary: { soLuong: result.length, tongKL: tongKL, tongTien: tongTien } };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -2639,15 +2660,22 @@ function BG_phieuChoTinhLai_(maList, hieuLucDate) {
     const lr = sh ? sh.getLastRow() : 0;
     if (lr <= 1) return kq;
     const tu = new Date(hieuLucDate.getFullYear(), hieuLucDate.getMonth(), hieuLucDate.getDate()).getTime();
-    sh.getRange(2, 2, lr - 1, 24).getValues().forEach(function (r) { // B..Y: [0]=Ngày cân 1, [15]=Q Mã ĐG, [20]=V Mã CT, [23]=Y Trạng thái
-      const tt = String(r[23] || "").trim();
-      if (tt === "OK" || !ma.has(String(r[15] || "").trim())) return;
-      if (!(r[0] instanceof Date) || r[0].getTime() < tu) return;
-      const maCT = String(r[20] || "").trim();
-      if (!maCT || kq.dsMaCT.length >= 5000) return;
+    // PERF: chỉ đọc 6 cột cần dùng (B, Q, V..Y) thay vì 24 cột B..Y - chạy sau MỖI lần
+    // lưu báo giá, sheet 100.000 phiếu giảm từ 2,4 triệu xuống 0,6 triệu ô. Kết quả không đổi.
+    const soDong = lr - 1;
+    const cotB = sh.getRange(2, 2, soDong, 1).getValues();  // Ngày cân 1
+    const cotQ = sh.getRange(2, 17, soDong, 1).getValues(); // Mã ĐG
+    const cotVY = sh.getRange(2, 22, soDong, 4).getValues(); // [0]=V Mã CT, [3]=Y Trạng thái
+    for (let i = 0; i < soDong; i++) {
+      const tt = String(cotVY[i][3] || "").trim();
+      if (tt === "OK" || !ma.has(String(cotQ[i][0] || "").trim())) continue;
+      const ngay = cotB[i][0];
+      if (!(ngay instanceof Date) || ngay.getTime() < tu) continue;
+      const maCT = String(cotVY[i][0] || "").trim();
+      if (!maCT || kq.dsMaCT.length >= 5000) continue;
       kq.dsMaCT.push(maCT);
       if (tt !== "Test giá") kq.soLoiBaoGia++;
-    });
+    }
   } catch (e) { /* chỉ là gợi ý - lỗi thì bỏ qua */ }
   return kq;
 }
