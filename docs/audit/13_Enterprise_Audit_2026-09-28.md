@@ -659,8 +659,9 @@ Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ 
 | Biểu đồ Dashboard | Cột giãn đều cả chiều ngang, bo góc |
 | Kéo thả file | Có biểu tượng tải lên |
 | Điện thoại | Thanh menu gọn, không chiếm hết màn hình đầu |
+| Nhóm Kho Dăm (Nhập/Xuất dăm, Độ khô, Kỳ vét bãi, Danh mục kho, Báo cáo tồn) | Đồng bộ với các màn khác: thanh chọn tab dạng nút (thay dải vàng), khung lọc nền nhạt có viền, ô nhập/nút cao đều, bảng không kẻ ô vuông, tiêu đề bảng in hoa nhỏ - chỉ CSS trong phạm vi `#view-khodam` |
 
-**Rollback:** xóa khối CSS "GIAO DIỆN CHUYÊN NGHIỆP" trong `Index.html`. **Test:** `npm test` → 46/46 đạt (gồm các bài giao diện Chromium: 375px, zoom, chế độ tối).
+**Đã kiểm tra đủ 30 màn hình con của 7 menu** (ảnh chụp Chromium với dữ liệu giả lập). **Rollback:** xóa khối CSS "GIAO DIỆN CHUYÊN NGHIỆP" trong `Index.html`. **Test:** `npm test` → 46/46 đạt (gồm các bài giao diện Chromium: 375px, zoom, chế độ tối).
 
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
@@ -679,3 +680,4 @@ Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ 
 - 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 15 nút kết xuất Excel/PDF (test/ketXuat.test.js).
 - 29/09/2026 — Rà soát lại toàn bộ thay đổi: tối ưu sắp xếp Mã CT (Intl.Collator), đọc 6 cột khi gợi ý tính lại giá, ghi đè Draft Chưa TT theo khối.
 - 29/09/2026 — Giao diện chuyên nghiệp (CSS, giữ nguyên bộ màu).
+- 29/09/2026 — Đồng bộ giao diện cho tất cả menu (nhóm Kho Dăm theo cùng kiểu).
