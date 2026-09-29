@@ -606,6 +606,26 @@ Quy tắc của chủ hệ thống:
 | Test | Mô phỏng tải file MISA gốc: file tạm có đủ tiêu đề + dữ liệu (ngày là giá trị ngày thật, mã giữ dạng chữ), thứ tự ghi → flush → tải. Bỏ bản sửa thì test báo lỗi. `npm test` → 29/29 đạt. |
 | Rollback | Revert commit (chỉ thêm 1 lệnh flush). |
 
+### Rà soát toàn bộ chức năng kết xuất Excel/PDF (29/09/2026)
+
+Tất cả 16 nút xuất trên giao diện đều đi qua `runServer` → `API` → `chuyenLinkXuatThanhFile_`, nên bản sửa `SpreadsheetApp.flush()` ở trên áp dụng cho **mọi** file xuất. Trước bản sửa, chỉ *Bảng báo giá* có sẵn `flush()`; các chức năng còn lại đều có thể tải về file trống.
+
+| Chức năng | Kết quả kiểm tra |
+|---|---|
+| Tổng hợp cân (Excel, PDF) | Đạt |
+| Tổng hợp theo báo giá (Excel, PDF) | Đạt |
+| Báo cáo Misa (Excel, PDF) + File MISA gốc | Đạt |
+| Xuất qua cân (Excel, PDF) | Đạt |
+| Xuất bán Misa (Excel) | Đạt |
+| Nhật ký hoạt động (Excel) | Đạt |
+| Phiếu nhập kho (PDF) | Đạt |
+| File mẫu import Phiếu cân / Xuất hàng | Đạt |
+| Bảng báo giá (Excel) | Đạt |
+
+Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu, không thừa), cột ngày là giá trị ngày thật + định dạng ngày, mã chứng từ / số phiếu / số TKHQ giữ dạng chữ, không ô nào thành công thức, định dạng số hợp lệ, ghi → flush → tải đúng thứ tự; không có dữ liệu thì báo lỗi, không tạo file. `test/ketXuat.test.js` (14 bài). `npm test` → 43/43 đạt.
+
+**Ghi nhận (chưa sửa, không phải lỗi kết xuất):** file mẫu import Phiếu cân có 14 cột tiêu đề nhưng dòng ví dụ chỉ có 13 giá trị. Vì vậy chữ "ĐL" rơi vào cột "Nguồn gốc", còn cột "ĐL" để trống. Bước import đọc Đại lý ở cột thứ 14 ("ĐL"). Chỉ ảnh hưởng dòng ví dụ minh họa.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -620,3 +640,4 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
 - 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
 - 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.
+- 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 16 chức năng kết xuất Excel/PDF (test/ketXuat.test.js).
