@@ -608,7 +608,7 @@ Quy tắc của chủ hệ thống:
 
 ### Rà soát toàn bộ chức năng kết xuất Excel/PDF (29/09/2026)
 
-Tất cả 16 nút xuất trên giao diện đều đi qua `runServer` → `API` → `chuyenLinkXuatThanhFile_`, nên bản sửa `SpreadsheetApp.flush()` ở trên áp dụng cho **mọi** file xuất. Trước bản sửa, chỉ *Bảng báo giá* có sẵn `flush()`; các chức năng còn lại đều có thể tải về file trống.
+Tất cả 15 nút xuất trên giao diện đều đi qua `runServer` → `API` → `chuyenLinkXuatThanhFile_`, nên bản sửa `SpreadsheetApp.flush()` ở trên áp dụng cho **mọi** file xuất. Trước bản sửa, chỉ *Bảng báo giá* có sẵn `flush()`; các chức năng còn lại đều có thể tải về file trống.
 
 | Chức năng | Kết quả kiểm tra |
 |---|---|
@@ -640,4 +640,4 @@ Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu
 - 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
 - 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
 - 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.
-- 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 16 chức năng kết xuất Excel/PDF (test/ketXuat.test.js).
+- 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 15 nút kết xuất Excel/PDF (test/ketXuat.test.js).
