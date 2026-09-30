@@ -1765,23 +1765,44 @@
         <!-- TAB: CẤU HÌNH HỆ THỐNG -->
         <div class="tabpane" id="ht-tab-cauhinh">
           <div class="card">
-            <h2>1. Locale hệ thống — đồng bộ với Locale THẬT của Google Sheet</h2>
+            <h2>1. Định dạng hiển thị trên Webapp</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Cách webapp hiển thị số, ngày và giờ trên màn hình (bảng, ô nhập, thông báo). Quy tắc chung: <b>số canh phải</b> (có phân cách hàng nghìn), <b>chữ canh trái</b>, <b>ngày/giờ canh giữa</b>.
+              <b>Múi giờ</b> chỉ dùng để <b>hiển thị giờ</b> (webapp và file Excel/PDF xuất ra) — dữ liệu gốc, lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá vẫn theo giờ Việt Nam; ngày không kèm giờ (VD Ngày cân) không đổi theo múi giờ. Lưu xong <b>tải lại trang (F5)</b> để áp dụng.
+            </p>
+            <div class="field-grid">
+              <div class="field" style="grid-column:span 2;">
+                <label>Định dạng Webapp</label>
+                <select id="ht_vungMienWeb">
+                  <option value="VN">🇻🇳 Việt Nam — 1.234.567,89 · dd/MM/yyyy (VD: 25/07/2026)</option>
+                  <option value="US">🇺🇸 United States — 1,234,567.89 · MM/dd/yyyy (VD: 07/25/2026)</option>
+                </select>
+              </div>
+              <div class="field" style="grid-column:span 2;">
+                <label>Múi giờ hiển thị</label>
+                <select id="ht_muiGio"><option value="Asia/Ho_Chi_Minh">(GMT+07:00) Việt Nam - Hồ Chí Minh / Hà Nội</option></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>2. Định dạng ghi dữ liệu lên Google Sheet — đồng bộ với Locale THẬT của Google Sheet</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Xác định thứ tự ngày/tháng khi hệ thống ghi dữ liệu xuống các Google Sheet nghiệp vụ chính, <b>VÀ đồng thời</b> quyết định cách hệ thống hiểu dấu phân cách (","/".") khi <b>đọc số từ file Excel import</b> (Import phiếu cân, Import xuất hàng) trong trường hợp ô đến dưới dạng chữ. Chọn ĐÚNG Locale thật đang cài trên các Google Sheet đích — nếu chọn sai, dữ liệu ghi xuống có thể bị Google Sheets không nhận diện được là Ngày/Số và để nguyên dạng Text, hoặc bị hiểu sai giá trị khi đọc từ file Excel. Đổi xong áp dụng <b>ngay lập tức</b>, không cần deploy lại.
             </p>
             <div class="field-grid">
               <div class="field" style="grid-column:span 2;">
-                <label>Vùng lãnh thổ</label>
+                <label>Định dạng ghi Google Sheet</label>
                 <select id="ht_vungMien">
                   <option value="VN">🇻🇳 Việt Nam — dd/MM/yyyy (VD: 25/07/2026)</option>
                   <option value="US">🇺🇸 United States — MM/dd/yyyy (VD: 07/25/2026)</option>
                 </select>
               </div>
             </div>
-            <div class="guide-note">Giờ luôn hiển thị dạng 12 giờ kèm AM/PM — riêng chữ AM/PM (hay SA/CH) do <b>Locale của chính từng Google Sheet</b> quyết định (Sheet đặt Locale "Vietnam" sẽ tự hiện "SA"/"CH", đặt "United States" sẽ hiện "AM"/"PM"), độc lập với lựa chọn Vùng lãnh thổ ở trên.</div>
+            <div class="guide-note">Giờ luôn hiển thị dạng 12 giờ kèm AM/PM — riêng chữ AM/PM (hay SA/CH) do <b>Locale của chính từng Google Sheet</b> quyết định (Sheet đặt Locale "Vietnam" sẽ tự hiện "SA"/"CH", đặt "United States" sẽ hiện "AM"/"PM"), độc lập với lựa chọn "Định dạng ghi Google Sheet" ở trên.</div>
 
             <h5 style="margin:16px 0 4px;color:var(--brand-dark);font-size:12.5px;text-transform:uppercase;letter-spacing:.3px;">Locale THẬT đang cài trên từng Sheet (kiểm tra trực tiếp, không phải đoán)</h5>
-            <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Bấm "Kiểm tra ngay" để hệ thống tự mở từng Sheet và đọc đúng Locale thật đang cài đặt, so sánh với lựa chọn "Vùng lãnh thổ" ở trên.</p>
+            <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Bấm "Kiểm tra ngay" để hệ thống tự mở từng Sheet và đọc đúng Locale thật đang cài đặt, so sánh với lựa chọn "Định dạng ghi Google Sheet" ở trên.</p>
             <div class="btnrow" style="margin-top:0;margin-bottom:10px;">
               <button class="btn btn-ghost btn-sm" id="btnKiemTraLocaleThat">🔍 Kiểm tra ngay</button>
             </div>
@@ -1794,16 +1815,16 @@
           </div>
 
           <div class="card">
-            <h2>2. Locale riêng cho Báo cáo Misa</h2>
+            <h2>3. Định dạng kết xuất dữ liệu &amp; báo cáo (Excel / PDF / MISA)</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Tách biệt hoàn toàn với mục 1 — vì đây là <b>file Excel/PDF tải về</b> (không phải Sheet lưu trữ lâu dài), nên <b>KHÔNG cần đồng bộ</b> với Locale thật của bất kỳ Google Sheet nào. Đây đơn thuần là lựa chọn hiển thị khi anh mở file Misa đã xuất ra — đổi tùy ý mà không ảnh hưởng đến cách hệ thống ghi dữ liệu vào các Sheet khác. Áp dụng cho: "Báo cáo gỗ keo nhập kết xuất Misa", "Báo cáo xuất kho dăm gỗ kết xuất Misa" (khi xuất Excel/PDF).
+              Tách biệt với mục 2 — đây là <b>file tải về</b> (không phải Sheet lưu trữ lâu dài), nên <b>không cần đồng bộ</b> với Locale thật của Google Sheet. Áp dụng cho <b>mọi</b> file xuất: Excel/PDF các báo cáo (tổng hợp cân, theo báo giá, Misa, xuất qua cân, xuất bán Misa, nhật ký), File MISA gốc, Phiếu nhập kho PDF, Bảng báo giá. Giờ trong file theo múi giờ ở mục 1.
             </p>
             <div class="field-grid">
               <div class="field" style="grid-column:span 2;">
-                <label>Vùng lãnh thổ (riêng cho Misa)</label>
+                <label>Định dạng file kết xuất</label>
                 <select id="ht_vungMienMisa">
-                  <option value="VN">🇻🇳 Việt Nam — dd/MM/yyyy</option>
-                  <option value="US">🇺🇸 United States — MM/dd/yyyy</option>
+                  <option value="VN">🇻🇳 Việt Nam — 1.234.567,89 · dd/MM/yyyy</option>
+                  <option value="US">🇺🇸 United States — 1,234,567.89 · MM/dd/yyyy</option>
                 </select>
               </div>
             </div>
@@ -1813,7 +1834,7 @@
           </div>
 
           <div class="card">
-            <h2>3. Giá trị mặc định cho Báo cáo Misa Nhập (Update_MiSa_PC)</h2>
+            <h2>4. Giá trị mặc định cho Báo cáo Misa Nhập (Update_MiSa_PC)</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Các giá trị kế toán dùng chung khi hệ thống tạo dữ liệu Misa từ phiếu cân (nút "⚙️ Chạy trích xuất dữ liệu Misa" ở tab Import) — trước đây phải sửa code mới đổi được, nay chỉnh trực tiếp tại đây. Áp dụng từ lần chạy trích xuất tiếp theo.
             </p>
@@ -2137,14 +2158,33 @@
     // Ngày/giờ máy chủ gửi dạng chuẩn nội bộ "dd/MM/yyyy[ HH:mm[:ss]]" hoặc "yyyy-MM-dd[ HH:mm]"
     // -> hiển thị theo Locale hệ thống. Chuỗi khác giữ nguyên. Đổi được cả ngày nằm giữa câu
     // (VD "Từ: 2026-01-01 00:00 - Đến: ...").
+    // MÚI GIỜ HIỂN THỊ (Hệ thống › Cấu hình): máy chủ gửi giờ theo giờ Việt Nam (GMT+7);
+    // chuỗi CÓ giờ được đổi sang múi giờ đã chọn, ngày KHÔNG kèm giờ giữ nguyên (không nhảy ngày).
+    const MUI_GIO_HT = (<?!= muiGioJson ?>) || 'Asia/Ho_Chi_Minh';
+    let _dinhDangMuiGio = null;
+    function gioVNSangMuiGio(y, mo, d, h, mi, se){
+      if (MUI_GIO_HT === 'Asia/Ho_Chi_Minh') return null;
+      try {
+        if (!_dinhDangMuiGio) _dinhDangMuiGio = new Intl.DateTimeFormat('en-GB', { timeZone: MUI_GIO_HT, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23' });
+        const p = {};
+        _dinhDangMuiGio.formatToParts(new Date(Date.UTC(+y, +mo - 1, +d, +h - 7, +mi, +(se || 0)))).forEach(x => { p[x.type] = x.value; });
+        return { y: p.year, mo: p.month, d: p.day, h: p.hour, mi: p.minute, se: p.second };
+      } catch(e) { return null; }
+    }
     function ngayHT(s){
       if (s === null || s === undefined) return '';
       const us = MIEN_HT === 'US';
       // 1 lượt thay duy nhất (tránh đổi 2 lần 1 ngày đã đổi ở kiểu US).
-      return String(s).replace(/\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\/(\d{2})\/(\d{4})\b/g, (m, y, mo, d, d2, mo2, y2) => {
-        if (y) return us ? mo + '/' + d + '/' + y : d + '/' + mo + '/' + y;
-        return us ? mo2 + '/' + d2 + '/' + y2 : m;
-      });
+      return String(s).replace(/\b(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\b|\b(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\b/g,
+        (m, y, mo, d, h, mi, se, d2, mo2, y2, h2, mi2, se2) => {
+          if (!y) { y = y2; mo = mo2; d = d2; h = h2; mi = mi2; se = se2; }
+          if (h !== undefined) {
+            const t = gioVNSangMuiGio(y, mo, d, h, mi, se);
+            if (t) { y = t.y; mo = t.mo; d = t.d; h = t.h; mi = t.mi; if (se !== undefined) se = t.se; }
+          }
+          const ngay = us ? mo + '/' + d + '/' + y : d + '/' + mo + '/' + y;
+          return h === undefined ? ngay : ngay + ' ' + h + ':' + mi + (se !== undefined ? ':' + se : '');
+        });
     }
     // Ô bảng ngày (canh giữa) / số (canh phải).
     function tdNgay(s){ return '<td class="ngay">' + escapeHtml(ngayHT(s)) + '</td>'; }
@@ -5719,6 +5759,12 @@
         if (res.status === 'success') {
           document.getElementById('ht_vungMien').value = res.mien;
           document.getElementById('ht_vungMienMisa').value = res.mienMisa;
+          if (res.mienWeb) document.getElementById('ht_vungMienWeb').value = res.mienWeb;
+          if (Array.isArray(res.dsMuiGio)) {
+            const sel = document.getElementById('ht_muiGio');
+            sel.innerHTML = res.dsMuiGio.map(m => '<option value="' + escapeHtml(m.id) + '">' + escapeHtml(m.ten) + '</option>').join('');
+            sel.value = res.muiGio || 'Asia/Ho_Chi_Minh';
+          }
         }
       } catch(err){ toast('Lỗi tải cấu hình: ' + err, false); }
       await htLoadMisaDefaults();
@@ -5779,7 +5825,9 @@
       try {
         const res = await runServer('HT_luuCauHinhVungMien',
           document.getElementById('ht_vungMien').value,
-          document.getElementById('ht_vungMienMisa').value
+          document.getElementById('ht_vungMienMisa').value,
+          document.getElementById('ht_vungMienWeb').value,
+          document.getElementById('ht_muiGio').value
         );
         toast(res.message, res.status === 'success');
       } catch(err){ toast('Lỗi lưu cấu hình: ' + err, false); } finally { hideOverlay(); }

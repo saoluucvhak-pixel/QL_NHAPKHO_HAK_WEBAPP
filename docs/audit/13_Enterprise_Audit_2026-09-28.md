@@ -676,6 +676,34 @@ Kiểm tra lại 4 nguyên tắc (Đợt 2) trên toàn bộ mã, kể cả ph�
 
 Dữ liệu bảng gửi lên giao diện vẫn là chuẩn nội bộ `dd/MM/yyyy` và được giao diện đổi theo vùng khi hiển thị (`ngayHT`) - đúng thiết kế Đợt 2. Email báo lỗi giữ `dd/MM/yyyy` (thư gửi Quản trị, không phải màn hình). **Test:** thêm 1 bài VN/US cho thông báo máy chủ; `npm test` → 47/47.
 
+## 3 định dạng độc lập + múi giờ hiển thị (30/09/2026) — theo yêu cầu chủ hệ thống
+
+Hệ thống › Cấu hình hệ thống nay có **3 lựa chọn định dạng độc lập (VN / US)** + **múi giờ**:
+
+| Mục | Áp dụng cho | Thuộc tính (Script Properties) | Mặc định |
+|---|---|---|---|
+| 1. Định dạng Webapp | Số, ngày trên màn hình (bảng, ô nhập, thông báo) | `WEBAPP_FORMAT_MIEN` | Chưa chọn → theo mục 2 (giống hệt trước đây) |
+| 1. Múi giờ hiển thị | Giờ trên webapp + giờ trong file Excel/PDF | `MUI_GIO_HIEN_THI` (16 múi giờ cho phép) | `Asia/Ho_Chi_Minh` |
+| 2. Ghi Google Sheet | Định dạng ngày/số khi ghi Sheet, đọc số dạng chữ từ file import | `REGION_FORMAT_MIEN` (không đổi) | VN |
+| 3. Kết xuất Excel / PDF / MISA | Mọi file tải về (đổi tên từ "Locale Misa") | `MISA_FORMAT_MIEN` (không đổi) | VN |
+
+**Múi giờ chỉ để HIỂN THỊ** (theo quyết định): dữ liệu gốc, lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá vẫn theo giờ Việt Nam. Chỉ giá trị **có kèm giờ** được đổi (VD "25/07/2026 23:30" giờ VN → "26/07/2026 01:30" giờ Tokyo); **ngày không kèm giờ** (Ngày cân…) giữ nguyên để không nhảy ngày. Cột **chỉ có giờ** tách riêng khỏi ngày (VD "Giờ cân 1" cạnh "Ngày cân 1") giữ giờ Việt Nam, vì đổi riêng giờ sẽ lệch với cột ngày.
+
+**Quy tắc canh lề** giữ nguyên ở cả 3 nơi: số canh phải (có phân cách hàng nghìn), chữ canh trái, ngày/giờ canh giữa.
+
+| Hàm / vị trí | Thay đổi |
+|---|---|
+| `WEBAPP_FORMAT_`, `MUI_GIO_HIEN_THI_`, `MUI_GIO_CHO_PHEP` (Config.gs) | Mới |
+| `HT_layCauHinhVungMien_`, `HT_luuCauHinhVungMien_(mien, mienMisa, mienWeb, muiGio)` | Trả/nhận thêm 2 mục; client cũ gửi 2 tham số → giữ nguyên 2 mục mới; múi giờ sai → báo lỗi, **không lưu dở dang** |
+| `doGet` | Nhúng định dạng webapp + múi giờ (`muiGioJson`) |
+| `ngayHT` (Index.html) | Đổi giờ VN → múi giờ chọn cho chuỗi có giờ (Intl) |
+| `soHT_`, `ngayHT_` | Thông báo máy chủ theo định dạng webapp + múi giờ |
+| `XK_chuanBiCot_`, `XK_theoMuiGio_` | Cột ngày CÓ giờ trong file xuất theo múi giờ |
+
+**Test:** 2 bài mới (máy chủ: tách 3 định dạng, tương thích client cũ, không lưu dở dang, đổi giờ file xuất; giao diện Chromium: đổi giờ qua nửa đêm, ngày không giờ giữ nguyên). `npm test` → 49/49.
+
+**Rollback:** chọn lại "Việt Nam" + "(GMT+07:00) Việt Nam" (hiển thị như cũ), hoặc revert commit; xóa `WEBAPP_FORMAT_MIEN`, `MUI_GIO_HIEN_THI` trong Script Properties nếu muốn sạch hoàn toàn.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -695,3 +723,4 @@ Dữ liệu bảng gửi lên giao diện vẫn là chuẩn nội bộ `dd/MM/yy
 - 29/09/2026 — Giao diện chuyên nghiệp (CSS, giữ nguyên bộ màu).
 - 29/09/2026 — Đồng bộ giao diện cho tất cả menu (nhóm Kho Dăm theo cùng kiểu).
 - 29/09/2026 — Thông báo máy chủ (số, ngày) theo Locale hệ thống (soHT_, ngayHT_).
+- 30/09/2026 — Tách 3 định dạng (Webapp / Ghi Google Sheet / Kết xuất Excel-PDF-MISA) + múi giờ hiển thị.

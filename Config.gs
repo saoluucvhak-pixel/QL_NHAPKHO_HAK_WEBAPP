@@ -188,7 +188,43 @@ function parseSoTheoLocale_(rawValue) {
   return parseFloat(str);
 }
 
+/* ---------- ĐỊNH DẠNG HIỂN THỊ TRÊN WEBAPP + MÚI GIỜ HIỂN THỊ (29/09/2026) ----------
+ * Tách khỏi "Ghi Google Sheet" (REGION_FORMAT_): webapp chọn VN/US riêng. Chưa từng
+ * chọn -> dùng đúng như trước (theo REGION_FORMAT_) nên không đổi gì với hệ thống cũ.
+ * MÚI GIỜ chỉ dùng để HIỂN THỊ giờ (webapp + file Excel/PDF xuất ra) - dữ liệu gốc,
+ * lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá VẪN theo giờ Việt Nam (GMT+7).
+ * Ngày không kèm giờ (VD Ngày cân) không đổi theo múi giờ (tránh nhảy ngày). */
+const MUI_GIO_MAC_DINH = "Asia/Ho_Chi_Minh";
+const MUI_GIO_CHO_PHEP = [
+  { id: "Asia/Ho_Chi_Minh", ten: "(GMT+07:00) Việt Nam - Hồ Chí Minh / Hà Nội" },
+  { id: "Asia/Bangkok", ten: "(GMT+07:00) Bangkok" },
+  { id: "Asia/Singapore", ten: "(GMT+08:00) Singapore" },
+  { id: "Asia/Shanghai", ten: "(GMT+08:00) Trung Quốc" },
+  { id: "Asia/Taipei", ten: "(GMT+08:00) Đài Loan" },
+  { id: "Asia/Tokyo", ten: "(GMT+09:00) Nhật Bản" },
+  { id: "Asia/Seoul", ten: "(GMT+09:00) Hàn Quốc" },
+  { id: "Australia/Sydney", ten: "(GMT+10/+11) Sydney" },
+  { id: "Asia/Kolkata", ten: "(GMT+05:30) Ấn Độ" },
+  { id: "Asia/Dubai", ten: "(GMT+04:00) Dubai" },
+  { id: "Europe/London", ten: "(GMT+00/+01) London" },
+  { id: "Europe/Paris", ten: "(GMT+01/+02) Paris / Berlin" },
+  { id: "America/New_York", ten: "(GMT-05/-04) New York" },
+  { id: "America/Chicago", ten: "(GMT-06/-05) Chicago" },
+  { id: "America/Los_Angeles", ten: "(GMT-08/-07) Los Angeles" },
+  { id: "UTC", ten: "(GMT+00:00) UTC" }
+];
+function WEBAPP_FORMAT_() {
+  const mien = PropertiesService.getScriptProperties().getProperty("WEBAPP_FORMAT_MIEN") || REGION_FORMAT_().MIEN;
+  const dateFmt = mien === "US" ? "MM/dd/yyyy" : "dd/MM/yyyy";
+  return { MIEN: mien === "US" ? "US" : "VN", DATE_FMT: dateFmt };
+}
+function MUI_GIO_HIEN_THI_() {
+  const tz = PropertiesService.getScriptProperties().getProperty("MUI_GIO_HIEN_THI") || MUI_GIO_MAC_DINH;
+  return MUI_GIO_CHO_PHEP.some(function (m) { return m.id === tz; }) ? tz : MUI_GIO_MAC_DINH;
+}
+
 /* ---------- CẤU HÌNH RIÊNG CHO BÁO CÁO / KẾT XUẤT MISA ---------- */
+// (Giao diện gọi là "Định dạng kết xuất dữ liệu & báo cáo (Excel / PDF / MISA)".)
 // TÁCH BIỆT HOÀN TOÀN với REGION_FORMAT ở trên - vì đây là FILE XUẤT/TẢI VỀ
 // (Excel/PDF), KHÔNG PHẢI Sheet lưu trữ lâu dài, nên KHÔNG cần đồng bộ với
 // Locale thật của bất kỳ Google Sheet nào. Đây chỉ đơn thuần là LỰA CHỌN hiển
@@ -218,7 +254,8 @@ function HT_layCauHinhVungMien_() {
     // mục cấu hình (đã chặn Admin-only), tránh 1 điểm hở dù nhỏ.
     const rf = REGION_FORMAT_();
     const mf = MISA_FORMAT_();
-    return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN };
+    return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN,
+      mienWeb: WEBAPP_FORMAT_().MIEN, muiGio: MUI_GIO_HIEN_THI_(), dsMuiGio: MUI_GIO_CHO_PHEP };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
@@ -265,20 +302,31 @@ function HT_layLocaleThatCuaSheet_() {
 }
 
 // Lưu TOÀN BỘ cấu hình mới - áp dụng NGAY LẬP TỨC cho mọi lần ghi Sheet tiếp theo
-function HT_luuCauHinhVungMien_(mien, mienMisa) {
+// mienWeb, muiGio (tùy chọn, 29/09/2026): client cũ không gửi -> giữ nguyên giá trị đang có.
+function HT_luuCauHinhVungMien_(mien, mienMisa, mienWeb, muiGio) {
   try {
     const props = PropertiesService.getScriptProperties();
     mien = (String(mien || "").toUpperCase() === "US") ? "US" : "VN";
     mienMisa = (String(mienMisa || "").toUpperCase() === "US") ? "US" : "VN";
+    // Kiểm tra TRƯỚC khi ghi: múi giờ sai -> không lưu gì (không lưu dở dang)
+    const coMuiGio = muiGio !== undefined && muiGio !== null && muiGio !== "";
+    if (coMuiGio && !MUI_GIO_CHO_PHEP.some(function (m) { return m.id === String(muiGio); })) throw new Error("Múi giờ không hợp lệ: " + muiGio);
 
     props.setProperty("REGION_FORMAT_MIEN", mien);
     props.setProperty("MISA_FORMAT_MIEN", mienMisa);
+    if (mienWeb !== undefined && mienWeb !== null && mienWeb !== "") {
+      props.setProperty("WEBAPP_FORMAT_MIEN", String(mienWeb).toUpperCase() === "US" ? "US" : "VN");
+    }
+    if (coMuiGio) props.setProperty("MUI_GIO_HIEN_THI", String(muiGio));
+    const ten = function (m) { return m === "VN" ? "Việt Nam (dd/MM/yyyy)" : "United States (MM/dd/yyyy)"; };
+    const web = WEBAPP_FORMAT_().MIEN, tz = MUI_GIO_HIEN_THI_();
 
-    logAudit_("CAUHINH_VUNGMIEN", "OK", "Locale hệ thống: " + mien + ", Locale Misa: " + mienMisa);
+    logAudit_("CAUHINH_VUNGMIEN", "OK", "Webapp: " + web + ", Múi giờ hiển thị: " + tz + ", Ghi Google Sheet: " + mien + ", Kết xuất Excel/PDF/MISA: " + mienMisa);
     return {
       status: "success",
-      message: "✅ Đã lưu cấu hình: Hệ thống = " + (mien === "VN" ? "Việt Nam (dd/MM/yyyy)" : "United States (MM/dd/yyyy)") +
-        ", Báo cáo Misa = " + (mienMisa === "VN" ? "Việt Nam" : "United States")
+      message: "✅ Đã lưu cấu hình: Webapp = " + ten(web) + ", Múi giờ hiển thị = " + tz +
+        ", Ghi Google Sheet = " + ten(mien) + ", Kết xuất Excel/PDF/MISA = " + ten(mienMisa) +
+        ". Tải lại trang (F5) để webapp hiển thị theo cấu hình mới."
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }

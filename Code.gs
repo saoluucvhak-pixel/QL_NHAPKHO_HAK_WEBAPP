@@ -42,9 +42,12 @@ function doGet(e) {
   t.thongBaoDangNhapJson = JSON.stringify(thongBao).replace(/</g, '\\u003c');
   // Locale hệ thống (VN/US) cho giao diện: số, ngày hiển thị trên webapp theo đúng
   // thiết lập Hệ thống › Cấu hình (không phải dữ liệu nhạy cảm, nhúng sẵn để vẽ ngay).
-  let _mienGiaoDien = "VN";
-  try { _mienGiaoDien = REGION_FORMAT_().MIEN; } catch (err) { /* mặc định VN */ }
+  // 29/09/2026: webapp có định dạng riêng (WEBAPP_FORMAT_) + múi giờ hiển thị.
+  let _mienGiaoDien = "VN", _muiGio = "Asia/Ho_Chi_Minh";
+  try { _mienGiaoDien = WEBAPP_FORMAT_().MIEN; } catch (err) { /* mặc định VN */ }
+  try { _muiGio = MUI_GIO_HIEN_THI_(); } catch (err) { /* mặc định giờ VN */ }
   t.mienHeThongJson = JSON.stringify(_mienGiaoDien);
+  t.muiGioJson = JSON.stringify(_muiGio);
   return t.evaluate()
     .setTitle('HỆ THỐNG QUẢN LÝ CÂN HAKGROUP')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -142,14 +145,26 @@ function PC_canhBaoHopLy_(dateC, dateD, can1, can2, klHang) {
 // Nguyên tắc số & vùng cho CHỮ TRONG THÔNG BÁO gửi người dùng (toast, lỗi, ghi chú sheet):
 // theo Locale hệ thống (REGION_FORMAT_), không viết cứng kiểu VN. Dữ liệu bảng vẫn gửi
 // dạng chuẩn nội bộ dd/MM/yyyy - giao diện tự đổi theo vùng khi hiển thị (ngayHT).
+// Thông báo hiện trên webapp -> theo "Định dạng webapp" (WEBAPP_FORMAT_); có giờ thì
+// theo múi giờ hiển thị (ngày không kèm giờ giữ theo giờ VN, không nhảy ngày).
 function soHT_(n, soLe) {
   const x = Number(n);
   if (!isFinite(x)) return String(n == null ? "" : n);
-  return x.toLocaleString(REGION_FORMAT_().MIEN === "US" ? "en-US" : "vi-VN", { maximumFractionDigits: soLe == null ? 3 : soLe });
+  return x.toLocaleString(WEBAPP_FORMAT_().MIEN === "US" ? "en-US" : "vi-VN", { maximumFractionDigits: soLe == null ? 3 : soLe });
 }
 function ngayHT_(d, coGio) {
   if (!(d instanceof Date) || isNaN(d.getTime())) return "";
-  return dinhDangGMT7_(d, REGION_FORMAT_().DATE_FMT + (coGio ? " HH:mm:ss" : ""));
+  const mau = WEBAPP_FORMAT_().DATE_FMT + (coGio ? " HH:mm:ss" : "");
+  const tz = coGio ? MUI_GIO_HIEN_THI_() : MUI_GIO_MAC_DINH;
+  return tz === MUI_GIO_MAC_DINH ? dinhDangGMT7_(d, mau) : Utilities.formatDate(d, tz, mau);
+}
+// File xuất: 1 thời điểm (Date thật) -> Date mang "giờ đồng hồ" của múi giờ hiển thị, để
+// file tạm (múi giờ script = giờ VN) hiện đúng giờ theo múi giờ đã chọn. Giờ VN -> giữ nguyên.
+function XK_theoMuiGio_(d) {
+  const tz = MUI_GIO_HIEN_THI_();
+  if (tz === MUI_GIO_MAC_DINH || !(d instanceof Date) || isNaN(d.getTime())) return d;
+  const p = Utilities.formatDate(d, tz, "yyyy-MM-dd HH:mm:ss").split(/[- :]/).map(Number);
+  return new Date(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
 }
 
 function doiChuoiNgayTheoMien_(s, mien) {
@@ -2024,17 +2039,20 @@ function XK_chuanBiCot_(headers, rows) {
     }
     if (!coGiaTri) return { loai: "chu" };
     if (tatCaSo) return { loai: "so", fmt: soLe ? "#,##0.00" : "#,##0" };
-    if (tatCaNgay) return { loai: "ngay", fmt: coGio ? mf.DATETIME_FMT : mf.DATE_FMT };
+    if (tatCaNgay) return { loai: "ngay", fmt: coGio ? mf.DATETIME_FMT : mf.DATE_FMT, coGio: coGio };
     if (tatCaGio) return { loai: "gio", fmt: mf.TIME_FMT };
     return { loai: "chu" };
   });
   rows.forEach(function (r) {
     kieu.forEach(function (k, c) {
       const v = r[c];
+      // Cột ngày CÓ giờ đã là Date thật -> đổi theo múi giờ hiển thị (ngày không giờ giữ nguyên)
+      if (k.loai === "ngay" && k.coGio && v instanceof Date) { r[c] = XK_theoMuiGio_(v); return; }
       if (typeof v !== "string" || v === "") return;
       if (k.loai === "ngay") {
         const m = v.match(XK_RE_NGAY_);
         r[c] = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+        if (m[4] !== undefined) r[c] = XK_theoMuiGio_(r[c]); // có giờ -> theo múi giờ hiển thị
       } else if (k.loai === "gio") {
         const g = v.match(XK_RE_GIO_);
         r[c] = ((+g[1]) * 3600 + (+g[2]) * 60 + (+(g[3] || 0))) / 86400; // phần ngày: không phụ thuộc múi giờ

@@ -282,3 +282,40 @@ test('Nguyên tắc số & vùng trong thông báo máy chủ: theo Locale hệ 
   assert.strictEqual(us.chay('MISA_moTaBan_({ tuNgay: "2026-09-01", denNgay: "2026-09-30", soDong: 5, email: "a@x", luc: "x" })').startsWith('khoảng 09/01/2026 – 09/30/2026'), true);
   assert.strictEqual(us.chay('TC_moTaGia_({ trangThai: "Test giá", hieuSo: 1500000, thanhTien: 30000000 })'), 'Đơn giá 1,500,000 · Thành tiền 30,000,000');
 });
+
+test('Cấu hình 3 định dạng + múi giờ hiển thị: tách riêng, tương thích client cũ, đổi giờ file xuất', () => {
+  // Utilities.formatDate có múi giờ thật (giống Apps Script) cho bài này
+  const fmtTZ = (d, tz, mau) => {
+    const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d).forEach(x => { p[x.type] = x.value; });
+    return mau.replace('yyyy', p.year).replace('MM', p.month).replace('dd', p.day).replace('HH', p.hour).replace('mm', p.minute).replace('ss', p.second);
+  };
+  const { chay, props, ctx } = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'US' } });
+  ctx.Utilities.formatDate = fmtTZ;
+  ctx.logAudit_ = () => {};
+  // Chưa chọn định dạng webapp -> theo "Ghi Google Sheet" như trước (không đổi hệ thống cũ)
+  assert.strictEqual(chay('WEBAPP_FORMAT_().MIEN'), 'US');
+  assert.strictEqual(chay('MUI_GIO_HIEN_THI_()'), 'Asia/Ho_Chi_Minh');
+  // Lưu đủ 4 lựa chọn: độc lập nhau
+  const kq = chay('HT_luuCauHinhVungMien_("VN", "US", "US", "Asia/Tokyo")');
+  assert.strictEqual(kq.status, 'success', kq.message);
+  assert.deepStrictEqual([props.REGION_FORMAT_MIEN, props.MISA_FORMAT_MIEN, props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['VN', 'US', 'US', 'Asia/Tokyo']);
+  // Client cũ chỉ gửi 2 tham số -> giữ nguyên định dạng webapp + múi giờ
+  chay('HT_luuCauHinhVungMien_("VN", "VN")');
+  assert.deepStrictEqual([props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['US', 'Asia/Tokyo']);
+  // Múi giờ ngoài danh sách -> từ chối
+  assert.strictEqual(chay('HT_luuCauHinhVungMien_("US", "US", "VN", "Mars/Olympus")').status, 'error');
+  assert.deepStrictEqual([props.REGION_FORMAT_MIEN, props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['VN', 'US', 'Asia/Tokyo'], 'lỗi thì không lưu dở dang');
+  // Thông báo webapp: số + ngày theo định dạng webapp (US), giờ theo múi giờ Tokyo (+2h so với VN)
+  assert.strictEqual(chay('soHT_(1500000)'), '1,500,000');
+  assert.strictEqual(chay('ngayHT_(new Date(Date.UTC(2026,8,5,1,30,0)))'), '09/05/2026');            // 08:30 VN, không giờ -> theo ngày VN
+  assert.strictEqual(chay('ngayHT_(new Date(Date.UTC(2026,8,5,1,30,0)), true)'), '09/05/2026 10:30:00');
+  // File xuất: cột ngày CÓ giờ đổi theo múi giờ, cột chỉ có ngày giữ nguyên
+  const r = JSON.parse(chay(`(function () {
+    var rows = [["05/09/2026 23:30:00", "05/09/2026", new Date(2026,8,5,8,0,0)]];
+    XK_chuanBiCot_(["Thời gian", "Ngày cân", "Lúc tạo"], rows);
+    var f = function (d) { return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate() + " " + d.getHours() + ":" + d.getMinutes(); };
+    return JSON.stringify(rows[0].map(f));
+  })()`));
+  assert.deepStrictEqual(r, ['2026-9-6 1:30', '2026-9-5 0:0', '2026-9-5 10:0']);
+});
