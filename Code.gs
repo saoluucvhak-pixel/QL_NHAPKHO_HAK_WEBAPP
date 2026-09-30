@@ -586,14 +586,17 @@ function ghiNhieuVung_(ss, sheet, vung) {
   vung.forEach(function (v) { sheet.getRange(v.hang, v.cot, v.giaTri.length, v.giaTri[0].length).setValues(v.giaTri); });
 }
 
-// DRAFT-02: ghép kết quả tính giá (T, X, Y, Z) vào các dòng A..Z bắt đầu ở dòng
-// sheet "dongDau" (dsDong[i] = dòng dongDau + i). ketQua = [{rowNum, gia, hieuSo, trangThai, thanhTien}].
+// DRAFT-02: ghép kết quả tính giá (T, X, Y, Z) vào các dòng A..Z (bản sao sẽ ghi
+// vào Draft). ketQua = [{rowNum, maCT, gia, hieuSo, trangThai, thanhTien}].
+// Ghép theo MÃ CHỨNG TỪ (cột V) - không theo số dòng: nếu ĐNTT xóa dòng giữa lúc
+// ghi phiếu mới và lúc tính giá, số dòng lệch nhưng mã chứng từ vẫn đúng phiếu.
+// (dongDau giữ lại cho tương thích lời gọi cũ, không còn dùng.)
 function ghepKetQuaGia_(dsDong, dongDau, ketQua) {
   if (!ketQua || !ketQua.length) return;
-  const theoDong = new Map();
-  ketQua.forEach(function (k) { if (k.hieuSo !== undefined) theoDong.set(k.rowNum, k); });
-  dsDong.forEach(function (r, i) {
-    const k = theoDong.get(dongDau + i);
+  const theoMa = new Map();
+  ketQua.forEach(function (k) { if (k.hieuSo !== undefined && k.maCT) theoMa.set(k.maCT, k); });
+  dsDong.forEach(function (r) {
+    const k = theoMa.get(String(r[21] || "").trim());
     if (!k) return;
     while (r.length < 26) r.push("");
     r[19] = k.gia; r[23] = k.hieuSo; r[24] = k.trangThai; r[25] = k.thanhTien;
