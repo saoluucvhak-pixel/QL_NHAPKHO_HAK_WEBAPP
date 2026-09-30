@@ -147,3 +147,14 @@ test('Tải lớn giao diện: xem trước 50.000 dòng vẽ lô đầu < 2 gi�
   assert.ok(r.hang <= 501, 'chỉ vẽ lô đầu, thấy ' + r.hang + ' dòng');
   assert.strictEqual(r.chon, 50000);
 });
+
+test('Múi giờ hiển thị: giờ VN đổi sang múi giờ chọn (kể cả qua nửa đêm), ngày không giờ giữ nguyên', { skip: !chromium && 'chưa có Playwright' }, async () => {
+  const b = await chromium.launch(); const pg = await b.newPage();
+  const f = path.join(os.tmpdir(), 'hak_ui_tz.html');
+  fs.writeFileSync(f, SRC.replace(/<\?!= mienHeThongJson \?>/, '"VN"').replace(/<\?!= muiGioJson \?>/, '"Asia/Tokyo"').replace(/<\?!= [a-zA-Z]+ \?>/g, '""')
+    .replace('<head>', '<head>' + STUB).replace(/<link[^>]+fonts[^>]*>/g, ''));
+  await pg.goto('file://' + f);
+  const r = await pg.evaluate(() => [ngayHT('25/07/2026 08:30'), ngayHT('25/07/2026 23:30:15'), ngayHT('25/07/2026'), ngayHT('2026-07-25 08:30'), ngayHT('Lúc 25/07/2026 08:30:00 (VN)')]);
+  await b.close();
+  assert.deepStrictEqual(r, ['25/07/2026 10:30', '26/07/2026 01:30:15', '25/07/2026', '25/07/2026 10:30', 'Lúc 25/07/2026 10:30:00 (VN)']);
+});

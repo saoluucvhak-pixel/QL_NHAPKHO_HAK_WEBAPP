@@ -423,6 +423,160 @@
       .sub-menu{margin-left:8px;}
       .content{padding:18px;}
     }
+    /* =====================================================================
+       GIAO DIỆN CHUYÊN NGHIỆP (29/09/2026) - lớp tinh chỉnh đặt CUỐI để ghi đè.
+       GIỮ NGUYÊN bộ màu (chỉ dùng các biến màu sẵn có ở :root, nên chế độ tối
+       vẫn tự đúng). Chỉ đổi chữ, khoảng cách, bo góc, bóng, bảng, nút, ô nhập.
+       Quay lại giao diện cũ: xóa nguyên khối này.
+       ===================================================================== */
+    :root{ --radius:12px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.07); --shadow-lg:0 12px 32px rgba(16,24,40,.14); }
+    body{font-size:14px;line-height:1.5;letter-spacing:-.005em;}
+    /* Số: cùng font chữ chính, chữ số đều cột (thay font "máy đánh chữ") */
+    .num, td.num, th.num, .stat .value, input.o-so, .tc-the .v{font-family:'Be Vietnam Pro',sans-serif;font-variant-numeric:tabular-nums;}
+    .mono{font-size:.95em;letter-spacing:-.01em;}
+
+    /* Thanh menu bên */
+    .sidebar{padding:20px 14px;border-right:1px solid rgba(255,255,255,.04);}
+    .brand{margin-bottom:22px;padding:4px 8px 18px;border-bottom:1px solid rgba(255,255,255,.07);}
+    .brand-text .name{font-size:15px;letter-spacing:.2px;}
+    .menu{gap:2px;}
+    .menu-item{padding:10px 12px;border-radius:8px;font-size:13.5px;position:relative;}
+    .menu-item:hover{background:rgba(255,255,255,.06);}
+    .menu-item.active{box-shadow:0 4px 12px rgba(37,99,235,.35);}
+    .sub-menu{margin:4px 0 8px 21px;padding-left:12px;border-left:1px solid rgba(255,255,255,.1);}
+    .sub-group-label{font-size:10px;letter-spacing:.6px;padding:10px 10px 4px;opacity:.85;}
+    .sub-item{padding:6px 10px;border-radius:6px;line-height:1.35;}
+    .sub-item:hover{background:rgba(255,255,255,.05);}
+    .sub-item.active{background:rgba(37,99,235,.14);}
+    .sidebar-foot{border-top:1px solid rgba(255,255,255,.07);padding:14px 8px 2px;line-height:1.6;}
+    .nut-giao-dien{margin:12px 4px 0;border-radius:8px;padding:8px 12px;}
+
+    /* Vùng nội dung + tiêu đề trang */
+    .content{padding:28px 36px 64px;max-width:1680px;}
+    .page-head{margin-bottom:22px;}
+    .page-head h1{font-size:22px;letter-spacing:-.02em;margin-bottom:6px;}
+    .page-head p{font-size:13.5px;}
+
+    /* Thẻ */
+    .card{padding:20px 22px;margin-bottom:20px;border-radius:var(--radius);}
+    .card h2{font-size:15px;margin-bottom:16px;letter-spacing:-.01em;}
+
+    /* Ô số liệu (KPI) */
+    .summary-row{gap:16px;margin-bottom:20px;}
+    .stat{position:relative;overflow:hidden;padding:16px 18px 16px 20px;border-radius:var(--radius);}
+    .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand);}
+    .stat.stat-warn::before{background:var(--danger);}
+    .stat .label{font-size:11px;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;}
+    .stat .value{font-size:24px;letter-spacing:-.02em;line-height:1.2;}
+
+    /* Thẻ tab */
+    .tabbar{gap:2px;margin-bottom:18px;}
+    .tabbtn{padding:10px 16px;border-radius:8px 8px 0 0;transition:color .15s ease, background .15s ease;}
+    .tabbtn:hover{color:var(--ink);background:var(--bg-soft2);}
+    .tabbtn.active{border-bottom-width:2px;}
+
+    /* Ô nhập */
+    .field-grid{gap:16px;}
+    .field label{font-size:12px;margin-bottom:6px;}
+    .field input,.field select{height:40px;padding:8px 12px;border-radius:8px;transition:border-color .15s ease, box-shadow .15s ease;}
+    .field input:hover,.field select:hover{border-color:var(--disabled);}
+    .field input:focus,.field select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.18);}
+    .field select[multiple]{height:auto;}
+
+    /* Nút */
+    .btnrow{gap:10px;margin-top:18px;}
+    .btn{height:40px;padding:0 18px;border-radius:8px;font-size:13.5px;transition:filter .15s ease, box-shadow .15s ease, transform .05s ease, background .15s ease;}
+    .btn-primary{box-shadow:0 1px 2px rgba(16,24,40,.08), 0 2px 6px rgba(37,99,235,.25);}
+    .btn-accent{box-shadow:0 1px 2px rgba(16,24,40,.08), 0 2px 6px rgba(180,83,9,.22);}
+    .btn-ghost{background:var(--surface);border:1px solid var(--border);}
+    .btn-ghost:hover{background:var(--bg-soft2);border-color:var(--disabled);}
+    .btn-sm{height:30px;padding:0 10px;font-size:12px;}
+    .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.3);}
+
+    /* Bảng dữ liệu */
+    .table-wrap{border-radius:10px;background:var(--surface);}
+    table{font-size:13px;}
+    thead th{padding:11px 12px;font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+    tbody td{padding:10px 12px;}
+    tbody tr:nth-child(even) td{background:var(--bg-soft2);}
+    tbody tr:hover td{background:var(--info-soft);}
+    tbody tr:last-child td{border-bottom:none;}
+    .table-wrap tfoot td{padding:11px 12px;}
+    .badge{padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.01em;}
+
+    /* Biểu đồ cột Dashboard: cột giãn đều cả chiều ngang */
+    .dash-chart{gap:6px;height:200px;padding:12px 4px 0;border-bottom:1px solid var(--border);}
+    .dash-chart .bar-col{flex:1 1 0;min-width:14px;}
+    .dash-chart .bar{width:72%;max-width:26px;border-radius:4px 4px 0 0;opacity:.9;transition:opacity .15s ease;}
+    .dash-chart .bar-col:hover .bar{opacity:1;filter:brightness(1.1);}
+    .dash-chart .bar-day{font-size:10px;margin-top:6px;}
+
+    /* Vùng kéo thả file */
+    .dropzone{padding:34px 20px;border-radius:12px;transition:border-color .15s ease, background .15s ease;}
+    .dropzone::before{content:"";display:block;width:40px;height:40px;margin:0 auto 10px;border-radius:50%;
+      background:var(--info-soft) no-repeat center/20px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4M7 9l5-5 5 5'/%3E%3Cpath d='M20 16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3'/%3E%3C/svg%3E");}
+    .dropzone:hover{border-color:var(--brand);}
+
+    /* Thông báo, hộp chờ, cửa sổ */
+    .toast{border-radius:10px;padding:12px 16px;max-width:440px;box-shadow:var(--shadow-lg);line-height:1.45;}
+    .overlay-box{border-radius:12px;box-shadow:var(--shadow-lg);}
+    .tc-modal-box{border-radius:14px;box-shadow:var(--shadow-lg);}
+    .login-box{border-radius:16px;box-shadow:var(--shadow-lg);}
+
+    tbody td{padding:9px 12px;}
+
+    /* ---- Đồng bộ nhóm KHO DĂM (Nhập/Xuất dăm, Độ khô, Kỳ vét bãi, Danh mục kho, Báo cáo tồn)
+       với các màn hình khác - chỉ CSS, không đổi HTML sinh từ JavaScript. ---- */
+    #view-khodam .form-container{padding:20px 22px;gap:12px;border-radius:var(--radius);}
+    #view-khodam .form-container > b{font-size:14px;letter-spacing:.03em;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:2px;}
+    #view-khodam .form-container label{font-size:12px;margin-top:6px;}
+    /* Thanh chọn tab (trước: dải vàng + nút nhỏ viền xanh) -> nhóm nút dạng tab như các màn khác */
+    #view-khodam .sub-nav-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px;gap:4px;margin-bottom:16px;box-shadow:var(--shadow);align-items:center;}
+    #view-khodam .sub-nav-bar > span{color:var(--ink-soft) !important;font-size:11px !important;letter-spacing:.05em;padding:0 8px 0 6px;}
+    #view-khodam .sub-nav-btn{height:34px;padding:0 14px;border:none;border-radius:8px;background:transparent;color:var(--ink-soft);font-size:13px;font-weight:600;font-family:inherit;transition:background .15s ease, color .15s ease;}
+    #view-khodam .sub-nav-btn:hover{background:var(--bg-soft2);color:var(--ink);}
+    #view-khodam .sub-nav-btn.active{background:var(--brand);color:var(--on-brand);box-shadow:0 2px 6px rgba(37,99,235,.25);}
+    /* Khung lọc (trước: nền xanh nhạt, ô ngày giãn hết chiều ngang) */
+    #view-khodam div[style*="info-soft"]{background:var(--bg-soft2) !important;border:1px solid var(--border);border-radius:10px !important;padding:12px 14px !important;gap:10px 12px !important;}
+    #view-khodam div[style*="info-soft"] > span{font-size:12px !important;color:var(--ink-soft);font-weight:600 !important;}
+    #view-khodam div[style*="info-soft"] input, #view-khodam div[style*="info-soft"] select{width:auto;min-width:150px;}
+    /* Khung Thêm/Sửa bên cạnh */
+    #view-khodam .grid-2 > div[style*="bg-soft"]{border:1px solid var(--border);border-radius:10px !important;padding:16px !important;}
+    /* Ô nhập + nút cao đều, vòng sáng khi chọn */
+    #view-khodam input[type="text"], #view-khodam input[type="date"], #view-khodam input[type="datetime-local"],
+    #view-khodam input[type="number"], #view-khodam select{height:40px;padding:8px 12px;transition:border-color .15s ease, box-shadow .15s ease;}
+    #view-khodam input:focus, #view-khodam select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.18);}
+    #view-khodam .nav-btn{height:40px;padding:0 16px;background:var(--surface);font-family:inherit;}
+    #view-khodam .nav-btn:hover{background:var(--bg-soft2);filter:none;}
+    #view-khodam .form-submit-btn, #view-khodam .btn-scan{min-height:40px;box-shadow:0 1px 2px rgba(16,24,40,.08), 0 2px 6px rgba(37,99,235,.2);}
+    #view-khodam .btn-scan{box-shadow:0 1px 2px rgba(16,24,40,.08), 0 2px 6px rgba(180,83,9,.2);}
+    #view-khodam .btn-action{height:28px;padding:0 10px;font-weight:600;}
+    #view-khodam .btn.btn-info, #view-khodam .btn.btn-warning, #view-khodam .btn.btn-success, #view-khodam .btn.btn-secondary{
+      height:36px;padding:0 14px;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(16,24,40,.08);}
+    #view-khodam .btn.btn-sm{height:30px;padding:0 10px;}
+    /* Bảng Kho Dăm: như bảng chung (không kẻ ô vuông) */
+    #view-khodam .dokho-table{font-size:13px;border:1px solid var(--border);border-radius:10px;border-collapse:separate;border-spacing:0;overflow:hidden;}
+    #view-khodam .dokho-table th, #view-khodam .dokho-table td{border:none;border-bottom:1px solid var(--border);padding:9px 12px;}
+    #view-khodam .dokho-table th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:11px 12px;}
+    #view-khodam .dokho-table tr:last-child td{border-bottom:none;}
+    /* Điện thoại / máy tính bảng: thanh menu gọn, không chiếm hết màn hình đầu */
+    @media (max-width:820px){
+      .content{padding:18px;}
+      .sidebar{padding:12px 12px 10px;}
+      .brand{margin-bottom:10px;padding:0 4px 10px;}
+      .seal{width:36px;height:36px;} .seal span{font-size:11px;}
+      .menu{gap:4px;}
+      .menu-item{padding:7px 10px;font-size:12.5px;gap:7px;}
+      .menu-item svg{width:15px;height:15px;}
+      .sub-menu{flex-basis:100%;margin:2px 0 6px 6px;}
+      .nut-giao-dien{margin:8px 0 0;padding:6px 10px;}
+      .sidebar-foot{padding:8px 4px 0;margin-top:8px;font-size:10.5px;}
+    }
+    @media (max-width:480px){
+      .content{padding:14px 12px 48px;}
+      .stat .value{font-size:20px;}
+      .page-head h1{font-size:19px;}
+    }
   </style>
 </head>
 <body>
@@ -1611,23 +1765,44 @@
         <!-- TAB: CẤU HÌNH HỆ THỐNG -->
         <div class="tabpane" id="ht-tab-cauhinh">
           <div class="card">
-            <h2>1. Locale hệ thống — đồng bộ với Locale THẬT của Google Sheet</h2>
+            <h2>1. Định dạng hiển thị trên Webapp</h2>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
+              Cách webapp hiển thị số, ngày và giờ trên màn hình (bảng, ô nhập, thông báo). Quy tắc chung: <b>số canh phải</b> (có phân cách hàng nghìn), <b>chữ canh trái</b>, <b>ngày/giờ canh giữa</b>.
+              <b>Múi giờ</b> chỉ dùng để <b>hiển thị giờ</b> (webapp và file Excel/PDF xuất ra) — dữ liệu gốc, lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá vẫn theo giờ Việt Nam; ngày không kèm giờ (VD Ngày cân) không đổi theo múi giờ. Lưu xong <b>tải lại trang (F5)</b> để áp dụng.
+            </p>
+            <div class="field-grid">
+              <div class="field" style="grid-column:span 2;">
+                <label>Định dạng Webapp</label>
+                <select id="ht_vungMienWeb">
+                  <option value="VN">🇻🇳 Việt Nam — 1.234.567,89 · dd/MM/yyyy (VD: 25/07/2026)</option>
+                  <option value="US">🇺🇸 United States — 1,234,567.89 · MM/dd/yyyy (VD: 07/25/2026)</option>
+                </select>
+              </div>
+              <div class="field" style="grid-column:span 2;">
+                <label>Múi giờ hiển thị</label>
+                <select id="ht_muiGio"><option value="Asia/Ho_Chi_Minh">(GMT+07:00) Việt Nam - Hồ Chí Minh / Hà Nội</option></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>2. Định dạng ghi dữ liệu lên Google Sheet — đồng bộ với Locale THẬT của Google Sheet</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Xác định thứ tự ngày/tháng khi hệ thống ghi dữ liệu xuống các Google Sheet nghiệp vụ chính, <b>VÀ đồng thời</b> quyết định cách hệ thống hiểu dấu phân cách (","/".") khi <b>đọc số từ file Excel import</b> (Import phiếu cân, Import xuất hàng) trong trường hợp ô đến dưới dạng chữ. Chọn ĐÚNG Locale thật đang cài trên các Google Sheet đích — nếu chọn sai, dữ liệu ghi xuống có thể bị Google Sheets không nhận diện được là Ngày/Số và để nguyên dạng Text, hoặc bị hiểu sai giá trị khi đọc từ file Excel. Đổi xong áp dụng <b>ngay lập tức</b>, không cần deploy lại.
             </p>
             <div class="field-grid">
               <div class="field" style="grid-column:span 2;">
-                <label>Vùng lãnh thổ</label>
+                <label>Định dạng ghi Google Sheet</label>
                 <select id="ht_vungMien">
                   <option value="VN">🇻🇳 Việt Nam — dd/MM/yyyy (VD: 25/07/2026)</option>
                   <option value="US">🇺🇸 United States — MM/dd/yyyy (VD: 07/25/2026)</option>
                 </select>
               </div>
             </div>
-            <div class="guide-note">Giờ luôn hiển thị dạng 12 giờ kèm AM/PM — riêng chữ AM/PM (hay SA/CH) do <b>Locale của chính từng Google Sheet</b> quyết định (Sheet đặt Locale "Vietnam" sẽ tự hiện "SA"/"CH", đặt "United States" sẽ hiện "AM"/"PM"), độc lập với lựa chọn Vùng lãnh thổ ở trên.</div>
+            <div class="guide-note">Giờ luôn hiển thị dạng 12 giờ kèm AM/PM — riêng chữ AM/PM (hay SA/CH) do <b>Locale của chính từng Google Sheet</b> quyết định (Sheet đặt Locale "Vietnam" sẽ tự hiện "SA"/"CH", đặt "United States" sẽ hiện "AM"/"PM"), độc lập với lựa chọn "Định dạng ghi Google Sheet" ở trên.</div>
 
             <h5 style="margin:16px 0 4px;color:var(--brand-dark);font-size:12.5px;text-transform:uppercase;letter-spacing:.3px;">Locale THẬT đang cài trên từng Sheet (kiểm tra trực tiếp, không phải đoán)</h5>
-            <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Bấm "Kiểm tra ngay" để hệ thống tự mở từng Sheet và đọc đúng Locale thật đang cài đặt, so sánh với lựa chọn "Vùng lãnh thổ" ở trên.</p>
+            <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Bấm "Kiểm tra ngay" để hệ thống tự mở từng Sheet và đọc đúng Locale thật đang cài đặt, so sánh với lựa chọn "Định dạng ghi Google Sheet" ở trên.</p>
             <div class="btnrow" style="margin-top:0;margin-bottom:10px;">
               <button class="btn btn-ghost btn-sm" id="btnKiemTraLocaleThat">🔍 Kiểm tra ngay</button>
             </div>
@@ -1640,16 +1815,16 @@
           </div>
 
           <div class="card">
-            <h2>2. Locale riêng cho Báo cáo Misa</h2>
+            <h2>3. Định dạng kết xuất dữ liệu &amp; báo cáo (Excel / PDF / MISA)</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
-              Tách biệt hoàn toàn với mục 1 — vì đây là <b>file Excel/PDF tải về</b> (không phải Sheet lưu trữ lâu dài), nên <b>KHÔNG cần đồng bộ</b> với Locale thật của bất kỳ Google Sheet nào. Đây đơn thuần là lựa chọn hiển thị khi anh mở file Misa đã xuất ra — đổi tùy ý mà không ảnh hưởng đến cách hệ thống ghi dữ liệu vào các Sheet khác. Áp dụng cho: "Báo cáo gỗ keo nhập kết xuất Misa", "Báo cáo xuất kho dăm gỗ kết xuất Misa" (khi xuất Excel/PDF).
+              Tách biệt với mục 2 — đây là <b>file tải về</b> (không phải Sheet lưu trữ lâu dài), nên <b>không cần đồng bộ</b> với Locale thật của Google Sheet. Áp dụng cho <b>mọi</b> file xuất: Excel/PDF các báo cáo (tổng hợp cân, theo báo giá, Misa, xuất qua cân, xuất bán Misa, nhật ký), File MISA gốc, Phiếu nhập kho PDF, Bảng báo giá. Giờ trong file theo múi giờ ở mục 1.
             </p>
             <div class="field-grid">
               <div class="field" style="grid-column:span 2;">
-                <label>Vùng lãnh thổ (riêng cho Misa)</label>
+                <label>Định dạng file kết xuất</label>
                 <select id="ht_vungMienMisa">
-                  <option value="VN">🇻🇳 Việt Nam — dd/MM/yyyy</option>
-                  <option value="US">🇺🇸 United States — MM/dd/yyyy</option>
+                  <option value="VN">🇻🇳 Việt Nam — 1.234.567,89 · dd/MM/yyyy</option>
+                  <option value="US">🇺🇸 United States — 1,234,567.89 · MM/dd/yyyy</option>
                 </select>
               </div>
             </div>
@@ -1659,7 +1834,7 @@
           </div>
 
           <div class="card">
-            <h2>3. Giá trị mặc định cho Báo cáo Misa Nhập (Update_MiSa_PC)</h2>
+            <h2>4. Giá trị mặc định cho Báo cáo Misa Nhập (Update_MiSa_PC)</h2>
             <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">
               Các giá trị kế toán dùng chung khi hệ thống tạo dữ liệu Misa từ phiếu cân (nút "⚙️ Chạy trích xuất dữ liệu Misa" ở tab Import) — trước đây phải sửa code mới đổi được, nay chỉnh trực tiếp tại đây. Áp dụng từ lần chạy trích xuất tiếp theo.
             </p>
@@ -1983,14 +2158,33 @@
     // Ngày/giờ máy chủ gửi dạng chuẩn nội bộ "dd/MM/yyyy[ HH:mm[:ss]]" hoặc "yyyy-MM-dd[ HH:mm]"
     // -> hiển thị theo Locale hệ thống. Chuỗi khác giữ nguyên. Đổi được cả ngày nằm giữa câu
     // (VD "Từ: 2026-01-01 00:00 - Đến: ...").
+    // MÚI GIỜ HIỂN THỊ (Hệ thống › Cấu hình): máy chủ gửi giờ theo giờ Việt Nam (GMT+7);
+    // chuỗi CÓ giờ được đổi sang múi giờ đã chọn, ngày KHÔNG kèm giờ giữ nguyên (không nhảy ngày).
+    const MUI_GIO_HT = (<?!= muiGioJson ?>) || 'Asia/Ho_Chi_Minh';
+    let _dinhDangMuiGio = null;
+    function gioVNSangMuiGio(y, mo, d, h, mi, se){
+      if (MUI_GIO_HT === 'Asia/Ho_Chi_Minh') return null;
+      try {
+        if (!_dinhDangMuiGio) _dinhDangMuiGio = new Intl.DateTimeFormat('en-GB', { timeZone: MUI_GIO_HT, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23' });
+        const p = {};
+        _dinhDangMuiGio.formatToParts(new Date(Date.UTC(+y, +mo - 1, +d, +h - 7, +mi, +(se || 0)))).forEach(x => { p[x.type] = x.value; });
+        return { y: p.year, mo: p.month, d: p.day, h: p.hour, mi: p.minute, se: p.second };
+      } catch(e) { return null; }
+    }
     function ngayHT(s){
       if (s === null || s === undefined) return '';
       const us = MIEN_HT === 'US';
       // 1 lượt thay duy nhất (tránh đổi 2 lần 1 ngày đã đổi ở kiểu US).
-      return String(s).replace(/\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\/(\d{2})\/(\d{4})\b/g, (m, y, mo, d, d2, mo2, y2) => {
-        if (y) return us ? mo + '/' + d + '/' + y : d + '/' + mo + '/' + y;
-        return us ? mo2 + '/' + d2 + '/' + y2 : m;
-      });
+      return String(s).replace(/\b(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\b|\b(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\b/g,
+        (m, y, mo, d, h, mi, se, d2, mo2, y2, h2, mi2, se2) => {
+          if (!y) { y = y2; mo = mo2; d = d2; h = h2; mi = mi2; se = se2; }
+          if (h !== undefined) {
+            const t = gioVNSangMuiGio(y, mo, d, h, mi, se);
+            if (t) { y = t.y; mo = t.mo; d = t.d; h = t.h; mi = t.mi; if (se !== undefined) se = t.se; }
+          }
+          const ngay = us ? mo + '/' + d + '/' + y : d + '/' + mo + '/' + y;
+          return h === undefined ? ngay : ngay + ' ' + h + ':' + mi + (se !== undefined ? ':' + se : '');
+        });
     }
     // Ô bảng ngày (canh giữa) / số (canh phải).
     function tdNgay(s){ return '<td class="ngay">' + escapeHtml(ngayHT(s)) + '</td>'; }
@@ -5565,6 +5759,12 @@
         if (res.status === 'success') {
           document.getElementById('ht_vungMien').value = res.mien;
           document.getElementById('ht_vungMienMisa').value = res.mienMisa;
+          if (res.mienWeb) document.getElementById('ht_vungMienWeb').value = res.mienWeb;
+          if (Array.isArray(res.dsMuiGio)) {
+            const sel = document.getElementById('ht_muiGio');
+            sel.innerHTML = res.dsMuiGio.map(m => '<option value="' + escapeHtml(m.id) + '">' + escapeHtml(m.ten) + '</option>').join('');
+            sel.value = res.muiGio || 'Asia/Ho_Chi_Minh';
+          }
         }
       } catch(err){ toast('Lỗi tải cấu hình: ' + err, false); }
       await htLoadMisaDefaults();
@@ -5625,7 +5825,9 @@
       try {
         const res = await runServer('HT_luuCauHinhVungMien',
           document.getElementById('ht_vungMien').value,
-          document.getElementById('ht_vungMienMisa').value
+          document.getElementById('ht_vungMienMisa').value,
+          document.getElementById('ht_vungMienWeb').value,
+          document.getElementById('ht_muiGio').value
         );
         toast(res.message, res.status === 'success');
       } catch(err){ toast('Lỗi lưu cấu hình: ' + err, false); } finally { hideOverlay(); }

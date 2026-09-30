@@ -595,6 +595,115 @@ Quy tắc của chủ hệ thống:
 
 **Kết thúc Đợt sửa 4** — mọi mục kiểm toán trong repo đã xử lý hoặc đóng theo quyết định (M-11, SEC-03, L-05, ARCH-01, Import Wizard).
 
+## Sửa lỗi sau Đợt 4 (29/09/2026) — File kết xuất MISA trống trơn
+
+| Mục | Nội dung |
+|---|---|
+| Lỗi | Tải file MISA gốc / Excel / PDF báo cáo Misa → file về máy **trống**. |
+| Nguyên nhân | Apps Script gom các lệnh ghi `SpreadsheetApp` và chưa ghi thật vào file tạm. Máy chủ tải file qua link export **ngay trong cùng lượt chạy** (`chuyenLinkXuatThanhFile_`) nên nhận bản chưa có dữ liệu; sau đó file tạm bị chuyển vào Thùng rác (M-01) nên cũng không mở lại được bản đúng. Đợt 2 thêm nhiều lệnh định dạng hơn (Locale Misa, canh lề) nên dễ xảy ra hơn, rõ nhất ở file MISA 31 cột. |
+| Sửa | `SpreadsheetApp.flush()` trước khi tải file xuất - áp dụng cho **mọi** chức năng xuất Excel/PDF (một chỗ dùng chung). |
+| Vị trí | `chuyenLinkXuatThanhFile_` (Config.gs) |
+| Test | Mô phỏng tải file MISA gốc: file tạm có đủ tiêu đề + dữ liệu (ngày là giá trị ngày thật, mã giữ dạng chữ), thứ tự ghi → flush → tải. Bỏ bản sửa thì test báo lỗi. `npm test` → 29/29 đạt. |
+| Rollback | Revert commit (chỉ thêm 1 lệnh flush). |
+
+### Rà soát toàn bộ chức năng kết xuất Excel/PDF (29/09/2026)
+
+Tất cả 15 nút xuất trên giao diện đều đi qua `runServer` → `API` → `chuyenLinkXuatThanhFile_`, nên bản sửa `SpreadsheetApp.flush()` ở trên áp dụng cho **mọi** file xuất. Trước bản sửa, chỉ *Bảng báo giá* có sẵn `flush()`; các chức năng còn lại đều có thể tải về file trống.
+
+| Chức năng | Kết quả kiểm tra |
+|---|---|
+| Tổng hợp cân (Excel, PDF) | Đạt |
+| Tổng hợp theo báo giá (Excel, PDF) | Đạt |
+| Báo cáo Misa (Excel, PDF) + File MISA gốc | Đạt |
+| Xuất qua cân (Excel, PDF) | Đạt |
+| Xuất bán Misa (Excel) | Đạt |
+| Nhật ký hoạt động (Excel) | Đạt |
+| Phiếu nhập kho (PDF) | Đạt |
+| File mẫu import Phiếu cân / Xuất hàng | Đạt |
+| Bảng báo giá (Excel) | Đạt |
+
+Mỗi bài kiểm tra: có tiêu đề + đủ mọi dòng/cột (không thiếu, không thừa), cột ngày là giá trị ngày thật + định dạng ngày, mã chứng từ / số phiếu / số TKHQ giữ dạng chữ, không ô nào thành công thức, định dạng số hợp lệ, ghi → flush → tải đúng thứ tự; không có dữ liệu thì báo lỗi, không tạo file. `test/ketXuat.test.js` (14 bài). `npm test` → 43/43 đạt.
+
+**Ghi nhận (chưa sửa, không phải lỗi kết xuất):** file mẫu import Phiếu cân có 14 cột tiêu đề nhưng dòng ví dụ chỉ có 13 giá trị. Vì vậy chữ "ĐL" rơi vào cột "Nguồn gốc", còn cột "ĐL" để trống. Bước import đọc Đại lý ở cột thứ 14 ("ĐL"). Chỉ ảnh hưởng dòng ví dụ minh họa.
+
+## Rà soát lại toàn bộ thay đổi (29/09/2026)
+
+Đọc lại toàn bộ phần đã sửa từ đầu đợt kiểm toán (Config.gs, Code.gs, Index.html) + quét mẫu đọc/ghi sheet trong vòng lặp.
+
+**Lỗi chức năng:** không phát hiện lỗi mới. Đã kiểm tra riêng: mọi chỗ đọc lại `NL_PC_XH` đều qua `toDateObj_` nên đọc được cả ngày thật (ghi từ Đợt 2) lẫn chữ cũ; chống tạo trùng, khóa phiên bản BUG-004, email báo lỗi, đo API chậm hoạt động như thiết kế.
+
+**Tối ưu đã làm:**
+
+| Vị trí | Vấn đề | Sửa | Hiệu quả |
+|---|---|---|---|
+| `getBaoCaoTongHop_`, `getBaoCaoDonGia_`, `getBaoCaoMisa_` | Sắp xếp Mã CT bằng `localeCompare(…, "vi", {numeric})` (từ L-07) tạo lại bộ so sánh ở mỗi lần so | 1 `Intl.Collator` tạo sẵn (`soSanhMaChungTu_`), cùng thứ tự | 100.000 dòng: ~7,5 giây → ~0,3 giây |
+| `BG_phieuChoTinhLai_` (chạy sau mỗi lần lưu báo giá) | Đọc 24 cột B..Y của toàn bộ PhieuCan_DN | Chỉ đọc 6 cột B, Q, V..Y | Ít hơn 4 lần số ô đọc |
+| `ghiVaoDraftChuaTT_` | Ghi đè phiếu đã có trong Draft Chưa TT: 1 lệnh ghi / dòng | Gom theo khối dòng liền nhau; trùng dòng thì bản sau thắng (như cũ) | Import lại 500 phiếu: 500 → vài lượt ghi |
+
+**Test:** thêm 3 bài (sắp xếp 100.000 mã, gợi ý tính lại giá đọc đúng 6 cột + đúng phiếu, ghi đè Draft theo khối). Với mã cũ, 3 bài này báo lỗi. `npm test` → 46/46 đạt.
+
+**Rollback:** revert commit (không đổi dữ liệu / cấu trúc sheet).
+
+## Giao diện chuyên nghiệp (29/09/2026) — giữ nguyên bộ màu
+
+Một khối CSS đặt cuối `<style>` trong `Index.html` (ghi đè), **chỉ dùng các biến màu sẵn có** nên màu sáng/tối giữ nguyên; không đổi HTML, JavaScript hay máy chủ.
+
+| Phần | Thay đổi |
+|---|---|
+| Chữ số | Dùng cùng font chữ chính, chữ số đều cột (`tabular-nums`) thay font "máy đánh chữ" |
+| Thanh menu | Tách vùng logo, menu con có đường dẫn dọc, mục đang chọn có nền nhạt, chân menu tách dòng |
+| Tiêu đề trang, thẻ | Tiêu đề lớn hơn, bo góc 12px, bóng nhẹ hai lớp |
+| Ô số liệu (KPI) | Nhãn chữ nhỏ in hoa, số 24px, vạch màu bên trái (xanh; đỏ cho mục cần chú ý) |
+| Ô nhập, nút | Cao đều 40px, viền nổi khi chọn (vòng sáng xanh), nút phụ có viền |
+| Bảng | Tiêu đề in hoa nhỏ, dòng xen kẽ nhạt, rê chuột tô xanh nhạt |
+| Biểu đồ Dashboard | Cột giãn đều cả chiều ngang, bo góc |
+| Kéo thả file | Có biểu tượng tải lên |
+| Điện thoại | Thanh menu gọn, không chiếm hết màn hình đầu |
+| Nhóm Kho Dăm (Nhập/Xuất dăm, Độ khô, Kỳ vét bãi, Danh mục kho, Báo cáo tồn) | Đồng bộ với các màn khác: thanh chọn tab dạng nút (thay dải vàng), khung lọc nền nhạt có viền, ô nhập/nút cao đều, bảng không kẻ ô vuông, tiêu đề bảng in hoa nhỏ - chỉ CSS trong phạm vi `#view-khodam` |
+
+**Đã kiểm tra đủ 30 màn hình con của 7 menu** (ảnh chụp Chromium với dữ liệu giả lập). **Rollback:** xóa khối CSS "GIAO DIỆN CHUYÊN NGHIỆP" trong `Index.html`. **Test:** `npm test` → 46/46 đạt (gồm các bài giao diện Chromium: 375px, zoom, chế độ tối).
+
+## Rà soát nguyên tắc số & vùng (29/09/2026)
+
+Kiểm tra lại 4 nguyên tắc (Đợt 2) trên toàn bộ mã, kể cả phần thêm sau:
+
+| Nguyên tắc | Kết quả |
+|---|---|
+| 1. Ô nhập số có phân cách hàng nghìn | Đạt - mọi ô số (22 ô `type=number` + ô `data-so`, cả ô vẽ sau) tự nâng cấp; test Chromium VN/US |
+| 2. Số phải, chữ trái, ngày giữa | Đạt - bảng web (`.num`, `.ngay`), Google Sheet (setHorizontalAlignment), file xuất (`XK_apDinhDangCot_`) |
+| 3. Webapp + ghi Google Sheet theo Locale hệ thống | Đạt cho bảng/ô nhập/sheet. **Sửa thêm:** 4 thông báo máy chủ viết số cố định kiểu VN (`toLocaleString("vi-VN")`) và 6 chỗ ngày trong thông báo/ghi chú viết cứng `dd/MM/yyyy` → nay theo Locale hệ thống (`soHT_`, `ngayHT_`): cảnh báo chồng dải báo giá, kiểm tra sửa dòng báo giá, mô tả giá Tra cứu, lỗi "CHƯA LƯU" Tra cứu, thông tin bản Misa, ghi chú sheet xem trước |
+| 4. PDF / Excel / MISA theo Locale Misa | Đạt - `XK_datLocaleFileTam_` + `MISA_FORMAT_` cho mọi file xuất (test `ketXuat.test.js`) |
+
+Dữ liệu bảng gửi lên giao diện vẫn là chuẩn nội bộ `dd/MM/yyyy` và được giao diện đổi theo vùng khi hiển thị (`ngayHT`) - đúng thiết kế Đợt 2. Email báo lỗi giữ `dd/MM/yyyy` (thư gửi Quản trị, không phải màn hình). **Test:** thêm 1 bài VN/US cho thông báo máy chủ; `npm test` → 47/47.
+
+## 3 định dạng độc lập + múi giờ hiển thị (30/09/2026) — theo yêu cầu chủ hệ thống
+
+Hệ thống › Cấu hình hệ thống nay có **3 lựa chọn định dạng độc lập (VN / US)** + **múi giờ**:
+
+| Mục | Áp dụng cho | Thuộc tính (Script Properties) | Mặc định |
+|---|---|---|---|
+| 1. Định dạng Webapp | Số, ngày trên màn hình (bảng, ô nhập, thông báo) | `WEBAPP_FORMAT_MIEN` | Chưa chọn → theo mục 2 (giống hệt trước đây) |
+| 1. Múi giờ hiển thị | Giờ trên webapp + giờ trong file Excel/PDF | `MUI_GIO_HIEN_THI` (16 múi giờ cho phép) | `Asia/Ho_Chi_Minh` |
+| 2. Ghi Google Sheet | Định dạng ngày/số khi ghi Sheet, đọc số dạng chữ từ file import | `REGION_FORMAT_MIEN` (không đổi) | VN |
+| 3. Kết xuất Excel / PDF / MISA | Mọi file tải về (đổi tên từ "Locale Misa") | `MISA_FORMAT_MIEN` (không đổi) | VN |
+
+**Múi giờ chỉ để HIỂN THỊ** (theo quyết định): dữ liệu gốc, lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá vẫn theo giờ Việt Nam. Chỉ giá trị **có kèm giờ** được đổi (VD "25/07/2026 23:30" giờ VN → "26/07/2026 01:30" giờ Tokyo); **ngày không kèm giờ** (Ngày cân…) giữ nguyên để không nhảy ngày. Cột **chỉ có giờ** tách riêng khỏi ngày (VD "Giờ cân 1" cạnh "Ngày cân 1") giữ giờ Việt Nam, vì đổi riêng giờ sẽ lệch với cột ngày.
+
+**Quy tắc canh lề** giữ nguyên ở cả 3 nơi: số canh phải (có phân cách hàng nghìn), chữ canh trái, ngày/giờ canh giữa.
+
+| Hàm / vị trí | Thay đổi |
+|---|---|
+| `WEBAPP_FORMAT_`, `MUI_GIO_HIEN_THI_`, `MUI_GIO_CHO_PHEP` (Config.gs) | Mới |
+| `HT_layCauHinhVungMien_`, `HT_luuCauHinhVungMien_(mien, mienMisa, mienWeb, muiGio)` | Trả/nhận thêm 2 mục; client cũ gửi 2 tham số → giữ nguyên 2 mục mới; múi giờ sai → báo lỗi, **không lưu dở dang** |
+| `doGet` | Nhúng định dạng webapp + múi giờ (`muiGioJson`) |
+| `ngayHT` (Index.html) | Đổi giờ VN → múi giờ chọn cho chuỗi có giờ (Intl) |
+| `soHT_`, `ngayHT_` | Thông báo máy chủ theo định dạng webapp + múi giờ |
+| `XK_chuanBiCot_`, `XK_theoMuiGio_` | Cột ngày CÓ giờ trong file xuất theo múi giờ |
+
+**Test:** 2 bài mới (máy chủ: tách 3 định dạng, tương thích client cũ, không lưu dở dang, đổi giờ file xuất; giao diện Chromium: đổi giờ qua nửa đêm, ngày không giờ giữ nguyên). `npm test` → 49/49.
+
+**Rollback:** chọn lại "Việt Nam" + "(GMT+07:00) Việt Nam" (hiển thị như cũ), hoặc revert commit; xóa `WEBAPP_FORMAT_MIEN`, `MUI_GIO_HIEN_THI` trong Script Properties nếu muốn sạch hoàn toàn.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -608,3 +717,10 @@ Quy tắc của chủ hệ thống:
 - 28/09/2026 — Đợt sửa 4 (tiếp 4): email báo lỗi cho Quản trị khi sao lưu đêm / tính giá theo giờ lỗi (mặc định tắt), thêm scope script.send_mail.
 - 28/09/2026 — Đợt sửa 4 (tiếp 5): ghi nhận API chạy chậm (≥ 30 giây) vào Nhật ký/Giám sát, bộ kiểm thử tải lớn (50.000 phiếu, 100.000 dòng báo cáo, 50.000 dòng xem trước).
 - 28/09/2026 — Đóng ARCH-01 và Import Wizard theo quyết định chủ hệ thống (không làm). Kết thúc Đợt sửa 4.
+- 29/09/2026 — Sửa file kết xuất MISA/Excel/PDF trống: ép ghi (flush) trước khi tải file xuất.
+- 29/09/2026 — Rà soát + bộ kiểm thử cho toàn bộ 15 nút kết xuất Excel/PDF (test/ketXuat.test.js).
+- 29/09/2026 — Rà soát lại toàn bộ thay đổi: tối ưu sắp xếp Mã CT (Intl.Collator), đọc 6 cột khi gợi ý tính lại giá, ghi đè Draft Chưa TT theo khối.
+- 29/09/2026 — Giao diện chuyên nghiệp (CSS, giữ nguyên bộ màu).
+- 29/09/2026 — Đồng bộ giao diện cho tất cả menu (nhóm Kho Dăm theo cùng kiểu).
+- 29/09/2026 — Thông báo máy chủ (số, ngày) theo Locale hệ thống (soHT_, ngayHT_).
+- 30/09/2026 — Tách 3 định dạng (Webapp / Ghi Google Sheet / Kết xuất Excel-PDF-MISA) + múi giờ hiển thị.

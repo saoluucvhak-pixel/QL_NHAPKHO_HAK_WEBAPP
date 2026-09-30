@@ -219,3 +219,103 @@ test('Email báo lỗi: gửi thất bại không ném lỗi ra tác vụ chính
   assert.strictEqual(kq.status, 'error');
   assert.ok(kq.message.includes('CAP_QUYEN_EMAIL'));
 });
+
+test('Kết xuất MISA: file tạm có đủ tiêu đề + dữ liệu; ép ghi (flush) TRƯỚC khi tải file về', () => {
+  const nhatKy = [];
+  const ghi = {};   // "hàng,cột" -> giá trị đã ghi vào file tạm
+  function taoSheetTam() {
+    const range = (r, c, nr, nc) => {
+      const g = {
+        setValues(vs) { nhatKy.push('ghi'); vs.forEach((row, i) => row.forEach((v, j) => { ghi[(r + i) + ',' + (c + j)] = v; })); return g; },
+        setNumberFormat() { return g; }, setBackground() { return g; }, setFontWeight() { return g; },
+        setHorizontalAlignment() { return g; }, setFontColor() { return g; }
+      };
+      return g;
+    };
+    return { getRange: range, getRangeList() { const g = { setNumberFormat() { return g; }, setHorizontalAlignment() { return g; } }; return g; }, getSheetId: () => 0 };
+  }
+  const tieuDe = Array.from({ length: 31 }, (_, i) => 'Cột ' + (i + 1));
+  tieuDe[0] = 'Ngày hạch toán'; tieuDe[2] = 'Số chứng từ'; tieuDe[4] = 'Số lượng'; tieuDe[9] = 'Số hợp đồng'; tieuDe[10] = 'Mã nhà cung cấp';
+  const { chay, ctx } = taoMoiTruong({
+    SpreadsheetApp: {
+      openById: () => ({ getSheetByName: () => ctx.nguonMisa }),
+      create: () => { const sh = taoSheetTam(); return { getId: () => 'TAM1', getSheets: () => [sh], setSpreadsheetLocale() {}, setSpreadsheetTimeZone() {} }; },
+      flush: () => { nhatKy.push('flush'); }
+    },
+    DriveApp: {
+      getFileById: () => ({ moveTo() {}, getName: () => 'Misa_Export_x', getMimeType: () => 'sheets', getParents: () => ({ hasNext: () => false }), setTrashed() {} }),
+      getFolderById: () => ({})
+    },
+    MimeType: { GOOGLE_SHEETS: 'sheets' },
+    ScriptApp: { getOAuthToken: () => 't' },
+    UrlFetchApp: { fetch: () => { nhatKy.push('tai'); return { getResponseCode: () => 200, getBlob: () => ({ getBytes: () => [1, 2] }) }; } }
+  });
+  ctx.tieuDe = tieuDe;
+  ctx.Utilities.base64Encode = () => 'AQI=';
+  chay(`var d1 = new Array(31).fill(""); d1[0] = new Date(2026,8,5); d1[1] = new Date(2026,8,5); d1[2] = "12/2026/NK"; d1[4] = 20.5; d1[5] = 1500000; d1[6] = 30750000; d1[9] = "0123"; d1[10] = "NCC01";
+        var sh = { rows: [tieuDe, d1], getLastRow: function () { return 2; },
+          getRange: function (r, c, nr, nc) { var self = this; return { getValues: function () { return self.rows.slice(r - 1, r - 1 + nr).map(function (x) { return x.slice(c - 1, c - 1 + nc); }); } }; } };
+        nguonMisa = sh;`);
+  const kq = chay('chuyenLinkXuatThanhFile_(downloadMisaExcel_())');
+  assert.strictEqual(kq.status, 'success', kq.message);
+  assert.ok(kq.fileBase64, 'phải tải được file về');
+  assert.strictEqual(ghi['1,1'], 'Ngày hạch toán');
+  assert.strictEqual(ghi['2,3'], '12/2026/NK');
+  assert.strictEqual(ghi['2,5'], 20.5);
+  assert.strictEqual(ghi['2,11'], 'NCC01');
+  assert.strictEqual(Object.prototype.toString.call(ghi['2,1']), '[object Date]'); // ngày thật, không phải chữ
+  // Thứ tự: mọi lệnh ghi -> flush -> tải
+  assert.deepStrictEqual(nhatKy.slice(-2), ['flush', 'tai']);
+  assert.ok(nhatKy.indexOf('ghi') < nhatKy.indexOf('flush'));
+});
+
+test('Nguyên tắc số & vùng trong thông báo máy chủ: theo Locale hệ thống (VN / US)', () => {
+  const vn = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'VN' } });
+  assert.strictEqual(vn.chay('soHT_(1500000)'), '1.500.000');
+  assert.strictEqual(vn.chay('soHT_(20.5)'), '20,5');
+  assert.strictEqual(vn.chay('ngayHT_(new Date(2026,8,5,8,30,0))'), '05/09/2026');
+  assert.strictEqual(vn.chay('ngayHT_(new Date(2026,8,5,8,30,0), true)'), '05/09/2026 08:30:00');
+  const us = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'US' } });
+  assert.strictEqual(us.chay('soHT_(1500000)'), '1,500,000');
+  assert.strictEqual(us.chay('soHT_(20.5)'), '20.5');
+  assert.strictEqual(us.chay('ngayHT_(new Date(2026,8,5))'), '09/05/2026');
+  assert.strictEqual(us.chay('MISA_moTaBan_({ tuNgay: "2026-09-01", denNgay: "2026-09-30", soDong: 5, email: "a@x", luc: "x" })').startsWith('khoảng 09/01/2026 – 09/30/2026'), true);
+  assert.strictEqual(us.chay('TC_moTaGia_({ trangThai: "Test giá", hieuSo: 1500000, thanhTien: 30000000 })'), 'Đơn giá 1,500,000 · Thành tiền 30,000,000');
+});
+
+test('Cấu hình 3 định dạng + múi giờ hiển thị: tách riêng, tương thích client cũ, đổi giờ file xuất', () => {
+  // Utilities.formatDate có múi giờ thật (giống Apps Script) cho bài này
+  const fmtTZ = (d, tz, mau) => {
+    const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d).forEach(x => { p[x.type] = x.value; });
+    return mau.replace('yyyy', p.year).replace('MM', p.month).replace('dd', p.day).replace('HH', p.hour).replace('mm', p.minute).replace('ss', p.second);
+  };
+  const { chay, props, ctx } = taoMoiTruong({ props: { REGION_FORMAT_MIEN: 'US' } });
+  ctx.Utilities.formatDate = fmtTZ;
+  ctx.logAudit_ = () => {};
+  // Chưa chọn định dạng webapp -> theo "Ghi Google Sheet" như trước (không đổi hệ thống cũ)
+  assert.strictEqual(chay('WEBAPP_FORMAT_().MIEN'), 'US');
+  assert.strictEqual(chay('MUI_GIO_HIEN_THI_()'), 'Asia/Ho_Chi_Minh');
+  // Lưu đủ 4 lựa chọn: độc lập nhau
+  const kq = chay('HT_luuCauHinhVungMien_("VN", "US", "US", "Asia/Tokyo")');
+  assert.strictEqual(kq.status, 'success', kq.message);
+  assert.deepStrictEqual([props.REGION_FORMAT_MIEN, props.MISA_FORMAT_MIEN, props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['VN', 'US', 'US', 'Asia/Tokyo']);
+  // Client cũ chỉ gửi 2 tham số -> giữ nguyên định dạng webapp + múi giờ
+  chay('HT_luuCauHinhVungMien_("VN", "VN")');
+  assert.deepStrictEqual([props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['US', 'Asia/Tokyo']);
+  // Múi giờ ngoài danh sách -> từ chối
+  assert.strictEqual(chay('HT_luuCauHinhVungMien_("US", "US", "VN", "Mars/Olympus")').status, 'error');
+  assert.deepStrictEqual([props.REGION_FORMAT_MIEN, props.WEBAPP_FORMAT_MIEN, props.MUI_GIO_HIEN_THI], ['VN', 'US', 'Asia/Tokyo'], 'lỗi thì không lưu dở dang');
+  // Thông báo webapp: số + ngày theo định dạng webapp (US), giờ theo múi giờ Tokyo (+2h so với VN)
+  assert.strictEqual(chay('soHT_(1500000)'), '1,500,000');
+  assert.strictEqual(chay('ngayHT_(new Date(Date.UTC(2026,8,5,1,30,0)))'), '09/05/2026');            // 08:30 VN, không giờ -> theo ngày VN
+  assert.strictEqual(chay('ngayHT_(new Date(Date.UTC(2026,8,5,1,30,0)), true)'), '09/05/2026 10:30:00');
+  // File xuất: cột ngày CÓ giờ đổi theo múi giờ, cột chỉ có ngày giữ nguyên
+  const r = JSON.parse(chay(`(function () {
+    var rows = [["05/09/2026 23:30:00", "05/09/2026", new Date(2026,8,5,8,0,0)]];
+    XK_chuanBiCot_(["Thời gian", "Ngày cân", "Lúc tạo"], rows);
+    var f = function (d) { return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate() + " " + d.getHours() + ":" + d.getMinutes(); };
+    return JSON.stringify(rows[0].map(f));
+  })()`));
+  assert.deepStrictEqual(r, ['2026-9-6 1:30', '2026-9-5 0:0', '2026-9-5 10:0']);
+});
