@@ -704,6 +704,10 @@ Hệ thống › Cấu hình hệ thống nay có **3 lựa chọn định dạn
 
 **Rollback:** chọn lại "Việt Nam" + "(GMT+07:00) Việt Nam" (hiển thị như cũ), hoặc revert commit; xóa `WEBAPP_FORMAT_MIEN`, `MUI_GIO_HIEN_THI` trong Script Properties nếu muốn sạch hoàn toàn.
 
+## Sửa: Excel Tổng hợp nhập kho thiếu ĐL, NG (01/10/2026)
+
+File Excel "Báo cáo tổng hợp nhập kho" (theo phiếu cân) thiếu cột Đại lý (ĐL) và Nguồn gốc (NG) dù dữ liệu báo cáo đã có (cột N, O của PhieuCan_DN). Nay thêm 2 cột ngay sau "Khách Hàng" (`exportBaoCaoTongHopExcel_`). PDF giữ nguyên số cột (khổ ngang đã kín). Test: `ketXuat.test.js` (vị trí + giá trị 2 cột mới, các cột sau không lệch). `npm test` → 50/50. Rollback: revert commit.
+
 ## CHANGELOG
 - 28/09/2026 — Thêm báo cáo kiểm toán Enterprise (tài liệu, không đổi mã nguồn).
 - 28/09/2026 — Đợt sửa 1: H-01 (báo giá mới nhất thắng + cảnh báo chồng dải), H-02, H-03, H-04, H-05, H-06, M-01, M-03, M-05, M-06, M-15, L-02.
@@ -724,3 +728,4 @@ Hệ thống › Cấu hình hệ thống nay có **3 lựa chọn định dạn
 - 29/09/2026 — Đồng bộ giao diện cho tất cả menu (nhóm Kho Dăm theo cùng kiểu).
 - 29/09/2026 — Thông báo máy chủ (số, ngày) theo Locale hệ thống (soHT_, ngayHT_).
 - 30/09/2026 — Tách 3 định dạng (Webapp / Ghi Google Sheet / Kết xuất Excel-PDF-MISA) + múi giờ hiển thị.
+- 01/10/2026 — Excel Tổng hợp nhập kho thêm cột Đại lý (ĐL), Nguồn gốc (NG).

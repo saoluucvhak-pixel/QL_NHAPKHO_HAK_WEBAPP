@@ -155,3 +155,18 @@ test('Kết xuất Bảng báo giá: đủ dòng báo giá đã chọn, đơn gi
   assert.strictEqual(o['7,4'], 1500000);
   assert.strictEqual(Object.prototype.toString.call(o['7,5']), '[object Date]');
 });
+
+test('Kết xuất Tổng hợp cân Excel: có cột Đại lý (ĐL) + Nguồn gốc (NG) ngay sau Khách hàng, đúng giá trị', () => {
+  const { chay, ctx, files } = moiTruongXuat();
+  ctx.__kq = { status: 'success', data: [Object.assign({}, PHIEU, { daiLy: 'ĐL Quế Sơn', nguonGoc: 'NG Duy Xuyên' })] };
+  chay('getBaoCaoTongHop_ = function () { return __kq; }');
+  const kq = chay('chuyenLinkXuatThanhFile_(exportBaoCaoTongHopExcel_({}))');
+  assert.strictEqual(kq.status, 'success', kq.message);
+  const o = files[0].sh.o;
+  const cot = t => Object.keys(o).filter(k => k.startsWith('1,') && o[k] === t).map(k => +k.split(',')[1])[0];
+  assert.strictEqual(cot('Đại Lý (ĐL)'), cot('Khách Hàng') + 1);
+  assert.strictEqual(cot('Nguồn Gốc (NG)'), cot('Khách Hàng') + 2);
+  assert.strictEqual(o['2,' + cot('Đại Lý (ĐL)')], 'ĐL Quế Sơn');
+  assert.strictEqual(o['2,' + cot('Nguồn Gốc (NG)')], 'NG Duy Xuyên');
+  assert.strictEqual(o['2,' + cot('KL Hàng (kg)')], 20000); // các cột sau vẫn đúng vị trí
+});
