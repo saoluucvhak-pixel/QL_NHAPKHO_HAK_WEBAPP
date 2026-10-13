@@ -1,16 +1,15 @@
 # QL_NHAPKHO_HAK_WEBAPP
 Created from gas-tools extension
 
-Hệ thống quản lý nhập/xuất kho, cân hàng, báo giá và kho dăm gỗ cho HAK Group
-(Google Apps Script: `Code.gs` + `Config.gs` + `Index.html`).
+## Triển khai
+Dán `Code.gs`, `Config.gs`, `Index.html` (và `appsscript.json` nếu đổi) vào dự án Apps Script → Deploy › Manage deployments › Edit › New version. Thư mục `test/`, `docs/`, `.github/`, `package.json` KHÔNG đưa lên Apps Script (`.claspignore`).
 
-## Test tự động
-
-Xem [`test/README.md`](test/README.md) - bộ test Jest cho phần logic thuần
-(phân quyền, sanitize, parse ngày/số, luồng xác nhận import...), chạy cục bộ
-bằng Node, không cần kết nối Google Sheets thật:
-
-```bash
-npm install
+## Kiểm thử tự động
+```
 npm test
 ```
+- `test/nghiepVu.test.js`: nạp nguyên `Config.gs` + `Code.gs` vào môi trường giả lập Apps Script (`test/gasEnv.js`) - tính giá, khóa kỳ, chống trùng, chặn người lưu sau, định dạng kết xuất...
+- `test/ui/giaoDien.test.js`: mở `Index.html` trên Chromium (Playwright) - ô nhập số theo Locale, ngày, bảng xem trước, di động, bàn phím. Máy không có Playwright thì tự bỏ qua.
+- GitHub Actions chạy tự động mỗi lần push (`.github/workflows/test.yml`).
+
+Báo cáo kiểm toán + lịch sử sửa: `docs/audit/13_Enterprise_Audit_2026-09-28.md`.

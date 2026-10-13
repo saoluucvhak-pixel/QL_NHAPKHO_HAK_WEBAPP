@@ -1,14 +1,11 @@
 {
-  "name": "ql-nhapkho-hak-webapp-tests",
+  "name": "ql-nhapkho-hak-webapp",
   "private": true,
-  "version": "1.0.0",
-  "description": "Bộ test cho phần logic thuần của webapp Google Apps Script QL_NHAPKHO_HAK (KHÔNG được deploy lên Apps Script - chỉ chạy cục bộ bằng Node/Jest).",
+  "description": "Kiểm thử tự động cho webapp Apps Script (không triển khai lên Apps Script).",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "node --test"
   },
-  "devDependencies": {
-    "jest": "^29.7.0"
+  "engines": {
+    "node": ">=18"
   }
 }

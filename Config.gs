@@ -188,7 +188,43 @@ function parseSoTheoLocale_(rawValue) {
   return parseFloat(str);
 }
 
+/* ---------- ĐỊNH DẠNG HIỂN THỊ TRÊN WEBAPP + MÚI GIỜ HIỂN THỊ (29/09/2026) ----------
+ * Tách khỏi "Ghi Google Sheet" (REGION_FORMAT_): webapp chọn VN/US riêng. Chưa từng
+ * chọn -> dùng đúng như trước (theo REGION_FORMAT_) nên không đổi gì với hệ thống cũ.
+ * MÚI GIỜ chỉ dùng để HIỂN THỊ giờ (webapp + file Excel/PDF xuất ra) - dữ liệu gốc,
+ * lọc ngày, kỳ vét bãi, tính giá theo hiệu lực báo giá VẪN theo giờ Việt Nam (GMT+7).
+ * Ngày không kèm giờ (VD Ngày cân) không đổi theo múi giờ (tránh nhảy ngày). */
+const MUI_GIO_MAC_DINH = "Asia/Ho_Chi_Minh";
+const MUI_GIO_CHO_PHEP = [
+  { id: "Asia/Ho_Chi_Minh", ten: "(GMT+07:00) Việt Nam - Hồ Chí Minh / Hà Nội" },
+  { id: "Asia/Bangkok", ten: "(GMT+07:00) Bangkok" },
+  { id: "Asia/Singapore", ten: "(GMT+08:00) Singapore" },
+  { id: "Asia/Shanghai", ten: "(GMT+08:00) Trung Quốc" },
+  { id: "Asia/Taipei", ten: "(GMT+08:00) Đài Loan" },
+  { id: "Asia/Tokyo", ten: "(GMT+09:00) Nhật Bản" },
+  { id: "Asia/Seoul", ten: "(GMT+09:00) Hàn Quốc" },
+  { id: "Australia/Sydney", ten: "(GMT+10/+11) Sydney" },
+  { id: "Asia/Kolkata", ten: "(GMT+05:30) Ấn Độ" },
+  { id: "Asia/Dubai", ten: "(GMT+04:00) Dubai" },
+  { id: "Europe/London", ten: "(GMT+00/+01) London" },
+  { id: "Europe/Paris", ten: "(GMT+01/+02) Paris / Berlin" },
+  { id: "America/New_York", ten: "(GMT-05/-04) New York" },
+  { id: "America/Chicago", ten: "(GMT-06/-05) Chicago" },
+  { id: "America/Los_Angeles", ten: "(GMT-08/-07) Los Angeles" },
+  { id: "UTC", ten: "(GMT+00:00) UTC" }
+];
+function WEBAPP_FORMAT_() {
+  const mien = PropertiesService.getScriptProperties().getProperty("WEBAPP_FORMAT_MIEN") || REGION_FORMAT_().MIEN;
+  const dateFmt = mien === "US" ? "MM/dd/yyyy" : "dd/MM/yyyy";
+  return { MIEN: mien === "US" ? "US" : "VN", DATE_FMT: dateFmt };
+}
+function MUI_GIO_HIEN_THI_() {
+  const tz = PropertiesService.getScriptProperties().getProperty("MUI_GIO_HIEN_THI") || MUI_GIO_MAC_DINH;
+  return MUI_GIO_CHO_PHEP.some(function (m) { return m.id === tz; }) ? tz : MUI_GIO_MAC_DINH;
+}
+
 /* ---------- CẤU HÌNH RIÊNG CHO BÁO CÁO / KẾT XUẤT MISA ---------- */
+// (Giao diện gọi là "Định dạng kết xuất dữ liệu & báo cáo (Excel / PDF / MISA)".)
 // TÁCH BIỆT HOÀN TOÀN với REGION_FORMAT ở trên - vì đây là FILE XUẤT/TẢI VỀ
 // (Excel/PDF), KHÔNG PHẢI Sheet lưu trữ lâu dài, nên KHÔNG cần đồng bộ với
 // Locale thật của bất kỳ Google Sheet nào. Đây chỉ đơn thuần là LỰA CHỌN hiển
@@ -218,7 +254,8 @@ function HT_layCauHinhVungMien_() {
     // mục cấu hình (đã chặn Admin-only), tránh 1 điểm hở dù nhỏ.
     const rf = REGION_FORMAT_();
     const mf = MISA_FORMAT_();
-    return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN };
+    return { status: "success", mien: rf.MIEN, mienMisa: mf.MIEN,
+      mienWeb: WEBAPP_FORMAT_().MIEN, muiGio: MUI_GIO_HIEN_THI_(), dsMuiGio: MUI_GIO_CHO_PHEP };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
 
@@ -265,20 +302,31 @@ function HT_layLocaleThatCuaSheet_() {
 }
 
 // Lưu TOÀN BỘ cấu hình mới - áp dụng NGAY LẬP TỨC cho mọi lần ghi Sheet tiếp theo
-function HT_luuCauHinhVungMien_(mien, mienMisa) {
+// mienWeb, muiGio (tùy chọn, 29/09/2026): client cũ không gửi -> giữ nguyên giá trị đang có.
+function HT_luuCauHinhVungMien_(mien, mienMisa, mienWeb, muiGio) {
   try {
     const props = PropertiesService.getScriptProperties();
     mien = (String(mien || "").toUpperCase() === "US") ? "US" : "VN";
     mienMisa = (String(mienMisa || "").toUpperCase() === "US") ? "US" : "VN";
+    // Kiểm tra TRƯỚC khi ghi: múi giờ sai -> không lưu gì (không lưu dở dang)
+    const coMuiGio = muiGio !== undefined && muiGio !== null && muiGio !== "";
+    if (coMuiGio && !MUI_GIO_CHO_PHEP.some(function (m) { return m.id === String(muiGio); })) throw new Error("Múi giờ không hợp lệ: " + muiGio);
 
     props.setProperty("REGION_FORMAT_MIEN", mien);
     props.setProperty("MISA_FORMAT_MIEN", mienMisa);
+    if (mienWeb !== undefined && mienWeb !== null && mienWeb !== "") {
+      props.setProperty("WEBAPP_FORMAT_MIEN", String(mienWeb).toUpperCase() === "US" ? "US" : "VN");
+    }
+    if (coMuiGio) props.setProperty("MUI_GIO_HIEN_THI", String(muiGio));
+    const ten = function (m) { return m === "VN" ? "Việt Nam (dd/MM/yyyy)" : "United States (MM/dd/yyyy)"; };
+    const web = WEBAPP_FORMAT_().MIEN, tz = MUI_GIO_HIEN_THI_();
 
-    logAudit_("CAUHINH_VUNGMIEN", "OK", "Locale hệ thống: " + mien + ", Locale Misa: " + mienMisa);
+    logAudit_("CAUHINH_VUNGMIEN", "OK", "Webapp: " + web + ", Múi giờ hiển thị: " + tz + ", Ghi Google Sheet: " + mien + ", Kết xuất Excel/PDF/MISA: " + mienMisa);
     return {
       status: "success",
-      message: "✅ Đã lưu cấu hình: Hệ thống = " + (mien === "VN" ? "Việt Nam (dd/MM/yyyy)" : "United States (MM/dd/yyyy)") +
-        ", Báo cáo Misa = " + (mienMisa === "VN" ? "Việt Nam" : "United States")
+      message: "✅ Đã lưu cấu hình: Webapp = " + ten(web) + ", Múi giờ hiển thị = " + tz +
+        ", Ghi Google Sheet = " + ten(mien) + ", Kết xuất Excel/PDF/MISA = " + ten(mienMisa) +
+        ". Tải lại trang (F5) để webapp hiển thị theo cấu hình mới."
     };
   } catch (e) { return { status: "error", message: e.toString() }; }
 }
@@ -459,9 +507,12 @@ function HT_chiaSeTaiNguyenChoDanhSachQuyen_() {
 
     const ketQua = [];
     taiNguyen.forEach(function (tn) {
+      // M-14: lấy tài nguyên 1 lần / tài nguyên (trước đây 1 lần / tài nguyên × người dùng).
+      let resource = null, loiLay = "";
+      try { resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id); } catch (e) { loiLay = e.toString(); }
       nguoiDung.forEach(function (nd) {
         try {
-          const resource = tn.loai === "folder" ? DriveApp.getFolderById(tn.id) : DriveApp.getFileById(tn.id);
+          if (!resource) throw new Error(loiLay);
           if (nd.quyenDrive === "VIEWER") resource.addViewer(nd.email);
           else if (nd.quyenDrive === "COMMENTER") resource.addCommenter(nd.email);
           else resource.addEditor(nd.email);
@@ -937,8 +988,10 @@ function API_ROUTES_() {
 function taoApiRoutes_() {
   const X = QUYEN.XEM, N = QUYEN.NGHIEP_VU, H = QUYEN.HE_THONG, Q = QUYEN.QUAN_TRI;
   const r = function (fn, quyen) { return { fn: fn, quyen: quyen }; };
+  // M-08: thao tác TẠO MỚI - chống tạo trùng khi bấm lại / mất mạng (xem API()).
+  const rTao = function (fn, quyen) { return { fn: fn, quyen: quyen, chongTrung: true }; };
   // Mỗi thao tác của processFormData (Kho Dăm) 1 mức quyền riêng.
-  const rTheoThaoTac = function (fn, quyenTheoThaoTac) { return { fn: fn, quyenTheoThaoTac: quyenTheoThaoTac }; };
+  const rTheoThaoTac = function (fn, quyenTheoThaoTac) { return { fn: fn, quyenTheoThaoTac: quyenTheoThaoTac, chongTrung: true }; };
   return {
     // --- Chung: người dùng, Dashboard ---
     HT_layThongTinNguoiDungHienTai: r(HT_layThongTinNguoiDungHienTai_, X),
@@ -946,9 +999,11 @@ function taoApiRoutes_() {
 
     // --- Báo cáo nhập kho + Misa (xem, xuất file) ---
     getFilterOptions: r(getFilterOptions_, X),
-    getBaoCaoTongHop: r(getBaoCaoTongHop_, X),
-    getBaoCaoMisa: r(getBaoCaoMisa_, X),
-    getBaoCaoDonGia: r(getBaoCaoDonGia_, X),
+    // ARCH-02: bản cho giao diện - tổng cộng đủ, chỉ gửi tối đa BC_TOI_DA_DONG_WEB_ dòng
+    // mới nhất (Xuất Excel/PDF và Dashboard vẫn dùng bản đầy đủ).
+    getBaoCaoTongHop: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoTongHop_(f), "ngayCan1"); }, X),
+    getBaoCaoMisa: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoMisa_(f), "ngay"); }, X),
+    getBaoCaoDonGia: r(function (f) { return BC_gioiHanDongWeb_(getBaoCaoDonGia_(f), "ngayCan1"); }, X),
     exportBaoCaoTongHopExcel: r(exportBaoCaoTongHopExcel_, X),
     exportBaoCaoTongHopPDF: r(exportBaoCaoTongHopPDF_, X),
     exportBaoCaoMisaExcel: r(exportBaoCaoMisaExcel_, X),
@@ -997,30 +1052,32 @@ function taoApiRoutes_() {
     layDanhSachDanhMucKho: r(layDanhSachDanhMucKho_, X),
     layDanhSachDoKhoTheoBoLoc: r(layDanhSachDoKhoTheoBoLoc_, X),
     layDanhSachKyVetBai: r(layDanhSachKyVetBai_, X),
+    // M-09: báo cáo chỉ đọc - gọi thẳng, KHÔNG qua processFormData (vốn giữ khóa toàn hệ thống).
+    layBaoCaoTheoKyVetBai: r(layBaoCaoTheoKyVetBai_, X),
 
     // --- Nhập liệu phiếu cân (nghiệp vụ) ---
     step1_PreviewDraft: r(step1_PreviewDraft_, N),
-    step1_ConfirmImport: r(step1_ConfirmImport_, N),
-    addManualPhieuCan: r(addManualPhieuCan_, N),
+    step1_ConfirmImport: rTao(step1_ConfirmImport_, N),
+    addManualPhieuCan: rTao(addManualPhieuCan_, N),
     taoFileMauPhieuCan: r(taoFileMauPhieuCan_, N),
     taoFileMauXuatHang: r(taoFileMauXuatHang_, N),
     runCreateMisaData: r(runCreateMisaData_, N),
     downloadMisaExcel: r(downloadMisaExcel_, N),
 
     // --- Báo giá: nhập/sửa/xóa (nghiệp vụ) ---
-    BG_addMaBaoGia: r(BG_addMaBaoGia_, N),
+    BG_addMaBaoGia: rTao(BG_addMaBaoGia_, N),
     BG_deleteMaBaoGia: r(BG_deleteMaBaoGia_, N),
-    BG_addMaKL: r(BG_addMaKL_, N),
+    BG_addMaKL: rTao(BG_addMaKL_, N),
     BG_deleteMaKL: r(BG_deleteMaKL_, N),
-    BG_createQuote: r(BG_createQuote_, N),
+    BG_createQuote: rTao(BG_createQuote_, N),
     BG_deleteQuote: r(BG_deleteQuote_, N),
     BG_updateBaogiaRow: r(BG_updateBaogiaRow_, N),
     BG_deleteBaogiaRow: r(BG_deleteBaogiaRow_, N),
 
     // --- Xuất hàng: nhập/sửa/xóa (nghiệp vụ) ---
     XH_step1_PreviewDraft: r(XH_step1_PreviewDraft_, N),
-    XH_step1_ConfirmImport: r(XH_step1_ConfirmImport_, N),
-    XH_saveDonHang: r(XH_saveDonHang_, N),
+    XH_step1_ConfirmImport: rTao(XH_step1_ConfirmImport_, N),
+    XH_saveDonHang: rTao(XH_saveDonHang_, N),
     XH_updateDonHang: r(XH_updateDonHang_, N),
     XH_deleteDonHang: r(XH_deleteDonHang_, N),
 
@@ -1034,8 +1091,10 @@ function taoApiRoutes_() {
 
     // --- Hệ thống: Sao lưu, Nhật ký hoạt động (Quản trị + Tổng hợp) ---
     HT_layTinhTrangSaoLuu: r(HT_layTinhTrangSaoLuu_, H),
+    HT_layGiamSat: r(HT_layGiamSat_, H), // Giám sát lỗi 24h + sao lưu trên Dashboard
     HT_luuCauHinhSaoLuu: r(HT_luuCauHinhSaoLuu_, H),
     HT_saoLuuNgay: r(HT_saoLuuNgay_, H),
+    HT_guiEmailThu: r(HT_guiEmailThu_, H),   // Đợt sửa 4 (tiếp 4)
     HT_layNhatKy: r(HT_layNhatKy_, H),
     HT_xuatNhatKyExcel: r(HT_xuatNhatKyExcel_, H),
 
@@ -1064,8 +1123,10 @@ function taoApiRoutes_() {
 }
 
 /** CỬA VÀO DUY NHẤT cho giao diện: kiểm tra phiên + quyền theo API_ROUTES rồi
- * gọi đúng hàm nội bộ đã đăng ký. */
-function API(maPhien, tenHam, thamSo) {
+ * gọi đúng hàm nội bộ đã đăng ký.
+ * maYeuCau (tùy chọn, M-08): mã do trình duyệt sinh cho 1 lần bấm; gửi lại CÙNG mã
+ * khi bấm lại cùng dữ liệu (sau mất mạng / bấm 2 lần) -> không chạy lần 2. */
+function API(maPhien, tenHam, thamSo, maYeuCau) {
   const ten = String(tenHam || "");
   const routes = API_ROUTES_();
   const route = Object.prototype.hasOwnProperty.call(routes, ten) ? routes[ten] : null;
@@ -1077,7 +1138,63 @@ function API(maPhien, tenHam, thamSo) {
     : route.quyen;
   if (!quyen) throw new Error("Thao tác không tồn tại: " + ten + " / " + String(args[0]));
   yeuCauQuyen_(quyen);
-  return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
+  // Đợt sửa 4 (tiếp 5) - GIÁM SÁT HIỆU NĂNG: đo thời gian từng lượt gọi; chậm quá
+  // API_CHAM_MS_ thì ghi Nhật ký "API_CHAM" = WARNING (tự hiện ở khung Giám sát
+  // 24 giờ trên Dashboard). Chỉ ghi khi chậm -> không thêm lượt ghi sheet cho
+  // lượt gọi bình thường. Không đổi kết quả / lỗi trả về.
+  const batDau = Date.now();
+  try {
+    if (route.chongTrung && /^[A-Za-z0-9-]{16,64}$/.test(String(maYeuCau || ""))) {
+      return chayChongTrung_(PHIEN_HIEN_TAI_.email, ten, String(maYeuCau), function () { return route.fn.apply(null, args); });
+    }
+    return chuyenLinkXuatThanhFile_(route.fn.apply(null, args));
+  } finally {
+    ghiNhanApiCham_(ten, Date.now() - batDau);
+  }
+}
+
+const API_CHAM_MS_ = 30000;
+// Chức năng vốn chạy lâu theo thiết kế (sao lưu toàn bộ 1–3 phút) - không tính là chậm.
+const API_CHAM_BO_QUA_ = { HT_saoLuuNgay: true };
+function ghiNhanApiCham_(tenHam, ms) {
+  if (!(ms >= API_CHAM_MS_) || API_CHAM_BO_QUA_[tenHam]) return false;
+  try { logAudit_("API_CHAM", "WARNING", tenHam + " chạy " + Math.round(ms / 100) / 10 + " giây (ngưỡng " + API_CHAM_MS_ / 1000 + " giây)"); } catch (e) { /* bỏ qua */ }
+  return true;
+}
+
+// M-08 - CHỐNG TẠO TRÙNG: đánh dấu "đang xử lý" theo (người dùng + mã yêu cầu) trước
+// khi chạy; chạy THÀNH CÔNG thì lưu kết quả 10 phút. Cùng mã gửi lại: đang chạy -> báo
+// chờ; đã xong -> trả lại kết quả cũ (không ghi thêm). Chạy lỗi -> xóa dấu để thử lại được.
+const YC_DANG_XU_LY_ = "__DANG_XU_LY__";
+function laKetQuaThanhCong_(kq) {
+  if (typeof kq === "string") return kq.indexOf("❌") !== 0 && kq.indexOf("⚠️TRUNG_LAP_TP::") !== 0;
+  return !!kq && kq.status === "success";
+}
+function chayChongTrung_(email, tenHam, maYeuCau, viec) {
+  const cache = CacheService.getScriptCache();
+  const khoa = "yc_" + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, email + "|" + tenHam + "|" + maYeuCau));
+  const daCo = cache.get(khoa);
+  if (daCo === YC_DANG_XU_LY_) {
+    const tb = "Yêu cầu này đang được xử lý (có thể vừa bấm 2 lần) - vui lòng chờ kết quả, không cần bấm lại.";
+    return tenHam === "processFormData" ? "❌ " + tb : { status: "error", message: tb };
+  }
+  if (daCo) {
+    try {
+      const cu = JSON.parse(daCo);
+      const note = " (Yêu cầu này đã được lưu trước đó - không lưu lần 2.)";
+      if (typeof cu === "string") return cu + note;
+      if (cu && typeof cu.message === "string") cu.message += note;
+      return cu;
+    } catch (e) { /* hỏng -> chạy lại bình thường */ }
+  }
+  cache.put(khoa, YC_DANG_XU_LY_, 600);
+  let kq;
+  try { kq = viec(); }
+  catch (e) { cache.remove(khoa); throw e; }
+  if (laKetQuaThanhCong_(kq)) {
+    try { const json = JSON.stringify(kq); if (json.length < 90000) cache.put(khoa, json, 600); else cache.remove(khoa); } catch (e) { cache.remove(khoa); }
+  } else cache.remove(khoa);
+  return chuyenLinkXuatThanhFile_(kq);
 }
 
 // Các chức năng Xuất Excel/PDF trả về link docs.google.com/.../export của file
@@ -1091,6 +1208,11 @@ function chuyenLinkXuatThanhFile_(kq) {
   const m = kq.url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)\/export\?(.*)$/);
   if (!m) return kq;
   try {
+    // FIX (file xuất TRỐNG): Apps Script gom các lệnh ghi SpreadsheetApp lại, chưa ghi
+    // thật vào file. Tải qua link export NGAY sau khi ghi có thể nhận bản CHƯA có dữ
+    // liệu (file Excel/PDF trống trơn, rõ nhất ở file MISA nhiều cột). Ép ghi xong
+    // mọi thay đổi đang chờ trước khi tải.
+    SpreadsheetApp.flush();
     const laPdf = /(^|&)format=pdf(&|$)/.test(m[2]);
     const res = UrlFetchApp.fetch(kq.url, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
@@ -1098,17 +1220,37 @@ function chuyenLinkXuatThanhFile_(kq) {
     });
     if (res.getResponseCode() !== 200) throw new Error("HTTP " + res.getResponseCode());
     let tenFile = "tai-ve";
-    try { tenFile = DriveApp.getFileById(m[1]).getName(); } catch (e) { /* giữ tên mặc định */ }
+    let fileTam = null;
+    try { fileTam = DriveApp.getFileById(m[1]); tenFile = fileTam.getName(); } catch (e) { /* giữ tên mặc định */ }
     const out = {};
     for (const k in kq) out[k] = kq[k];
     out.fileBase64 = Utilities.base64Encode(res.getBlob().getBytes());
     out.fileName = tenFile + (laPdf ? ".pdf" : ".xlsx");
     out.mimeType = laPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    // FIX M-01: file Google Sheet TẠM (tạo trong thư mục Done chỉ để xuất) - đã tải về
+    // thành công thì chuyển vào Thùng rác (khôi phục được 30 ngày). File báo giá xuất
+    // vào thư mục lưu báo giá (BACKUP_FOLDER_ID) là bản lưu có chủ đích -> giữ nguyên.
+    // Tải lỗi -> không tới đây, file được giữ để giao diện mở link như cũ.
+    try { if (fileTam && laFileTamXuat_(fileTam)) fileTam.setTrashed(true); } catch (e) { /* không làm hỏng việc tải */ }
     return out;
   } catch (e) {
     logAudit_("XUAT_FILE", "ERROR", "Không tải được file xuất: " + e);
     return kq; // giao diện sẽ mở link như cũ (vẫn dùng được với tài khoản Admin)
   }
+}
+
+// File tạm của chức năng xuất: Google Sheet nằm trong thư mục Done, tên theo mẫu
+// các hàm xuất tạo ra (không đụng file Excel gốc đã import cũng nằm ở Done).
+const TIEN_TO_FILE_TAM_XUAT_ = ["BaoCao_", "PhieuNhapKho_", "Misa_Export_", "Mau_Import_", "NhatKy_HoatDong_"];
+function laTenFileTamXuat_(ten) {
+  ten = String(ten || "");
+  return TIEN_TO_FILE_TAM_XUAT_.some(function (p) { return ten.indexOf(p) === 0; });
+}
+function laFileTamXuat_(file) {
+  if (file.getMimeType() !== MimeType.GOOGLE_SHEETS || !laTenFileTamXuat_(file.getName())) return false;
+  const it = file.getParents();
+  while (it.hasNext()) { if (it.next().getId() === CONFIG.FOLDER_DONE) return true; }
+  return false;
 }
 
 /* ----- Luồng đăng nhập qua Cổng (không cần phiên) ----- */
@@ -1245,6 +1387,12 @@ const QUYEN_DRIVE_HOP_LE = ["VIEWER", "COMMENTER", "EDITOR"];
 // danhSach = [{email, hoTen, vaiTro, trangThai, quyenDrive}, ...] - GHI ĐÈ TOÀN BỘ
 // sheet SYS_NguoiDung. Dòng không đổi giữ nguyên "Cập nhật lúc/bởi" cũ.
 function HT_luuDanhSachQuyen_(danhSach) {
+  // L-04: 2 Quản trị lưu cùng lúc -> người lưu sau không ghi đè lẫn lộn bảng người dùng.
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(CONFIG.LOCK_TIMEOUT_MS); } catch (e) { return { status: "error", message: "Hệ thống đang bận, vui lòng thử lại sau ít giây." }; }
+  try { return HT_luuDanhSachQuyenTrongKhoa_(danhSach); } finally { lock.releaseLock(); }
+}
+function HT_luuDanhSachQuyenTrongKhoa_(danhSach) {
   try {
     if (!Array.isArray(danhSach) || danhSach.length === 0) {
       throw new Error("Danh sách người dùng không được để trống.");
