@@ -76,3 +76,8 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 ## TABLE-01b — Lỗi "typed column" vẫn bật ra sau bản sửa đầu (đã sửa)
 - Google gom lệnh ghi/định dạng, tới lúc đẩy thật (flush / hết lượt chạy) mới báo lỗi -> try/catch quanh lệnh không bắt được ("ScriptError" ở giao diện).
 - Sửa: `dinhDangAnToan_(viec, sheet)` hỏi Sheets API (`sheetCoBang_`, 1 lần/file/lượt) - sheet có Bảng thì không gửi lệnh định dạng; không hỏi được thì `SpreadsheetApp.flush()` ngay trong try. Test tái hiện lỗi muộn: `test/bangCoKieu.test.js`.
+
+## TABLE-01c — "Cập nhật hiệu lực" vẫn báo lỗi "typed column" (đã sửa)
+- Nguyên nhân: ghi giá trị NGÀY (Date) bằng `setValues` cũng ngầm đặt định dạng số cho ô -> sheet là Bảng (Baogia_DN_FINAL...) báo lỗi dù không còn lệnh `setNumberFormat` nào.
+- Sửa: `ghiAnToan_(sheet, vung, giaTri)` - sheet có Bảng thì ghi ngày dạng SỐ NGÀY của Sheets (`soNgaySheets_`, theo múi giờ file; cột kiểu Ngày tự hiển thị), sheet thường ghi Date như cũ; không hỏi được Sheets API thì thử ghi + flush, gặp lỗi mới ghi lại bằng số ngày. Áp cho FINAL, SAVE, Baogia_DN, Quanly_BaoGia, Ma_KL.
+- Đọc báo giá chấp nhận cả Date lẫn số ngày (`ngayTuGiaTri_`, `tsTuGiaTri_`): engine tính giá, lịch sử, danh sách báo giá, xuất file. Test: `test/bangCoKieu.test.js`.
