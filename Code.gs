@@ -60,8 +60,32 @@ function doGet(e) {
 // (VD Xem toàn bộ lịch sử báo giá) dù dữ liệu đã ghi xong. Định dạng chỉ để HIỂN
 // THỊ và Bảng đã tự hiển thị theo kiểu cột -> bỏ qua đúng lỗi này; lỗi khác vẫn báo.
 // Dùng cho mọi lệnh định dạng trên sheet dữ liệu thật (không cần cho file xuất tạm).
-function dinhDangAnToan_(viec) {
-  try { viec(); }
+// Lưu ý: Google GOM các lệnh ghi/định dạng lại, tới lúc "đẩy" thật (đọc tiếp, flush
+// hoặc hết lượt chạy) mới báo lỗi - nên chỉ bọc try/catch quanh lệnh là KHÔNG đủ
+// (lỗi bật ra sau khi hàm đã chạy xong -> "ScriptError" ở giao diện). Vì vậy:
+//  1) Hỏi Sheets API (dịch vụ nâng cao "Sheets" đã bật) xem sheet có Bảng không ->
+//     có thì KHÔNG gửi lệnh định dạng nào (không thể sinh lỗi). Hỏi 1 lần/file/lượt.
+//  2) Không hỏi được -> ép chạy lệnh định dạng NGAY (flush) bên trong try để bắt lỗi.
+const SHEET_CO_BANG_ = {}; // id file -> Set(sheetId có Bảng), trong 1 lượt chạy
+function sheetCoBang_(sheet) {
+  try {
+    if (!sheet || typeof Sheets === "undefined" || !Sheets || !Sheets.Spreadsheets || !Sheets.Spreadsheets.get) return null;
+    const id = sheet.getParent().getId();
+    if (!SHEET_CO_BANG_[id]) {
+      const kq = Sheets.Spreadsheets.get(id, { fields: "sheets(properties(sheetId),tables(tableId))" });
+      SHEET_CO_BANG_[id] = new Set((kq.sheets || []).filter(function (x) { return x.tables && x.tables.length; })
+        .map(function (x) { return x.properties.sheetId; }));
+    }
+    return SHEET_CO_BANG_[id].has(sheet.getSheetId());
+  } catch (e) { return null; } // không xác định được -> dùng cách 2
+}
+function dinhDangAnToan_(viec, sheet) {
+  const coBang = sheetCoBang_(sheet);
+  if (coBang === true) return;               // sheet là Bảng: Bảng tự hiển thị theo kiểu cột
+  if (coBang === false) { viec(); return; }  // chắc chắn không có Bảng: định dạng như bình thường
+  const coFlush = typeof SpreadsheetApp !== "undefined" && SpreadsheetApp && typeof SpreadsheetApp.flush === "function";
+  if (coFlush) SpreadsheetApp.flush();       // ghi thật dữ liệu đang chờ trước (lỗi của chúng vẫn báo như cũ)
+  try { viec(); if (coFlush) SpreadsheetApp.flush(); }
   catch (e) { if (!/typed column/i.test(String((e && e.message) || e))) throw e; }
 }
 
@@ -401,9 +425,9 @@ function step1_PreviewDraft_(fileDataList) {
       // Ép định dạng Text (@) cột B..H TRƯỚC KHI ghi giá trị - tránh Google
       // Sheets tự "đoán" và chuyển chuỗi ngày dd/MM/yyyy thành Date thật theo
       // Locale mặc định của Sheet, khiến ngày bị đảo lần nữa (giống FIX #6).
-      dinhDangAnToan_(function () { draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@"); });
+      dinhDangAnToan_(function () { draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@"); }, draftSheet);
       draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
-      dinhDangAnToan_(function () { draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right"); });
+      dinhDangAnToan_(function () { draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right"); }, draftSheet);
       draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center"); // Ngày/Giờ cân canh giữa
       draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + ngayHT_(new Date(), true) + " (" + previewRows.length + " dòng)");
     } finally { _khoaDraft.releaseLock(); } }
@@ -624,12 +648,12 @@ function ghepKetQuaGia_(dsDong, dongDau, ketQua) {
 function PC_dinhDangCacKhoi_(sheet, cumDong, rf, coGia) {
   if (!cumDong.length) return;
   const vung = function (cot) { return cumDong.map(function (c) { return cot + c[0] + ":" + cot + c[1]; }); };
-  dinhDangAnToan_(function () { sheet.getRangeList(vung("B").concat(vung("D"))).setNumberFormat(rf.DATE_FMT); });
-  dinhDangAnToan_(function () { sheet.getRangeList(vung("C").concat(vung("E"))).setNumberFormat(rf.TIME_FMT); });
+  dinhDangAnToan_(function () { sheet.getRangeList(vung("B").concat(vung("D"))).setNumberFormat(rf.DATE_FMT); }, sheet);
+  dinhDangAnToan_(function () { sheet.getRangeList(vung("C").concat(vung("E"))).setNumberFormat(rf.TIME_FMT); }, sheet);
   sheet.getRangeList(cumDong.map(function (c) { return "B" + c[0] + ":E" + c[1]; })).setHorizontalAlignment("center");
   const so = cumDong.map(function (c) { return "H" + c[0] + ":J" + c[1]; });
   if (coGia) Array.prototype.push.apply(so, vung("T").concat(vung("X"), vung("Z")));
-  dinhDangAnToan_(function () { sheet.getRangeList(so).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); });
+  dinhDangAnToan_(function () { sheet.getRangeList(so).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); }, sheet);
 }
 
 function ghiCapNhatPhieuCanGop_(sheet, capNhatTheoDong, rf, chuKyMongDoi) {
@@ -1234,12 +1258,12 @@ function copyDataWithFinalLookup_(fromDate, toDate) {
       newRow[10] = maNCC ? '="' + maNCC + '"' : ""; newRow[11] = tenNCC; targetData.push(newRow);
     }
     if (ssTarget.getLastRow() > 1) ssTarget.getRange(2, 1, ssTarget.getLastRow(), 33).clearContent();
-    if (targetData.length > 0) { const _rf5 = REGION_FORMAT_(); dinhDangAnToan_(function () { ssTarget.getRange(2, 10, targetData.length, 2).setNumberFormat("@"); }); ssTarget.getRange(2, 1, targetData.length, 33).setValues(targetData); dinhDangAnToan_(function () { ssTarget.getRange(2, 1, targetData.length, 2).setNumberFormat(_rf5.DATE_FMT); }); dinhDangAnToan_(function () { ssTarget.getRange(2, 9, targetData.length, 1).setNumberFormat(_rf5.DATE_FMT); });
+    if (targetData.length > 0) { const _rf5 = REGION_FORMAT_(); dinhDangAnToan_(function () { ssTarget.getRange(2, 10, targetData.length, 2).setNumberFormat("@"); }, ssTarget); ssTarget.getRange(2, 1, targetData.length, 33).setValues(targetData); dinhDangAnToan_(function () { ssTarget.getRange(2, 1, targetData.length, 2).setNumberFormat(_rf5.DATE_FMT); }, ssTarget); dinhDangAnToan_(function () { ssTarget.getRange(2, 9, targetData.length, 1).setNumberFormat(_rf5.DATE_FMT); }, ssTarget);
       // Locale hệ thống: ngày (A, B, I) canh giữa; KL Tấn (E) 2 số lẻ, Đơn giá/Thành tiền (F, G) có phân cách, canh phải.
       const _n5 = targetData.length + 1;
       ssTarget.getRangeList(["A2:B" + _n5, "I2:I" + _n5]).setHorizontalAlignment("center");
-      dinhDangAnToan_(function () { ssTarget.getRange("E2:E" + _n5).setNumberFormat(_rf5.SO_THAP_PHAN_FMT); });
-      dinhDangAnToan_(function () { ssTarget.getRange("F2:G" + _n5).setNumberFormat(_rf5.SO_NGUYEN_FMT); });
+      dinhDangAnToan_(function () { ssTarget.getRange("E2:E" + _n5).setNumberFormat(_rf5.SO_THAP_PHAN_FMT); }, ssTarget);
+      dinhDangAnToan_(function () { ssTarget.getRange("F2:G" + _n5).setNumberFormat(_rf5.SO_NGUYEN_FMT); }, ssTarget);
       ssTarget.getRange("E2:G" + _n5).setHorizontalAlignment("right"); }
     // FIX H-06: Update_MiSa_PC là 1 bản dùng chung cho mọi người - ghi lại bản hiện có
     // là khoảng ngày nào, ai tạo, lúc nào để hiển thị và kiểm tra trước khi tải file MISA.
@@ -1439,7 +1463,7 @@ function runCalculatePrice_core_(chonDong, traKetQua) {
       idx = end + 1;
     }
     ghiNhieuVung_(ss, sheet, vungGhi);
-    if (vungDinhDang.length > 0) dinhDangAnToan_(function () { sheet.getRangeList(vungDinhDang).setNumberFormat("#,##0").setHorizontalAlignment("right"); }); // T/X/Z: phân cách + canh phải
+    if (vungDinhDang.length > 0) dinhDangAnToan_(function () { sheet.getRangeList(vungDinhDang).setNumberFormat("#,##0").setHorizontalAlignment("right"); }, sheet); // T/X/Z: phân cách + canh phải
 
     return {
       status: "success",
@@ -2631,15 +2655,15 @@ function BG_ss_() { return SpreadsheetApp.openById(BAOGIA_CONFIG.SPREADSHEET_ID)
 // Locale hệ thống cho sheet Baogia_DN: Thời điểm lập (A) + hiệu lực (B) canh giữa, Đơn giá (E) phân cách + canh phải.
 function BG_dinhDangDongBaoGia_(sheet, dongDau, soDong) {
   const rf = REGION_FORMAT_(), d2 = dongDau + soDong - 1;
-  dinhDangAnToan_(function () { sheet.getRange("A" + dongDau + ":B" + d2).setNumberFormat(rf.DATETIME_FMT).setHorizontalAlignment("center"); });
-  dinhDangAnToan_(function () { sheet.getRange("E" + dongDau + ":E" + d2).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); });
+  dinhDangAnToan_(function () { sheet.getRange("A" + dongDau + ":B" + d2).setNumberFormat(rf.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
+  dinhDangAnToan_(function () { sheet.getRange("E" + dongDau + ":E" + d2).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); }, sheet);
 }
 // Sheet dẫn xuất FINAL/SAVE (14 cột): Từ/Đến (B, C), lúc cập nhật (I) canh giữa; Đơn giá (G) phân cách + canh phải.
 function BG_dinhDangBangHieuLuc_(sheet, soDong) {
   if (soDong <= 0) return;
   const rf = REGION_FORMAT_(), n = soDong + 1;
-  dinhDangAnToan_(function () { sheet.getRangeList(["B2:C" + n, "I2:I" + n]).setNumberFormat(rf.DATETIME_FMT).setHorizontalAlignment("center"); });
-  dinhDangAnToan_(function () { sheet.getRange("G2:G" + n).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); });
+  dinhDangAnToan_(function () { sheet.getRangeList(["B2:C" + n, "I2:I" + n]).setNumberFormat(rf.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
+  dinhDangAnToan_(function () { sheet.getRange("G2:G" + n).setNumberFormat(rf.SO_NGUYEN_FMT).setHorizontalAlignment("right"); }, sheet);
 }
 
 /* ---------- 5.1 Danh mục mã báo giá (Ma_BaoGia) ---------- */
@@ -2832,8 +2856,8 @@ function BG_addMaKL_(fields) {
     // Lưu KL_Min/KL_Max theo đúng quy ước hiện có trong sheet Ma_KL: đơn vị Kg
     sheet.getRange(lastRow + 1, 1, 1, 4).setValues([[new Date(), maKL, klMinTan * 1000, klMaxTan * 1000]]);
     const _rfKL = REGION_FORMAT_(); // Locale hệ thống: thời điểm canh giữa, KL Min/Max (kg) phân cách + canh phải
-    dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 1).setNumberFormat(_rfKL.DATETIME_FMT).setHorizontalAlignment("center"); });
-    dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 3, 1, 2).setNumberFormat(_rfKL.SO_NGUYEN_FMT).setHorizontalAlignment("right"); });
+    dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 1).setNumberFormat(_rfKL.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
+    dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 3, 1, 2).setNumberFormat(_rfKL.SO_NGUYEN_FMT).setHorizontalAlignment("right"); }, sheet);
     const _canhBaoHeader = kiemTraLechHeaderSheet_(sheet, "Ma_KL", 4); // BUG-002
     // FIX H-01 (cảnh báo, không chặn): dải mới chồng lên dải KL đã có trong danh mục.
     const chong = [];
@@ -3382,8 +3406,8 @@ function BG_createQuote_(payload) {
 
     qlSheet.getRange(qlLastRow + 1, 1, 1, 5).setValues([[ngayBaoGiaDate, soBaoGiaMoi, now, hieuLucDate, payload.idTam || ""]]);
     const _rfBG = REGION_FORMAT_(); // Locale hệ thống: ngày báo giá (A), lúc lập (C), hiệu lực (D) canh giữa
-    dinhDangAnToan_(function () { qlSheet.getRange(qlLastRow + 1, 1).setNumberFormat(_rfBG.DATE_FMT); });
-    dinhDangAnToan_(function () { qlSheet.getRangeList(["C" + (qlLastRow + 1), "D" + (qlLastRow + 1)]).setNumberFormat(_rfBG.DATETIME_FMT); });
+    dinhDangAnToan_(function () { qlSheet.getRange(qlLastRow + 1, 1).setNumberFormat(_rfBG.DATE_FMT); }, qlSheet);
+    dinhDangAnToan_(function () { qlSheet.getRangeList(["C" + (qlLastRow + 1), "D" + (qlLastRow + 1)]).setNumberFormat(_rfBG.DATETIME_FMT); }, qlSheet);
     qlSheet.getRangeList(["A" + (qlLastRow + 1), "C" + (qlLastRow + 1) + ":D" + (qlLastRow + 1)]).setHorizontalAlignment("center");
 
     const rowsToAppend = groups.map(g => {
@@ -4231,14 +4255,14 @@ function xuLySuaXoaGiaoDich_(dataEdit) {
       const _moiGD = [ngay, dataEdit.loai, hinhThucVal, dotVetBai, khoXuatVal, khoNhapVal, mt, doKho, tyLeTieuHao, bdmt, "Hợp lệ"];
       logAudit_("LICH_SU_SUA", "OK", "Kho Dăm " + dataEdit.maPhieu + " | " + LS_thayDoi_(LS_COT_GIAODICH_, data[rowIdx - 1].slice(1, 12), _moiGD));
       sheet.getRange(rowIdx, 2, 1, 11).setValues([_moiGD]);
-      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 2).setNumberFormat(_rfKD.DATETIME_FMT).setHorizontalAlignment("center"); });
+      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 2).setNumberFormat(_rfKD.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
       sheet.getRangeList(["H" + rowIdx + ":K" + rowIdx]).setHorizontalAlignment("right");
       // Khối lượng tươi (H) / Khối lượng khô (K) theo đúng số chữ số thập phân
       // đã cấu hình (Hệ thống → Cấu hình hệ thống); Độ khô (I) luôn 4 số lẻ vì
       // là tỷ lệ kỹ thuật (0-1), không phải số lượng người dùng thường xem.
-      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 8).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); });
-      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 9).setNumberFormat("0.0000"); });
-      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 11).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); });
+      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 8).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); }, sheet);
+      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 9).setNumberFormat("0.0000"); }, sheet);
+      dinhDangAnToan_(function () { sheet.getRange(rowIdx, 11).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); }, sheet);
       sheet.getRange(rowIdx, 14).setValue(dienGiaiDK);
       return "✏️ Đã cập nhật phiếu thành công.";
     } else {
@@ -4268,11 +4292,11 @@ function xuLySuaXoaGiaoDich_(dataEdit) {
         maPhieuChinh, ngay, dataEdit.loai, hinhThucVal, dotVetBai,
         khoXuatVal, khoNhapVal, mt, doKho, tyLeTieuHao, bdmt, "Hợp lệ", "", dienGiaiDK
       ]);
-      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 2).setNumberFormat(_rfKD.DATETIME_FMT).setHorizontalAlignment("center"); });
+      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 2).setNumberFormat(_rfKD.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
       sheet.getRangeList(["H" + rowMoi + ":K" + rowMoi]).setHorizontalAlignment("right");
-      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 8).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); });
-      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 9).setNumberFormat("0.0000"); });
-      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 11).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); });
+      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 8).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); }, sheet);
+      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 9).setNumberFormat("0.0000"); }, sheet);
+      dinhDangAnToan_(function () { sheet.getRange(rowMoi, 11).setNumberFormat(_rfKD.SO_THAP_PHAN_FMT); }, sheet);
 
       if (dataEdit.loai === "XUẤT" && hinhThucVal === "TC" && khoNhapVal !== "Không có") {
         return "✅ Xuất trung chuyển sang [" + khoNhapVal + "] thành công!";
@@ -4532,7 +4556,7 @@ function xuLyDanhMucKho_(dataDM) {
       if (String(dsKho[k][4]).trim() !== "Đã hủy" && String(dsKho[k][2] || "").trim().toLowerCase() === tenMoi) return "❌ Kho \"" + dsKho[k][2] + "\" đã có trong danh mục.";
     }
     sheetDM.appendRow(["KHO_" + new Date().getTime(), sanitize_(dataDM.tenNhaMay), sanitize_(dataDM.tenKho), new Date(dataDM.ngayKhoiTao), "Hoạt động"]);
-    dinhDangAnToan_(function () { sheetDM.getRange(sheetDM.getLastRow(), 4).setNumberFormat(REGION_FORMAT_().DATE_FMT).setHorizontalAlignment("center"); });
+    dinhDangAnToan_(function () { sheetDM.getRange(sheetDM.getLastRow(), 4).setNumberFormat(REGION_FORMAT_().DATE_FMT).setHorizontalAlignment("center"); }, sheetDM);
     xoaCacheKho_();
     return "✅ Đã thêm kho.";
   }
@@ -4709,8 +4733,8 @@ function xuLySuaXoaDoKho_(dataEdit) {
       return "✏️ Đã cập nhật.";
     } else {
       sheet.appendRow([new Date(target), hinhThucSanitized, dk, da, "Hợp lệ"]);
-      dinhDangAnToan_(function () { sheet.getRange(sheet.getLastRow(), 1).setNumberFormat(REGION_FORMAT_().DATE_FMT).setHorizontalAlignment("center"); });
-      dinhDangAnToan_(function () { sheet.getRange(sheet.getLastRow(), 3, 1, 2).setNumberFormat("0.0000").setHorizontalAlignment("right"); });
+      dinhDangAnToan_(function () { sheet.getRange(sheet.getLastRow(), 1).setNumberFormat(REGION_FORMAT_().DATE_FMT).setHorizontalAlignment("center"); }, sheet);
+      dinhDangAnToan_(function () { sheet.getRange(sheet.getLastRow(), 3, 1, 2).setNumberFormat("0.0000").setHorizontalAlignment("right"); }, sheet);
       return "✅ Đã thêm.";
     }
   }
@@ -5294,7 +5318,7 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
         if (draftSheet.getLastRow() > 1) draftSheet.getRange(2, 1, draftSheet.getLastRow() - 1, 16).clearContent();
         const draftHeaders = ["Trạng Thái", "Mã Chứng Từ", "Số Phiếu", "Số Xe", "Ngày Cân 1", "Giờ Cân 1", "Ngày Cân 2", "Giờ Cân 2", "Cân Lần 1", "Cân Lần 2", "KL Hàng (Kg)", "Đơn Vị Vận Chuyển", "Tên Tài Xế", "Số TKHQ", "Kho Xuất", "Kho Nhập"];
         draftSheet.getRange(1, 1, 1, draftHeaders.length).setValues([draftHeaders]).setFontWeight("bold").setBackground("#cfe2ff");
-        dinhDangAnToan_(function () { draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@"); }); // ép Text cột B..H (Mã CT..Giờ Cân 2), tránh Sheets tự đoán lại theo Locale
+        dinhDangAnToan_(function () { draftSheet.getRange(2, 2, previewRows.length, 7).setNumberFormat("@"); }, draftSheet); // ép Text cột B..H (Mã CT..Giờ Cân 2), tránh Sheets tự đoán lại theo Locale
         const _mienDraftXH = REGION_FORMAT_().MIEN; // ngày dạng chữ theo Locale hệ thống
         const draftValues = previewRows.map(row => [
           row.isError ? "❌ " + row.errorMsg : (row.canhBao ? "⚠️ " + row.typeImport + " - " + row.canhBao : "✔️ " + row.typeImport), row.uniqueKey, row.soPhieu, row.bienSo,
@@ -5302,7 +5326,7 @@ function XH_step1_PreviewDraft_(fileDataList, khoXuatMacDinh, khoNhapMacDinh) {
           row.soTKHQ, row.khoXuat, row.khoNhap
         ]);
         draftSheet.getRange(2, 1, draftValues.length, draftHeaders.length).setValues(draftValues);
-        dinhDangAnToan_(function () { draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right"); });
+        dinhDangAnToan_(function () { draftSheet.getRange(2, 9, draftValues.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right"); }, draftSheet);
         draftSheet.getRange(2, 5, draftValues.length, 4).setHorizontalAlignment("center");
         draftSheet.getRange(1, 1).setNote("Xem trước bởi " + (layThongTinNguoiDungHienTai_().email || "?") + " lúc " + ngayHT_(new Date(), true) + " (" + previewRows.length + " dòng)");
       }
@@ -5388,15 +5412,15 @@ function XH_step1_ConfirmImport_(confirmedDataList) {
       // khoa học (VD "1.02345E+11") hoặc mất số 0 đứng đầu, làm sai lệch khi
       // đối chiếu với chứng từ hải quan. Đặt định dạng SAU khi ghi sẽ QUÁ TRỄ
       // vì Sheets có thể đã tự chuyển đổi giá trị ngay tại thời điểm ghi.
-      dinhDangAnToan_(function () { dataSheet.getRange(startRowXH, 15, batchNew.length, 1).setNumberFormat("@"); }); // Số TKHQ
-      dinhDangAnToan_(function () { dataSheet.getRange(startRowXH, 12, batchNew.length, 1).setNumberFormat("@"); }); // Số BKLS
+      dinhDangAnToan_(function () { dataSheet.getRange(startRowXH, 15, batchNew.length, 1).setNumberFormat("@"); }, dataSheet); // Số TKHQ
+      dinhDangAnToan_(function () { dataSheet.getRange(startRowXH, 12, batchNew.length, 1).setNumberFormat("@"); }, dataSheet); // Số BKLS
       dataSheet.getRange(startRowXH, 1, batchNew.length, 17).setValues(batchNew);
       const _rfXH = REGION_FORMAT_(), d1 = startRowXH, d2 = startRowXH + batchNew.length - 1;
-      dinhDangAnToan_(function () { dataSheet.getRangeList(["B" + d1 + ":C" + d2]).setNumberFormat(_rfXH.DATETIME_FMT); });
-      dinhDangAnToan_(function () { dataSheet.getRange("K" + d1 + ":K" + d2).setNumberFormat(_rfXH.DATE_FMT); });
+      dinhDangAnToan_(function () { dataSheet.getRangeList(["B" + d1 + ":C" + d2]).setNumberFormat(_rfXH.DATETIME_FMT); }, dataSheet);
+      dinhDangAnToan_(function () { dataSheet.getRange("K" + d1 + ":K" + d2).setNumberFormat(_rfXH.DATE_FMT); }, dataSheet);
       dataSheet.getRangeList(["B" + d1 + ":C" + d2, "K" + d1 + ":K" + d2]).setHorizontalAlignment("center");
-      dinhDangAnToan_(function () { dataSheet.getRange("E" + d1 + ":G" + d2).setNumberFormat(_rfXH.SO_NGUYEN_FMT); });
-      dinhDangAnToan_(function () { dataSheet.getRangeList(["J" + d1 + ":J" + d2, "M" + d1 + ":M" + d2]).setNumberFormat(_rfXH.SO_THAP_PHAN_FMT); });
+      dinhDangAnToan_(function () { dataSheet.getRange("E" + d1 + ":G" + d2).setNumberFormat(_rfXH.SO_NGUYEN_FMT); }, dataSheet);
+      dinhDangAnToan_(function () { dataSheet.getRangeList(["J" + d1 + ":J" + d2, "M" + d1 + ":M" + d2]).setNumberFormat(_rfXH.SO_THAP_PHAN_FMT); }, dataSheet);
       dataSheet.getRangeList(["E" + d1 + ":G" + d2, "J" + d1 + ":J" + d2, "M" + d1 + ":M" + d2]).setHorizontalAlignment("right");
     }
 
@@ -5461,8 +5485,8 @@ function XH_ngayTuInput_(v) {
 // KL_MT, KL_BDMT (H..J) có phân cách 2 số lẻ, canh phải.
 function XH_dinhDangDongDonHang_(sheet, r) {
   const rf = REGION_FORMAT_();
-  dinhDangAnToan_(function () { sheet.getRangeList(["B" + r, "M" + r + ":N" + r]).setNumberFormat(rf.DATE_FMT).setHorizontalAlignment("center"); });
-  dinhDangAnToan_(function () { sheet.getRange("H" + r + ":J" + r).setNumberFormat(rf.SO_THAP_PHAN_FMT).setHorizontalAlignment("right"); });
+  dinhDangAnToan_(function () { sheet.getRangeList(["B" + r, "M" + r + ":N" + r]).setNumberFormat(rf.DATE_FMT).setHorizontalAlignment("center"); }, sheet);
+  dinhDangAnToan_(function () { sheet.getRange("H" + r + ":J" + r).setNumberFormat(rf.SO_THAP_PHAN_FMT).setHorizontalAlignment("right"); }, sheet);
 }
 
 // payload: {ngayDonHang, soTKHQ, tau, khachHang, diaChiKH, tenHangHoa, donGiaUSD,
@@ -5511,7 +5535,7 @@ function XH_saveDonHang_(payload) {
     // chuỗi số dài). Phải tính trước đúng dòng đích vì appendRow() không cho
     // biết trước dòng sẽ ghi vào.
     const targetRowDH = sheet.getLastRow() + 1;
-    dinhDangAnToan_(function () { sheet.getRange(targetRowDH, 3, 1, 1).setNumberFormat("@"); });
+    dinhDangAnToan_(function () { sheet.getRange(targetRowDH, 3, 1, 1).setNumberFormat("@"); }, sheet);
 
     // FIX (Sanitize): áp dụng sanitize() cho toàn bộ trường văn bản tự do (chống
     // Formula/CSV Injection - TRƯỚC ĐÂY module Xuất hàng không dùng sanitize()
@@ -5632,7 +5656,7 @@ function XH_updateDonHang_(rowIndex, payload, sttKyVong) {
     const sttCu = _dongCuDH[0];
 
     // FIX #17: Khóa Text cột Số TKHQ (cột C) TRƯỚC KHI ghi
-    dinhDangAnToan_(function () { sheet.getRange(r, 3, 1, 1).setNumberFormat("@"); });
+    dinhDangAnToan_(function () { sheet.getRange(r, 3, 1, 1).setNumberFormat("@"); }, sheet);
     // FIX (Sanitize): xem giải thích ở XH_saveDonHang phía trên.
     sheet.getRange(r, 1, 1, 16).setValues([[
       sttCu, new Date(payload.ngayDonHang), sanitize_(String(payload.soTKHQ || "").trim()), sanitize_(String(payload.tau || "").trim()),
@@ -6779,7 +6803,7 @@ function TC_suaPhieuNhap_(maChungTu, thongTin) {
       // (đơn giá, trạng thái, thành tiền) - không đụng U/V/W (Picture, Mã CT, Số CT).
       sheet.getRange(dong, 11, 1, 10).setValues([moi.slice(10, 20)]);
       sheet.getRange(dong, 24, 1, 3).setValues([moi.slice(23, 26)]);
-      dinhDangAnToan_(function () { sheet.getRangeList(["T" + dong, "X" + dong, "Z" + dong]).setNumberFormat("#,##0").setHorizontalAlignment("right"); });
+      dinhDangAnToan_(function () { sheet.getRangeList(["T" + dong, "X" + dong, "Z" + dong]).setNumberFormat("#,##0").setHorizontalAlignment("right"); }, sheet);
     } else {
       sheet.getRange(dong, 12, 1, 1).setValues([[kh]]);            // L - Khách hàng
       sheet.getRange(dong, 19, 1, 1).setValues([[moi[18]]]);       // S - lúc cập nhật

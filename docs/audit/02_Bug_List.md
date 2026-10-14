@@ -72,3 +72,7 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 
 ## Tra cứu phiếu cân nhập — bộ lọc "Trạng thái giá" (tính năng mới)
 - Ô chọn: Tất cả / Chưa đóng thanh toán (khác OK) / OK / Test giá / Lỗi ĐK/Báo giá / Chưa tính giá (trống). Lọc ở máy chủ (`TC_TRANG_THAI_GIA_`, `TC_dongNhapKhopBoLoc_`), dùng chung cho "Tính lại giá theo bộ lọc". Test: `test/traCuuTrangThaiGia.test.js`, `test/ui/giaoDien.test.js`.
+
+## TABLE-01b — Lỗi "typed column" vẫn bật ra sau bản sửa đầu (đã sửa)
+- Google gom lệnh ghi/định dạng, tới lúc đẩy thật (flush / hết lượt chạy) mới báo lỗi -> try/catch quanh lệnh không bắt được ("ScriptError" ở giao diện).
+- Sửa: `dinhDangAnToan_(viec, sheet)` hỏi Sheets API (`sheetCoBang_`, 1 lần/file/lượt) - sheet có Bảng thì không gửi lệnh định dạng; không hỏi được thì `SpreadsheetApp.flush()` ngay trong try. Test tái hiện lỗi muộn: `test/bangCoKieu.test.js`.
