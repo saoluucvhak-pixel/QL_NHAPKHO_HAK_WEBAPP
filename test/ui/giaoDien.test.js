@@ -158,3 +158,38 @@ test('Múi giờ hiển thị: giờ VN đổi sang múi giờ chọn (kể cả
   await b.close();
   assert.deepStrictEqual(r, ['25/07/2026 10:30', '26/07/2026 01:30:15', '25/07/2026', '25/07/2026 10:30', 'Lúc 25/07/2026 10:30:00 (VN)']);
 });
+
+test('Tra cứu phiếu cân nhập: ô "Trạng thái giá" lọc ngay khi đổi, gửi đúng mã lên máy chủ', { skip: !chromium && 'chưa có Playwright' }, async () => {
+  const b = await chromium.launch();
+  const kq = {};
+  try { // luôn đóng trình duyệt, kể cả khi lỗi (không treo bộ chạy test)
+  for (const rong of [1400, 390]) {
+    const pg = await b.newPage({ viewport: { width: rong, height: 900 } });
+    const loi = []; pg.on('pageerror', (e) => loi.push(e.message));
+    await pg.goto(taoTrang('VN'));
+    kq[rong] = await pg.evaluate(async () => {
+      _baoPhienSanSang('x'); __goi.length = 0;
+      const sel = document.getElementById('tcn_trangThaiGia');
+      const o = { luaChon: Array.from(sel.options).map((x) => x.value) };
+      sel.value = 'LOI'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((z) => setTimeout(z, 20));
+      const goi = __goi.filter((g) => g[1] === 'TC_traCuuPhieuNhap');
+      o.boLoc = goi.length ? goi[goi.length - 1][2][0] : null;
+      sel.value = ''; o.tatCa = tcBoLoc('tcn').trangThaiGia === undefined;
+      o.tranNgang = document.documentElement.scrollWidth > window.innerWidth;
+      return o;
+    });
+    kq[rong].loi = loi;
+    await pg.close();
+  }
+  } finally { await b.close(); }
+  for (const rong of [1400, 390]) {
+    const r = kq[rong];
+    assert.deepStrictEqual(r.luaChon, ['', 'CHUA_OK', 'OK', 'TEST', 'LOI', 'TRONG']);
+    assert.ok(r.boLoc && r.boLoc.trangThaiGia === 'LOI', JSON.stringify(r.boLoc));
+    assert.strictEqual(r.tatCa, true);
+    assert.strictEqual(r.tranNgang, false);
+    // STUB chung của file này không giả lập DN_layLinkDangNhap (màn đăng nhập lúc tải trang) - lỗi đã biết, không liên quan.
+    assert.deepStrictEqual(r.loi.filter((m) => !/DN_layLinkDangNhap/.test(m)), []);
+  }
+});

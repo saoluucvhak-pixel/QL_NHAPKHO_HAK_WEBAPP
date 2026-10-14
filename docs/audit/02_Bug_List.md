@@ -69,3 +69,6 @@ Trạng thái: ✅ Đã sửa + có test · ⏸ Chưa sửa (cần quyết đị
 ## TABLE-01 — "Xem toàn bộ lịch sử" báo lỗi "You can't set the number format of cells in a typed column" (đã sửa)
 - Sheet dữ liệu đã chuyển thành Bảng (Insert > Table) có cột gán kiểu thì Google không cho script đặt định dạng số; `BG_dinhDangBangHieuLuc_` (Baogia_DN_SAVE/FINAL) báo lỗi sau khi đã ghi dữ liệu -> cả thao tác báo lỗi.
 - Sửa: `dinhDangAnToan_` bỏ qua đúng lỗi này (Bảng tự hiển thị theo kiểu cột), áp cho mọi lệnh định dạng trên sheet dữ liệu thật (Phiếu cân, Báo giá, Kho dăm, Xuất hàng, Draft). Test: `test/bangCoKieu.test.js`.
+
+## Tra cứu phiếu cân nhập — bộ lọc "Trạng thái giá" (tính năng mới)
+- Ô chọn: Tất cả / Chưa đóng thanh toán (khác OK) / OK / Test giá / Lỗi ĐK/Báo giá / Chưa tính giá (trống). Lọc ở máy chủ (`TC_TRANG_THAI_GIA_`, `TC_dongNhapKhopBoLoc_`), dùng chung cho "Tính lại giá theo bộ lọc". Test: `test/traCuuTrangThaiGia.test.js`, `test/ui/giaoDien.test.js`.
