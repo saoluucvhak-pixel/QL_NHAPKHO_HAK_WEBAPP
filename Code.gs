@@ -79,6 +79,53 @@ function sheetCoBang_(sheet) {
     return SHEET_CO_BANG_[id].has(sheet.getSheetId());
   } catch (e) { return null; } // không xác định được -> dùng cách 2
 }
+// FIX TABLE-01c: ghi 1 giá trị NGÀY GIỜ (Date) bằng setValues thì Apps Script TỰ ĐỔI
+// định dạng ô sang dạng ngày - ở cột có kiểu của Bảng việc này bị chặn, báo đúng lỗi
+// "You can't set the number format of cells in a typed column" (kể cả khi không gọi
+// setNumberFormat). Với sheet là Bảng: đổi Date thành SỐ NGÀY của Google Sheets (số
+// ngày kể từ 30/12/1899 theo múi giờ của file - đúng cách Sheets lưu ngày bên trong);
+// ghi số không đổi định dạng ô, cột kiểu Ngày của Bảng vẫn hiển thị là ngày.
+function soNgaySheets_(d, tz) {
+  const p = Utilities.formatDate(d, tz, "yyyy-MM-dd-HH-mm-ss").split("-").map(Number);
+  return Date.UTC(p[0], p[1] - 1, p[2], p[3], p[4], p[5]) / 86400000 + 25569;
+}
+function giaTriChoBang_(giaTri, sheet) {
+  let tz = "";
+  try { tz = sheet.getParent().getSpreadsheetTimeZone(); } catch (e) { /* dùng múi giờ script */ }
+  if (!tz) tz = Session.getScriptTimeZone();
+  return giaTri.map(function (dong) {
+    return dong.map(function (v) { return (v instanceof Date && !isNaN(v.getTime())) ? soNgaySheets_(v, tz) : v; });
+  });
+}
+// Đọc ngày từ ô: Date giữ nguyên; SỐ NGÀY Sheets (ô của Bảng ghi bằng giaTriChoBang_
+// mà cột không gán kiểu Ngày) -> Date theo giờ của script; giá trị khác -> null.
+function ngayTuGiaTri_(v) {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === "number" && isFinite(v) && v > -1 && v < 2958466) {
+    const u = new Date(Math.round((v - 25569) * 86400000));
+    return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+  }
+  return null;
+}
+// Mốc thời gian (ms) của ô ngày - như new Date(v).getTime() cũ, thêm hiểu số ngày Sheets.
+function tsTuGiaTri_(v) { const d = ngayTuGiaTri_(v); return d ? d.getTime() : new Date(v).getTime(); }
+
+// Ghi giaTri vào vùng "vung" của sheet - an toàn cả khi sheet là Bảng có cột gán kiểu.
+function ghiAnToan_(sheet, vung, giaTri) {
+  const coBang = sheetCoBang_(sheet);
+  if (coBang === true) { vung.setValues(giaTriChoBang_(giaTri, sheet)); return; }
+  if (coBang === false) { vung.setValues(giaTri); return; }
+  // Không hỏi được Sheets API: ghi bình thường, ép đẩy ngay; gặp lỗi cột có kiểu thì ghi lại bằng số ngày.
+  const coFlush = typeof SpreadsheetApp !== "undefined" && SpreadsheetApp && typeof SpreadsheetApp.flush === "function";
+  if (coFlush) SpreadsheetApp.flush();
+  try { vung.setValues(giaTri); if (coFlush) SpreadsheetApp.flush(); }
+  catch (e) {
+    if (!/typed column/i.test(String((e && e.message) || e))) throw e;
+    vung.setValues(giaTriChoBang_(giaTri, sheet));
+    if (coFlush) SpreadsheetApp.flush();
+  }
+}
+
 function dinhDangAnToan_(viec, sheet) {
   const coBang = sheetCoBang_(sheet);
   if (coBang === true) return;               // sheet là Bảng: Bảng tự hiển thị theo kiểu cột
@@ -1350,7 +1397,7 @@ function _tsTrongKhoangHieuLuc_(ts, tuTS, denTS) {
 // ghi chú đồng bộ Liên kết dữ liệu trong runCalculatePrice_core_).
 function TG_docBaoGia_() {
   const ssBG = BG_ss_(); const sheetBG = ssBG.getSheetByName(CONFIG.SHEET_BAO_GIA); const rawDataBG = sheetBG.getDataRange().getValues();
-  return rawDataBG.slice(1).map(bg => { return { start: new Date(bg[1]).getTime(), end: new Date(bg[2]).getTime(), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
+  return rawDataBG.slice(1).map(bg => { return { start: tsTuGiaTri_(bg[1]), end: tsTuGiaTri_(bg[2]), keyQ: String(bg[3] || "").trim().toUpperCase(), minKl: parseFloat(bg[4]) || 0, maxKl: parseFloat(bg[5]) || 0, price: parseFloat(bg[6]) || 0 }; });
 }
 
 // PERF-TG-01: nhóm báo giá theo Mã ĐG 1 lần (giữ nguyên thứ tự dòng trong mỗi
@@ -2819,7 +2866,7 @@ function BG_getMaKLList_() {
     const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
     const result = data
       .map(r => ({
-        timestamp: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy HH:mm") : "",
+        timestamp: ngayTuGiaTri_(r[0]) ? dinhDangGMT7_(ngayTuGiaTri_(r[0]), "dd/MM/yyyy HH:mm") : "",
         maKL: r[1], klMinKg: parseFloat(r[2]) || 0, klMaxKg: parseFloat(r[3]) || 0
       }))
       .filter(r => String(r.maKL || "").trim() !== "");
@@ -2854,7 +2901,7 @@ function BG_addMaKL_(fields) {
       }
     }
     // Lưu KL_Min/KL_Max theo đúng quy ước hiện có trong sheet Ma_KL: đơn vị Kg
-    sheet.getRange(lastRow + 1, 1, 1, 4).setValues([[new Date(), maKL, klMinTan * 1000, klMaxTan * 1000]]);
+    ghiAnToan_(sheet, sheet.getRange(lastRow + 1, 1, 1, 4), [[new Date(), maKL, klMinTan * 1000, klMaxTan * 1000]]);
     const _rfKL = REGION_FORMAT_(); // Locale hệ thống: thời điểm canh giữa, KL Min/Max (kg) phân cách + canh phải
     dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 1).setNumberFormat(_rfKL.DATETIME_FMT).setHorizontalAlignment("center"); }, sheet);
     dinhDangAnToan_(function () { sheet.getRange(lastRow + 1, 3, 1, 2).setNumberFormat(_rfKL.SO_NGUYEN_FMT).setHorizontalAlignment("right"); }, sheet);
@@ -2911,9 +2958,9 @@ function BG_getQuoteList_() {
     const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
     const result = data
       .map(r => ({
-        ngayBaoGia: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy") : "",
+        ngayBaoGia: ngayTuGiaTri_(r[0]) ? dinhDangGMT7_(ngayTuGiaTri_(r[0]), "dd/MM/yyyy") : "",
         soBaoGia: r[1],
-        hieuLuc: (r[3] instanceof Date) ? dinhDangGMT7_(r[3], "dd/MM/yyyy HH:mm") : "",
+        hieuLuc: ngayTuGiaTri_(r[3]) ? dinhDangGMT7_(ngayTuGiaTri_(r[3]), "dd/MM/yyyy HH:mm") : "",
         idTam: r[4] || ""
       }))
       .filter(r => String(r.soBaoGia || "").trim() !== "");
@@ -3093,7 +3140,7 @@ function BG_getBaogiaRowByHash_(idBgct) {
       maList: maList,
       klCode: klCode,
       gia: gia,
-      hieuLuc: (hieuLuc instanceof Date) ? dinhDangGMT7_(hieuLuc, "yyyy-MM-dd'T'HH:mm") : "",
+      hieuLuc: ngayTuGiaTri_(hieuLuc) ? dinhDangGMT7_(ngayTuGiaTri_(hieuLuc), "yyyy-MM-dd'T'HH:mm") : "",
       soBaoGia: String(found[7] || "").trim(),
       editable: editCheck.editable,
       reason: editCheck.reason
@@ -3144,7 +3191,7 @@ function BG_updateBaogiaRow_(payload) {
     // không đổi giá trị/kết quả ghi.
     BG_dinhDangDongBaoGia_(sheet, sheetRow, 1);
     logAudit_("LICH_SU_SUA", "OK", "Báo giá " + idBgct + " | " + LS_thayDoi_(LS_COT_BAOGIA_, data[rowIndex].slice(1, 5), [hieuLucDate, maList.join(" , "), klCode, gia]));
-    sheet.getRange(sheetRow, 2, 1, 4).setValues([[
+    ghiAnToan_(sheet, sheet.getRange(sheetRow, 2, 1, 4), [[
       hieuLucDate,             // Cột B - Thời điểm hiệu lực
       maList.join(" , "),      // Cột C - Mã đơn giá
       klCode,                  // Cột D - Khối lượng_Tấn
@@ -3296,8 +3343,8 @@ function BG_getQuoteListWithStatus_() {
       }
       return {
         soBaoGia: soBaoGia,
-        ngayBaoGia: (r[0] instanceof Date) ? dinhDangGMT7_(r[0], "dd/MM/yyyy") : "",
-        hieuLuc: (r[3] instanceof Date) ? dinhDangGMT7_(r[3], "dd/MM/yyyy HH:mm") : "",
+        ngayBaoGia: ngayTuGiaTri_(r[0]) ? dinhDangGMT7_(ngayTuGiaTri_(r[0]), "dd/MM/yyyy") : "",
+        hieuLuc: ngayTuGiaTri_(r[3]) ? dinhDangGMT7_(ngayTuGiaTri_(r[3]), "dd/MM/yyyy HH:mm") : "",
         idTam: r[4] || "",
         soNhom: groups.length,
         deletable: deletable,
@@ -3404,7 +3451,7 @@ function BG_createQuote_(payload) {
     let userEmail = "";
     userEmail = layThongTinNguoiDungHienTai_().email || "";
 
-    qlSheet.getRange(qlLastRow + 1, 1, 1, 5).setValues([[ngayBaoGiaDate, soBaoGiaMoi, now, hieuLucDate, payload.idTam || ""]]);
+    ghiAnToan_(qlSheet, qlSheet.getRange(qlLastRow + 1, 1, 1, 5), [[ngayBaoGiaDate, soBaoGiaMoi, now, hieuLucDate, payload.idTam || ""]]);
     const _rfBG = REGION_FORMAT_(); // Locale hệ thống: ngày báo giá (A), lúc lập (C), hiệu lực (D) canh giữa
     dinhDangAnToan_(function () { qlSheet.getRange(qlLastRow + 1, 1).setNumberFormat(_rfBG.DATE_FMT); }, qlSheet);
     dinhDangAnToan_(function () { qlSheet.getRangeList(["C" + (qlLastRow + 1), "D" + (qlLastRow + 1)]).setNumberFormat(_rfBG.DATETIME_FMT); }, qlSheet);
@@ -3417,7 +3464,7 @@ function BG_createQuote_(payload) {
     logAudit_("BAOGIA_TAO", "OK", "Lập báo giá " + soBaoGiaMoi + ", hiệu lực " + LS_giaTri_(hieuLucDate) + " | "
       + groups.map(function (g) { return g.maList.join(",") + " / " + g.klCode + " = " + g.gia; }).join("; "));
     const _dongDauSrc = srcSheet.getLastRow() + 1;
-    srcSheet.getRange(_dongDauSrc, 1, rowsToAppend.length, 8).setValues(rowsToAppend);
+    ghiAnToan_(srcSheet, srcSheet.getRange(_dongDauSrc, 1, rowsToAppend.length, 8), rowsToAppend);
     BG_dinhDangDongBaoGia_(srcSheet, _dongDauSrc, rowsToAppend.length);
 
     const _canhBaoHeader = [kiemTraLechHeaderSheet_(qlSheet, "QL_BaoGia", 5), kiemTraLechHeaderSheet_(srcSheet, "Baogia_DN", 8)]; // BUG-002
@@ -3446,7 +3493,7 @@ function BG_updateHieuLuc_() {
     const result = BG_coreLogicProcessor_(blockedIDs);
     const activeRows = result.finalRows.filter(row => row[13] === "Còn hiệu lực");
     if (dst.getLastRow() > 1) dst.getRange(2, 1, dst.getLastRow() - 1, 14).clearContent();
-    if (activeRows.length > 0) { dst.getRange(2, 1, activeRows.length, 14).setValues(activeRows); BG_dinhDangBangHieuLuc_(dst, activeRows.length); }
+    if (activeRows.length > 0) { ghiAnToan_(dst, dst.getRange(2, 1, activeRows.length, 14), activeRows); BG_dinhDangBangHieuLuc_(dst, activeRows.length); }
     // PERF-BG-03: chỉ gắn editable/reason cho các dòng CÒN hiệu lực (đúng những dòng
     // trả về) - lọc finalRows và displayData theo CÙNG chỉ số để giữ khớp vị trí.
     const chiSo = [];
@@ -3463,7 +3510,7 @@ function BG_lamMoiSave_() {
   const save = BG_ss_().getSheetByName(BAOGIA_CONFIG.SAVE_SHEET);
   const result = BG_coreLogicProcessor_(new Set());
   if (save.getLastRow() > 1) save.getRange(2, 1, save.getLastRow() - 1, 14).clearContent();
-  if (result.finalRows.length > 0) { save.getRange(2, 1, result.finalRows.length, 14).setValues(result.finalRows); BG_dinhDangBangHieuLuc_(save, result.finalRows.length); }
+  if (result.finalRows.length > 0) { ghiAnToan_(save, save.getRange(2, 1, result.finalRows.length, 14), result.finalRows); BG_dinhDangBangHieuLuc_(save, result.finalRows.length); }
   return result;
 }
 // FIX (BUG-BG-01 - giá mới không được áp dụng): trước đây Baogia_DN_SAVE CHỈ được
@@ -3544,6 +3591,8 @@ function BG_coreLogicProcessor_(blockedIDs, srcDataGiaLap) {
     const id_goc = srcData[i][6]?.toString().trim() || "";
     if (blockedIDs.has(id_bg) || blockedIDs.has(id_goc)) continue;
 
+    const _tuNgay = ngayTuGiaTri_(srcData[i][1]); // Date, hoặc số ngày nếu Baogia_DN là Bảng (TABLE-01c)
+    if (_tuNgay) srcData[i][1] = _tuNgay;
     if (id_goc && srcData[i][1] instanceof Date && srcData[i][2]) {
       srcData[i][2].toString().split(",").forEach(m => {
         let kl = (srcData[i][3] || "0_999999").toString().split("_");
@@ -3639,7 +3688,7 @@ function BG_exportFileSmart_(dateStr, currentView, filteredIds) {
     const filterTS = new Date(dateStr + "T23:59:59+07:00").getTime();
 
     const filteredRaw = values.filter(r => {
-      const rDate = new Date(r[1]).getTime();
+      const rDate = tsTuGiaTri_(r[1]);
       return rDate <= filterTS && filteredIds.includes(r[0].toString());
     });
 
@@ -3656,7 +3705,7 @@ function BG_exportFileSmart_(dateStr, currentView, filteredIds) {
     const headers = ["STT", "MÃ", "DIỄN GIẢI", "ĐƠN GIÁ", "HIỆU LỰC TỪ", "HIỆU LỰC ĐẾN", "STATUS"];
     sheet.getRange(6, 1, 1, 7).setValues([headers]).setFontWeight("bold").setBackground("#B7B7B7").setHorizontalAlignment("center").setBorder(true, true, true, true, true, true);
 
-    const exportData = filteredRaw.map((r, index) => [index + 1, r[3], r[12], Number(r[6]) || 0, r[1], r[2], r[13]]);
+    const exportData = filteredRaw.map((r, index) => [index + 1, r[3], r[12], Number(r[6]) || 0, ngayTuGiaTri_(r[1]) || r[1], ngayTuGiaTri_(r[2]) || r[2], r[13]]);
     // Kết xuất: định dạng theo Locale Misa (ngày giữa, số phải, chữ trái) - XK_ghiBang_.
     XK_ghiBang_(sheet, 6, headers, exportData);
     sheet.getRange(7, 1, exportData.length, 7).setBorder(true, true, true, true, true, true);
