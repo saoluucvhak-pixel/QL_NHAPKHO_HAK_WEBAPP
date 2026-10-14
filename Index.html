@@ -1246,6 +1246,16 @@
               <div class="field" style="grid-column:span 2;"><label>Từ khóa</label><input id="tcn_tuKhoa" placeholder="Số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc, mã ĐG…"></div>
               <div class="field"><label>Từ ngày cân</label><input type="date" id="tcn_tuNgay"></div>
               <div class="field"><label>Đến ngày cân</label><input type="date" id="tcn_denNgay"></div>
+              <div class="field"><label>Trạng thái giá</label>
+                <select id="tcn_trangThaiGia">
+                  <option value="">Tất cả</option>
+                  <option value="CHUA_OK">Chưa đóng thanh toán (khác OK)</option>
+                  <option value="OK">OK (đã đóng thanh toán)</option>
+                  <option value="TEST">Test giá</option>
+                  <option value="LOI">Lỗi ĐK/Báo giá</option>
+                  <option value="TRONG">Chưa tính giá (trống)</option>
+                </select>
+              </div>
             </div>
             <div class="tc-nhanh" data-tc-nhanh="tcn">
               <button type="button" class="tc-chip" data-khoang="thangNay">Tháng này</button>
@@ -1737,6 +1747,7 @@
               <div class="guide-body">
                 <ul>
                   <li><b>Phiếu cân nhập</b>: gõ số phiếu, mã chứng từ, biển số, khách hàng, đại lý, nguồn gốc hoặc mã đơn giá (không cần gõ dấu) rồi bấm <b>Tìm</b> hoặc Enter. Mặc định tìm trong 90 ngày gần nhất; xóa trống 2 ô ngày để tìm toàn bộ, kể cả các năm đã khóa sổ (cột "Nơi lưu" cho biết phiếu đang ở sheet nào).</li>
+                  <li>Ô <b>Trạng thái giá</b>: lọc phiếu nhập theo cột Trạng thái giá - Chưa đóng thanh toán (khác OK), OK, Test giá, Lỗi ĐK/Báo giá, Chưa tính giá. Đổi lựa chọn là tìm lại ngay; nút "Tính lại giá … phiếu chưa đóng thanh toán" cũng chỉ áp dụng cho đúng các phiếu khớp lựa chọn này.</li>
                   <li>Nút lọc nhanh <b>Tháng này / Tháng trước / Quý này / Năm nay</b> tự điền khoảng ngày và tìm ngay; <b>✕ Bỏ lọc ngày</b> xóa 2 ô ngày để tìm toàn bộ.</li>
                   <li><b>Phiếu cân xuất</b>: tìm theo số phiếu, biển số, đơn vị vận chuyển, tài xế, số TKHQ, kho xuất/kho nhập.</li>
                   <li>Bấm vào 1 dòng (hoặc nút <b>🔍 Xem</b>) để mở <b>chi tiết phiếu</b>: thông tin chính + toàn bộ các cột trên sheet; phiếu nhập có nút <b>In Phiếu Nhập Kho</b>. Nút <b>🔍 Chi tiết</b> cũng có sẵn trên từng dòng của các báo cáo phiếu cân nhập/xuất.</li>
@@ -3339,12 +3350,17 @@
       });
     });
     function tcBoLoc(p){
-      return {
+      const bl = {
         tuKhoa: document.getElementById(p + '_tuKhoa').value.trim(),
         tuNgay: document.getElementById(p + '_tuNgay').value,
         denNgay: document.getElementById(p + '_denNgay').value
       };
+      const ttg = document.getElementById(p + '_trangThaiGia'); // chỉ tab Phiếu cân nhập có
+      if (ttg && ttg.value) bl.trangThaiGia = ttg.value;
+      return bl;
     }
+    // Đổi "Trạng thái giá" -> tìm lại ngay (giống nút lọc nhanh ngày).
+    document.getElementById('tcn_trangThaiGia').addEventListener('change', ()=>tcTimNhap());
     function tcGhiChu(p, res){
       document.getElementById(p + '_ghiChu').textContent = res.tongSoDong > res.data.length
         ? 'Tìm thấy ' + fmtNum(res.tongSoDong) + ' phiếu, đang hiển thị ' + fmtNum(res.data.length) + ' phiếu mới nhất - thu hẹp từ khóa hoặc khoảng ngày để xem các phiếu còn lại.'
@@ -3599,7 +3615,9 @@
     });
     document.getElementById('btnTinhLaiGiaLoat').addEventListener('click', async ()=>{
       const boLoc = state.tcBoLocNhap || {};
-      const moTa = [boLoc.tuKhoa ? 'từ khóa "' + boLoc.tuKhoa + '"' : '', boLoc.tuNgay ? 'từ ' + boLoc.tuNgay : '', boLoc.denNgay ? 'đến ' + boLoc.denNgay : ''].filter(Boolean).join(', ') || 'toàn bộ dữ liệu';
+      const oTtg = document.querySelector('#tcn_trangThaiGia option[value="' + (boLoc.trangThaiGia || '') + '"]');
+      const moTa = [boLoc.tuKhoa ? 'từ khóa "' + boLoc.tuKhoa + '"' : '', boLoc.tuNgay ? 'từ ' + boLoc.tuNgay : '', boLoc.denNgay ? 'đến ' + boLoc.denNgay : '',
+        boLoc.trangThaiGia && oTtg ? 'trạng thái giá: ' + oTtg.textContent : ''].filter(Boolean).join(', ') || 'toàn bộ dữ liệu';
       if (!confirm('Tính lại giá ' + fmtNum(state.tcSoChuaChot) + ' phiếu chưa đóng thanh toán (Trạng thái giá khác OK) khớp bộ lọc: ' + moTa + '?\n\nGiá tính theo báo giá hiệu lực tại ngày cân của từng phiếu. Phiếu đã OK không bị động tới.')) return;
       showOverlay('Đang tính lại giá hàng loạt…');
       try {

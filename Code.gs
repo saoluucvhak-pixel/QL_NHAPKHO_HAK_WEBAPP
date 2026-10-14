@@ -6368,7 +6368,18 @@ function TC_nguonPhieuNhap_(ss, tuNgay, denNgay) {
 const TC_COT_TIM_NHAP_ = [0, 5, 6, 11, 13, 14, 16, 21, 22, 26];
 // 1 dòng phiếu nhập có khớp bộ lọc Tra cứu không - DÙNG CHUNG cho tìm kiếm và
 // "Tính lại giá theo bộ lọc" để 2 chức năng luôn chọn đúng cùng 1 tập phiếu.
-function TC_dongNhapKhopBoLoc_(row, tuKhoa, kn) {
+// Bộ lọc "Trạng thái giá" (cột Y) ở Tra cứu phiếu nhập: mã gửi từ ô chọn -> điều kiện.
+const TC_TRANG_THAI_GIA_ = {
+  CHUA_OK: { nhan: "Chưa đóng thanh toán (khác OK)", khop: function (y) { return y !== "OK"; } },
+  OK: { nhan: "OK (đã đóng thanh toán)", khop: function (y) { return y === "OK"; } },
+  TEST: { nhan: "Test giá", khop: function (y) { return y === "Test giá"; } },
+  LOI: { nhan: "Lỗi ĐK/Báo giá", khop: function (y) { return y.indexOf("Lỗi") === 0; } },
+  TRONG: { nhan: "Chưa tính giá (trống)", khop: function (y) { return y === ""; } }
+};
+function TC_locTrangThaiGia_(ma) { return TC_TRANG_THAI_GIA_[String(ma || "").trim()] || null; }
+
+// ttg (tùy chọn) = TC_locTrangThaiGia_(...): lọc thêm theo Trạng thái giá (cột Y).
+function TC_dongNhapKhopBoLoc_(row, tuKhoa, kn, ttg) {
   if (!String(row[21] || "").trim() && !String(row[0] || "").trim()) return false; // dòng trống
   const ngay1 = row[1];
   if (kn.tu || kn.den) {
@@ -6376,10 +6387,12 @@ function TC_dongNhapKhopBoLoc_(row, tuKhoa, kn) {
     if (kn.tu && ngay1 < kn.tu) return false;
     if (kn.den && ngay1 > kn.den) return false;
   }
+  if (ttg && !ttg.khop(String(row[24] || "").trim())) return false;
   return TC_khopTuKhoa_(row, TC_COT_TIM_NHAP_, tuKhoa);
 }
 
-// boLoc = {tuKhoa, tuNgay, denNgay} (ngày dạng yyyy-MM-dd, có thể để trống)
+// boLoc = {tuKhoa, tuNgay, denNgay, trangThaiGia} (ngày dạng yyyy-MM-dd, có thể để
+// trống; trangThaiGia = mã trong TC_TRANG_THAI_GIA_, trống = tất cả)
 // PERF-TC-01: lượt 1 chỉ lọc + cộng tổng + lấy mốc thời gian để sắp xếp; chỉ
 // 500 dòng được trả về mới dựng đối tượng hiển thị (định dạng ngày giờ...).
 function TC_traCuuPhieuNhap_(boLoc) {
@@ -6387,6 +6400,7 @@ function TC_traCuuPhieuNhap_(boLoc) {
     boLoc = boLoc || {};
     const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
     const kn = TC_khoangNgay_(boLoc);
+    const ttg = TC_locTrangThaiGia_(boLoc.trangThaiGia);
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const khop = []; let tongKL = 0; let tongTien = 0; let soChuaChot = 0;
     TC_nguonPhieuNhap_(ss, boLoc.tuNgay, boLoc.denNgay).forEach(function (n) {
@@ -6394,7 +6408,7 @@ function TC_traCuuPhieuNhap_(boLoc) {
       if (lastRow <= 1) return;
       const dangTheoDoi = n.sheet.getName() === CONFIG.DATA_SHEET;
       n.sheet.getRange(2, 1, lastRow - 1, 27).getValues().forEach(function (row) {
-        if (!TC_dongNhapKhopBoLoc_(row, tuKhoa, kn)) return;
+        if (!TC_dongNhapKhopBoLoc_(row, tuKhoa, kn, ttg)) return;
         const choSua = dangTheoDoi && String(row[24] || "").trim() !== "OK";
         if (choSua) soChuaChot++;
         tongKL += parseFloat(row[9]) || 0; tongTien += parseFloat(row[25]) || 0;
@@ -6838,18 +6852,20 @@ function TC_tinhLaiGiaCacPhieu_(dsMaChungTu) {
 }
 
 // Tính lại giá HÀNG LOẠT: mọi phiếu CHƯA "OK" ở sheet đang theo dõi khớp đúng bộ
-// lọc Tra cứu (từ khóa + khoảng ngày) - kể cả phần vượt quá 500 dòng hiển thị.
+// lọc Tra cứu (từ khóa + khoảng ngày + trạng thái giá) - kể cả phần vượt quá 500 dòng hiển thị.
 function TC_tinhLaiGiaTheoBoLoc_(boLoc) {
   return TC_chayCoKhoa_(function () {
     boLoc = boLoc || {};
     const tuKhoa = TC_chuanHoa_(boLoc.tuKhoa);
     const kn = TC_khoangNgay_(boLoc);
-    const gia = runCalculatePrice_core_(function (r) { return TC_dongNhapKhopBoLoc_(r, tuKhoa, kn); });
+    const ttg = TC_locTrangThaiGia_(boLoc.trangThaiGia);
+    const gia = runCalculatePrice_core_(function (r) { return TC_dongNhapKhopBoLoc_(r, tuKhoa, kn, ttg); });
     if (gia.status !== "success") return gia;
     if (!gia.soPhieu) return { status: "success", message: "Không có phiếu chưa đóng thanh toán nào khớp bộ lọc để tính lại giá.", soPhieu: 0, soLoiBaoGia: 0 };
     const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName(CONFIG.DATA_SHEET);
     const soDraft = TC_dongBoDraftChuaTT_(sheet, gia.ketQua);
-    const moTaBoLoc = [boLoc.tuKhoa ? "từ khóa \"" + boLoc.tuKhoa + "\"" : "", boLoc.tuNgay ? "từ " + boLoc.tuNgay : "", boLoc.denNgay ? "đến " + boLoc.denNgay : ""].filter(Boolean).join(", ") || "toàn bộ";
+    const moTaBoLoc = [boLoc.tuKhoa ? "từ khóa \"" + boLoc.tuKhoa + "\"" : "", boLoc.tuNgay ? "từ " + boLoc.tuNgay : "", boLoc.denNgay ? "đến " + boLoc.denNgay : "",
+      ttg ? "trạng thái giá: " + ttg.nhan : ""].filter(Boolean).join(", ") || "toàn bộ";
     logAudit_("TINH_LAI_GIA", "OK", "Hàng loạt (" + moTaBoLoc + "): " + gia.soPhieu + " phiếu, " + gia.soLoiBaoGia + " phiếu Lỗi ĐK/Báo giá, cập nhật Draft " + soDraft + " phiếu.");
     return {
       status: "success",
